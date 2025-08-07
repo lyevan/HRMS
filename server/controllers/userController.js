@@ -136,6 +136,8 @@ export const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    console.log(await bcrypt.hash("admin", 10));
+
     if (!username || !password) {
       return res.status(400).json({
         success: false,

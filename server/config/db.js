@@ -6,11 +6,11 @@ dotenv.config();
 const { PGHOST, PGDATABASE, PGUSER, PGPASSWORD, PGPORT } = process.env;
 
 export const pool = new Pool({
-  host: PGHOST || "localhost",
+  host: PGHOST,
   database: PGDATABASE,
   user: PGUSER,
   password: PGPASSWORD,
-  port: PGPORT || 5432,
+  port: PGPORT,
 });
 
 export async function initDB() {
