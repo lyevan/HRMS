@@ -1,0 +1,52 @@
+These are all the routes available
+
+BASE_URL: http://localhost:3000
+
+- /api/attendance
+
+  [Admin management routes]
+  - GET /: Get all attendance records
+  - GET /today/:employee_id: Get today's attendance for an employee
+  - GET /status/:employee_id: Get the status of an employee
+  - GET /can-break/:employee_id: Check if an employee can take a break
+  - POST /manual-update/:employee_id: Manually update attendance for an employee
+
+  [Employee attendance routes]
+  - POST /clock-in: Clock in for an employee
+  - POST /clock-out: Clock out for an employee
+  - POST /break-start: Start break for an employee
+  - POST /break-end: End break for an employee
+
+- /api/employees
+
+  [Admin management routes]
+
+  - GET /: Get all employees
+  - GET /:id: Get a specific employee
+  - POST /: Create a new employee
+  - PUT /:id: Update an existing employee
+  - DELETE /:id: Delete an employee
+
+- /api/users
+
+  [Admin management routes]
+
+  - PUT /:id: Update user details
+  - DELETE /:id: Delete a user
+  - GET /: Get all users
+  - GET /:id: Get a specific user
+  - POST /: Register a new user
+
+  [Public routes]
+
+  - POST /login: Login a user
+
+- /api/rfid
+
+   [RFID enrollment routes (browser-based, no ESP32 auth needed)]
+   - POST /: Have a pending enrollment for an employee with a 30-second timeout
+    
+   [RFID attendance routes for ESP32 (require ESP32 authentication)]
+   - POST /clock: Clock in/out using RFID
+   - POST /break: Start/end break using RFID
+   - POST /enroll: Enroll an employee using RFID

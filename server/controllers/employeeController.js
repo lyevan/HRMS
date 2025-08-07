@@ -1,0 +1,252 @@
+import { pool } from "../config/db.js";
+import bcrypt from "bcryptjs";
+import { sendOnboardingEmail } from "./emailController.js";
+import dotenv from "dotenv";
+dotenv.config();
+
+export const getAllEmployees = async (req, res) => {
+  const { role } = req.user;
+  if (role !== "admin") {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+  try {
+    const result = await pool.query("SELECT * FROM employees ORDER BY id ASC");
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      "SELECT * FROM employees WHERE employee_id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error("Error fetching employee:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const generateEmployeeId = (counter) => {
+  const year = new Date().getFullYear();
+  const padded = String(counter).padStart(5, "0");
+  return `${year}-${padded}`; // e.g. "2025-00001"
+};
+
+const getNextEmployeeId = async () => {
+  const year = new Date().getFullYear();
+
+  const query = `
+    SELECT employee_id
+    FROM employees
+    WHERE employee_id LIKE $1
+    ORDER BY employee_id DESC
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [`${year}-%`]);
+
+  let counter = 1;
+  if (result.rows.length > 0) {
+    const lastId = result.rows[0].employee_id; // e.g., "2025-00137"
+    const lastNumber = parseInt(lastId.split("-")[1], 10); // 137
+    counter = lastNumber + 1;
+  }
+
+  return generateEmployeeId(counter); // returns "2025-00138"
+};
+
+export const createEmployee = async (req, res) => {
+  const { role } = req.user;
+  let allowedAccountTypes = [];
+
+  // Admin can create any account type
+  if (role == "admin") {
+    allowedAccountTypes = ["employee", "staff", "admin"];
+  }
+  // Staff can only create employee accounts
+  if (role == "staff") {
+    allowedAccountTypes = ["employee"];
+  }
+  try {
+    const {
+      first_name,
+      last_name,
+      email,
+      phone,
+      department,
+      position,
+      hourly_rate,
+      hire_date,
+      status = "active",
+      account_type = "employee",
+    } = req.body;
+
+    if (!allowedAccountTypes.includes(account_type)) {
+      return res.status(403).json({ success: false, message: "Only admins can create staff and other admin accounts" });
+    }
+
+    const requiredFields = {
+      first_name,
+      last_name,
+      email,
+      department,
+      position,
+      hourly_rate,
+    };
+
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    const employee_id = await getNextEmployeeId();
+
+    // 1. Insert into employees
+    const insertEmployeeQuery = `
+      INSERT INTO employees (
+        employee_id, first_name, last_name, email, phone, 
+        department, position, hourly_rate, hire_date, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING *
+    `;
+
+    const employeeValues = [
+      employee_id,
+      first_name,
+      last_name,
+      email,
+      phone,
+      department,
+      position,
+      hourly_rate,
+      hire_date,
+      status,
+    ];
+
+    const employeeResult = await pool.query(
+      insertEmployeeQuery,
+      employeeValues
+    );
+    const insertedEmployee = employeeResult.rows[0];
+
+    // 2. Insert into users table
+    const insertUserQuery = `
+      INSERT INTO users (employee_id, email, password, role, username)
+      VALUES ($1, $2, $3, $4, $5)
+    `;
+
+    const encryptedPassword = await bcrypt.hash(
+      insertedEmployee.employee_id.toString(),
+      10
+    );
+
+    const username = `${insertedEmployee.first_name
+      .toLowerCase()
+      .charAt(0)}${insertedEmployee.last_name.toLowerCase()}`;
+
+    const userValues = [
+      insertedEmployee.employee_id,
+      insertedEmployee.email,
+      encryptedPassword,
+      account_type,
+      username,
+    ];
+
+    await pool.query(insertUserQuery, userValues);
+    await sendOnboardingEmail({
+      to: insertedEmployee.email,
+      first_name: insertedEmployee.first_name,
+      employee_id: insertedEmployee.employee_id,
+      username,
+      position: insertedEmployee.position,
+      company_name: process.env.COMPANY_NAME,
+    });
+
+    console.log(
+      `Employee with position -${position}- created successfully.\nEmployee ID: ${employee_id}`
+    );
+    console.log(
+      `Employee account with role -${account_type}- created successfully.\nUsername: ${username}`
+    );
+    res.status(201).json({ success: true, data: insertedEmployee });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: error.message, data: error });
+  }
+};
+
+export const updateEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    if (Object.keys(updates).length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No fields to update" });
+    }
+
+    const keys = Object.keys(updates);
+    const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(", ");
+    const values = [...Object.values(updates), id];
+
+    const query = `
+      UPDATE employees 
+      SET ${setClause}
+      WHERE employee_id = $${values.length}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({ success: true, result: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteEmployee = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM employees WHERE employee_id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({ success: true, result: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

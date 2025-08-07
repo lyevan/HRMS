@@ -1,0 +1,83 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: all;
+  exclude: rootscrollgutter;
+}
+
+@plugin "daisyui/theme" {
+  name: "hr-corporate-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(0.98 0.005 260);
+  --color-base-200: oklch(0.94 0.004 260);
+  --color-base-300: oklch(0.88 0.003 260);
+  --color-base-content: oklch(0.18 0.01 260);
+  /* --color-primary: oklch(0.65 0.22 250); */
+  --color-primary: oklch(37% 0.146 265.522);
+  --color-primary-content: oklch(1 0 0);
+  --color-secondary: oklch(0.82 0.06 300);
+  --color-secondary-content: oklch(0.1 0.01 270);
+  --color-accent: oklch(0.75 0.16 200);
+  --color-accent-content: oklch(1 0 0);
+  --color-neutral: oklch(0.65 0.01 260);
+  --color-neutral-content: oklch(1 0 0);
+  --color-info: oklch(0.68 0.24 250);
+  --color-info-content: oklch(1 0 0);
+  --color-success: oklch(0.68 0.2 145);
+  --color-success-content: oklch(1 0 0);
+  --color-warning: oklch(0.78 0.22 80);
+  --color-warning-content: oklch(0.15 0.01 270);
+  --color-error: oklch(0.64 0.25 30);
+  --color-error-content: oklch(1 0 0);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "hr-corporate-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: oklch(0.12 0.005 260);
+  --color-base-200: oklch(0.18 0.005 260);
+  --color-base-300: oklch(0.24 0.005 260);
+  --color-base-content: oklch(0.98 0.01 260);
+  /* --color-primary: oklch(0.75 0.13 250); */
+  --color-primary: oklch(78% 0.11 265.522);
+  --color-primary-content: oklch(0.05 0.01 270);
+  --color-secondary: oklch(0.72 0.05 300);
+  --color-secondary-content: oklch(0.05 0.01 270);
+  --color-accent: oklch(0.78 0.12 200);
+  --color-accent-content: oklch(0.05 0.01 270);
+  --color-neutral: oklch(0.6 0.01 260);
+  --color-neutral-content: oklch(0.98 0.01 260);
+  --color-info: oklch(0.78 0.2 250);
+  --color-info-content: oklch(0.05 0.01 270);
+  --color-success: oklch(0.78 0.17 145);
+  --color-success-content: oklch(0.05 0.01 270);
+  --color-warning: oklch(0.85 0.18 80);
+  --color-warning-content: oklch(0.12 0.01 270);
+  --color-error: oklch(0.75 0.21 30);
+  --color-error-content: oklch(0.05 0.01 270);
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@theme {
+  --font-montserrat: "Montserrat", sans-serif;
+}
