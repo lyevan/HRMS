@@ -33,6 +33,7 @@ const Input = ({
           required={required}
           className="grow placeholder:text-base-content"
           placeholder={"Enter " + label.toLowerCase()}
+          autoComplete="off"
           onChange={onChange}
           step={step}
         />

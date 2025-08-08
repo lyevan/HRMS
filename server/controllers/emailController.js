@@ -45,6 +45,7 @@ const sendOnboardingEmail = async ({
   employee_id,
   username,
   position,
+  company_name,
 }) => {
   try {
     const result = await baseEmail({
@@ -56,6 +57,7 @@ const sendOnboardingEmail = async ({
         username,
         position,
         company_name,
+        portal_url: process.env.FRONTEND_URL || "http://localhost:5173",
       }),
     });
     console.log("Onboarding email sent successfully to:", to);

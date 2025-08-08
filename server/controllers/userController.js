@@ -33,12 +33,65 @@ export const getUser = async (req, res) => {
   }
 };
 
-export const verifyUser = (req, res) => {
+export const verifyUser = async (req, res) => {
   try {
-    res.status(200).send({ success: true, user: req.user });
+    // req.user contains the JWT payload: { id, username, role }
+    const { id: employee_id, username } = req.user;
+
+    // Always fetch fresh user data from database to ensure current role
+    const result = await pool.query(
+      "SELECT id, employee_id, username, email, role, created_at, updated_at FROM users WHERE employee_id = $1 AND username = $2",
+      [employee_id, username]
+    );
+
+    if (result.rows.length === 0) {
+      // User not found in database - token is invalid
+      return res.status(401).json({
+        success: false,
+        message: "User not found in database",
+      });
+    }
+
+    const dbUser = result.rows[0];
+
+    // Check if the role in JWT matches the role in database
+    if (req.user.role !== dbUser.role) {
+      // Role mismatch - someone may have changed user role or token is stale
+      return res.status(403).json({
+        success: false,
+        message: "Role mismatch detected. Please login again.",
+        requiresReauth: true,
+      });
+    }
+
+    // Optional: Check if user account is still active (if you have an active field)
+    // if (dbUser.status !== 'active') {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: "User account is inactive"
+    //   });
+    // }
+
+    // Return fresh user data from database (not from JWT)
+    res.status(200).json({
+      success: true,
+      user: {
+        id: dbUser.id,
+        employee_id: dbUser.employee_id,
+        username: dbUser.username,
+        email: dbUser.email,
+        role: dbUser.role,
+        created_at: dbUser.created_at,
+        updated_at: dbUser.updated_at,
+      },
+    });
   } catch (error) {
     console.log("Verification error:", error.message);
-    return res.status(500).send({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: "Verification failed",
+      error: error.message,
+    });
   }
 };
 
@@ -136,8 +189,6 @@ export const loginUser = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    console.log(await bcrypt.hash("admin", 10));
-
     if (!username || !password) {
       return res.status(400).json({
         success: false,
@@ -168,14 +219,17 @@ export const loginUser = async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      { id: user.employee_id, username: user.username, role: user.role },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: process.env.JWT_EXPIRATION,
-      }
-    );
+    const payload = {
+      id: user.employee_id,
+      username: user.username,
+      role: user.role,
+    };
 
+    console.log(payload);
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRATION,
+    });
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS in production
@@ -184,9 +238,19 @@ export const loginUser = async (req, res) => {
       path: "/", // Available on all routes
     });
 
-    res
-      .status(200)
-      .json({ success: true, username: user.username, role: user.role });
+    // Return user object that matches what verify endpoint returns
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        employee_id: user.employee_id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
     console.log("Login error:", error.message);

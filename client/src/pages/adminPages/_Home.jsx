@@ -46,12 +46,6 @@ const AdminHome = () => {
           name={"Total Employees"}
           value={employeeData.employeeCount}
         />
-        <DashCardSmall name={"Job Applicants"} value={23} />
-        <DashCardSmall
-          className="col-span-2 lg:col-span-1"
-          name={"Total Payroll"}
-          value={"₱153,055.50"}
-        />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import axios from "axios";
 import { Navigate, useNavigate } from "react-router";
 import { Eye, EyeOff } from "lucide-react";
 import useToastStore from "../store/toastStore";
+import LoadingSpinner from "./LoadingSpinner";
 
 const LoginForm = () => {
   const { login, isAuthenticated, user } = useUserSessionStore();
@@ -21,13 +22,14 @@ const LoginForm = () => {
   if (isAuthenticated()) {
     if (user?.role === "admin") {
       return <Navigate to="/dashboard/admin" replace />;
+    } else if (user?.role === "staff") {
+      return <Navigate to="/dashboard/staff" replace />;
     } else if (user?.role === "employee") {
       return <Navigate to="/dashboard/employee" replace />;
     }
     // Fallback redirect
     return <Navigate to="/auth" replace />;
   }
-
   const handleLogin = async () => {
     setIsLoading(true);
     setError("");
@@ -37,14 +39,28 @@ const LoginForm = () => {
         password: data.password,
       });
 
-      const userData = response.data.user || response.data;
+      // Extract user data from response
+      const userData = response.data.user;
+
+      if (!userData) {
+        throw new Error("Invalid response from server");
+      }
+
+      // Store user in Zustand
       login(userData);
 
-      if (userData?.role === "admin") {
+      // Navigate based on role
+      if (userData.role === "admin") {
         navigate("/dashboard/admin");
         showToast("Login successful!", "success");
-
-      } else if (userData?.role === "employee") {
+      } else if (userData.role === "staff") {
+        navigate("/dashboard/staff");
+        showToast("Login successful!", "success");
+      } else if (userData.role === "employee") {
+        navigate("/dashboard/employee");
+        showToast("Login successful!", "success");
+      } else {
+        // Fallback for unknown roles
         navigate("/dashboard/employee");
         showToast("Login successful!", "success");
       }
@@ -109,11 +125,7 @@ const LoginForm = () => {
           className="btn btn-primary w-full"
           disabled={isLoading}
         >
-          {isLoading ? (
-            <span className="loading loading-ring loading-sm text-accent"></span>
-          ) : (
-            "Login"
-          )}
+          {isLoading ? <LoadingSpinner /> : "Login"}
         </button>
       </form>
     </fieldset>

@@ -5,6 +5,7 @@ const OnboardingTemplate = ({
   position,
   company_name = "Your Company",
   email = "emplorehr@gmail.com",
+  portal_url = "http://localhost:5173",
 }) => {
   return `
       <!DOCTYPE html>

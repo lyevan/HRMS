@@ -1,25 +1,69 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
 import { useUserSessionStore } from "../store/userSessionStore";
+import LoadingSpinner from "./LoadingSpinner";
 
 const ProtectedRoute = ({ children, requiredRole = null }) => {
-  const user = useUserSessionStore((state) => state.user);
-  const isLoading = useUserSessionStore((state) => state.isLoading);
-  const isAuthenticated = useUserSessionStore((state) => state.isAuthenticated);
-  const hasRole = useUserSessionStore((state) => state.hasRole);
+  const { user, isLoading, checkAuthStatus, validateRole, isAuthenticated } =
+    useUserSessionStore();
+  const [isValidating, setIsValidating] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
-  if (isLoading) {
-    return <div>Loading...</div>;
+  useEffect(() => {
+    const validateAccess = async () => {
+      try {
+        // Always verify with server on route access
+        await checkAuthStatus();
+
+        const currentUser = useUserSessionStore.getState().user;
+
+        // Check if user is authenticated
+        if (!currentUser) {
+          setIsAuthorized(false);
+          return;
+        }
+
+        // If no specific role required, user is authorized
+        if (!requiredRole) {
+          setIsAuthorized(true);
+          return;
+        }
+
+        // Validate specific role with fresh server check
+        const hasValidRole = await validateRole(requiredRole);
+        setIsAuthorized(hasValidRole);
+      } catch (error) {
+        console.error("Access validation failed:", error);
+        setIsAuthorized(false);
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    validateAccess();
+  }, [requiredRole, checkAuthStatus, validateRole]);
+
+  // Show loading spinner while validating
+  if (isLoading || isValidating) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <LoadingSpinner />
+        <span className="ml-2">Verifying access...</span>
+      </div>
+    );
   }
 
+  // Redirect to login if not authenticated
   if (!isAuthenticated()) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
+  // Redirect to unauthorized if role check failed
+  if (requiredRole && !isAuthorized) {
     return <Navigate to="/unauthorized" replace />;
   }
 
+  // Render protected content
   return children;
 };
 

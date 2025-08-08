@@ -33,7 +33,10 @@ const PendingEmployeeForm = ({ isModalOpen, setIsModalOpen }) => {
       setIsModalOpen(false); // Close modal after successful submission
     } catch (error) {
       console.error("Error:", error);
-      showToast(error.response.data.message, "error");
+      showToast(
+        error.response.data.error || error.response.data.message,
+        "error"
+      );
     } finally {
       setIsLoading(false);
     }

@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   UserCircle2,
+  Building,
 } from "lucide-react";
 import { Navigate, useNavigate, useLocation } from "react-router";
 import { useTheme } from "../store/themeStore";
@@ -35,6 +36,7 @@ const Sidebar = () => {
     { name: "Home", path: "home", logo: <Home /> },
     { name: "Attendance", path: "attendance", logo: <CalendarClock /> },
     { name: "Employees", path: "employees", logo: <IdCardLanyard /> },
+    { name: "Organization", path: "organization", logo: <Building /> },
     { name: "Payroll", path: "payroll", logo: <CreditCard /> },
     { name: "Reports", path: "reports", logo: <ScrollText /> },
     {

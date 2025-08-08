@@ -1,10 +1,11 @@
 import express from "express";
 import { verifyInviteToken, verifyToken } from "../middleware/verifyToken.js";
-import { verifyStaff } from "../middleware/verifyRole.js";
+import { verifyStaff, verifyAdmin } from "../middleware/verifyRole.js";
 import {
   createPendingEmployee,
   returnEmploymentData,
   completeRegistration,
+  reviewPendingEmployee,
   approvePendingEmployee,
   rejectPendingEmployee,
   getAllPendingEmployees,
@@ -25,7 +26,9 @@ router.post(
   completeRegistration
 );
 router.get("/pending", verifyToken, verifyStaff, getAllPendingEmployees);
-router.patch("/approve-pending", approvePendingEmployee);
-router.patch("/reject-pending", rejectPendingEmployee);
+router.post("/review/:id", verifyToken, verifyStaff, reviewPendingEmployee);
+
+router.post("/approve", verifyToken, verifyAdmin, approvePendingEmployee);
+router.post("/reject", verifyToken, verifyStaff, rejectPendingEmployee);
 
 export default router;

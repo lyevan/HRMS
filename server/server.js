@@ -7,6 +7,7 @@ import userRoutes from "./routes/userRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
+import departmentRoutes from "./routes/departmentRoutes.js";
 import rfidRoutes from "./routes/rfidRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
@@ -39,6 +40,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/invite", invitationRoutes);
+app.use("/api/departments", departmentRoutes);
 
 app.get("/test-db", async (req, res) => {
   try {
@@ -47,13 +49,13 @@ app.get("/test-db", async (req, res) => {
       success: true,
       message: "Database connected successfully",
       time: result.rows[0].current_time,
-      host: process.env.PGHOST
+      host: process.env.PGHOST,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Database connection failed",
-      error: error.message
+      error: error.message,
     });
   }
 });

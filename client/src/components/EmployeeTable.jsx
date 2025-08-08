@@ -7,12 +7,10 @@ import {
   ShieldAlert,
   Info,
   SquarePen,
-  UserPlus,
 } from "lucide-react";
 import RFIDModal from "./RFIDModal";
 import Toast from "./Toast";
-import useToastStore from "../store/toastStore";
-import PendingEmployeeForm from "./forms/PendingEmployeeForm";
+import LoadingSpinner from "./LoadingSpinner";
 
 const PersonalInfo = ({ employee }) => {
   return (
@@ -53,21 +51,13 @@ const RFIDBadge = ({ rfid, clickHandler }) => {
     </button>
   );
 };
-const tabList = [
-  { name: "All Employees" },
-  { name: "Active Employees" },
-  { name: "Inactive Employees" },
-];
 
 const EmployeeTable = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [employeeData, setEmployeeData] = useState([]);
-  const [activeTab, setActiveTab] = useState("All Employees");
   const [isRFIDModalOpen, setIsRFIDModalOpen] = useState(false);
-  const [isPendingFormOpen, setIsPendingFormOpen] = useState(false);
   const [activeEmployee, setActiveEmployee] = useState({});
-
-  const { showToast } = useToastStore();
 
   useEffect(() => {
     setIsRefreshing(!isRefreshing);
@@ -75,9 +65,15 @@ const EmployeeTable = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch employee data from API
-      const result = await axios.get("/employees");
-      setEmployeeData(result.data.data);
+      setIsLoading(true);
+      try {
+        const result = await axios.get("/employees");
+        setEmployeeData(result.data.data);
+      } catch (error) {
+        console.error("Error fetching employee data:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchData();
@@ -88,16 +84,8 @@ const EmployeeTable = () => {
   };
 
   return (
-    <div>
+    <div className="w-full">
       <div className="flex justify-end items-center mb-4 gap-4">
-        <button
-          className="btn btn-primary"
-          onClick={() => setIsPendingFormOpen(true)}
-          aria-label="Add Pending Employee"
-          title="Add Pending Employee"
-        >
-          <UserPlus />
-        </button>
         <RefreshButton
           isRefreshing={isRefreshing}
           setIsRefreshing={setIsRefreshing}
@@ -108,24 +96,9 @@ const EmployeeTable = () => {
         isModalOpen={isRFIDModalOpen}
         setIsModalOpen={setIsRFIDModalOpen}
       />
-      <PendingEmployeeForm
-        isModalOpen={isPendingFormOpen}
-        setIsModalOpen={setIsPendingFormOpen}
-      />
+
       <Toast />
 
-      {/* <div role="tablist" className="tabs tabs-lift">
-        {tabList.map((tab) => (
-          <input
-            type="radio"
-            name={tab}
-            className="tab"
-            aria-label={tab.name}
-            onChange={() => setActiveTab(tab.name)}
-            checked={activeTab === tab.name}
-          />
-        ))}
-      </div> */}
       <div className="overflow-x-hidden sm:overflow-x-auto">
         <table className="table table-xs table-pin-rows table-pin-cols">
           <thead>
@@ -146,71 +119,81 @@ const EmployeeTable = () => {
             </tr>
           </thead>
           <tbody>
-            {employeeData?.map((employee) => (
-              <tr key={employee.employee_id}>
-                <th className="bg-base-200 border-b border-base-300 text-center">
-                  {employee.employee_id}
-                </th>
-                <td className="relative">
-                  <button
-                    className="absolute inset-0 sm:hidden"
-                    onClick={() => handleMoreInfo(employee)}
-                  ></button>
-                  <PersonalInfo employee={employee} />
-                  <dl className="sm:hidden mt-[0.3rem]">
-                    <dt className="sr-only">Position</dt>
-                    <dd className="text-[0.5rem] text-neutral sm:table-cell">
-                      {employee.position}
-                    </dd>
-                    <dt className="sr-only">Department</dt>
-                    <dd className="text-[0.5rem] text-neutral md:table-cell">
-                      {employee.department}
-                    </dd>
-                  </dl>
-                </td>
-                <td className="flex justify-center items-center pt-2">
-                  {
-                    <RFIDBadge
-                      rfid={employee.rfid}
-                      clickHandler={() => {
-                        setActiveEmployee(employee);
-                        setIsRFIDModalOpen(true);
-                      }}
-                    />
-                  }
-                </td>
-                <td className="hidden sm:table-cell">{employee.position}</td>
-                <td className="hidden md:table-cell">{employee.department}</td>
-                <td className="hidden lg:table-cell text-center">
-                  <div
-                    className={`badge font-semibold ${
-                      employee.status.toLowerCase() !== "active"
-                        ? "badge-warning"
-                        : "badge-success"
-                    }`}
-                  >
-                    {employee.status.charAt(0).toUpperCase() +
-                      employee.status.slice(1)}
-                  </div>
-                </td>
-                <td className="hidden sm:table-cell text-center space-x-1.5">
-                  <div className="tooltip tooltip-left" data-tip="More Info">
-                    <button
-                      className="text-accent cursor-pointer"
-                      onClick={() => handleMoreInfo(employee)}
-                    >
-                      <Info />
-                    </button>
-                  </div>
-                  <button
-                    className="text-warning cursor-pointer"
-                    onClick={() => handleMoreInfo(employee)}
-                  >
-                    <SquarePen />
-                  </button>
+            {isLoading ? (
+              <tr className="">
+                <td colSpan="7" className="text-center h-120">
+                  <LoadingSpinner />
                 </td>
               </tr>
-            ))}
+            ) : (
+              employeeData?.map((employee) => (
+                <tr key={employee.employee_id}>
+                  <th className="bg-base-200 border-b border-base-300 text-center">
+                    {employee.employee_id}
+                  </th>
+                  <td className="relative">
+                    <button
+                      className="absolute inset-0 sm:hidden"
+                      onClick={() => handleMoreInfo(employee)}
+                    ></button>
+                    <PersonalInfo employee={employee} />
+                    <dl className="sm:hidden mt-[0.3rem]">
+                      <dt className="sr-only">Position</dt>
+                      <dd className="text-[0.5rem] text-neutral sm:table-cell">
+                        {employee.position}
+                      </dd>
+                      <dt className="sr-only">Department</dt>
+                      <dd className="text-[0.5rem] text-neutral md:table-cell">
+                        {employee.department}
+                      </dd>
+                    </dl>
+                  </td>
+                  <td className="flex justify-center items-center pt-2">
+                    {
+                      <RFIDBadge
+                        rfid={employee.rfid}
+                        clickHandler={() => {
+                          setActiveEmployee(employee);
+                          setIsRFIDModalOpen(true);
+                        }}
+                      />
+                    }
+                  </td>
+                  <td className="hidden sm:table-cell">{employee.position}</td>
+                  <td className="hidden md:table-cell">
+                    {employee.department}
+                  </td>
+                  <td className="hidden lg:table-cell text-center">
+                    <div
+                      className={`badge font-semibold ${
+                        employee.status.toLowerCase() !== "active"
+                          ? "badge-warning"
+                          : "badge-success"
+                      }`}
+                    >
+                      {employee.status.charAt(0).toUpperCase() +
+                        employee.status.slice(1)}
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell text-center space-x-1.5">
+                    <div className="tooltip tooltip-left" data-tip="More Info">
+                      <button
+                        className="text-accent cursor-pointer"
+                        onClick={() => handleMoreInfo(employee)}
+                      >
+                        <Info />
+                      </button>
+                    </div>
+                    <button
+                      className="text-warning cursor-pointer"
+                      onClick={() => handleMoreInfo(employee)}
+                    >
+                      <SquarePen />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
