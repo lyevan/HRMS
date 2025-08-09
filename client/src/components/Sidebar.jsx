@@ -50,7 +50,7 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`relative bg-base-100 flex flex-col justify-center text-base-content h-screen pb-4 transition-all duration-75 ease-in-out border-r border-base-300 z-50 ${
+      className={`relative bg-base-100 flex flex-col justify-center text-base-content h-screen pb-4 transition-all duration-300 ease-in-out border-r border-base-300 z-50 ${
         isSidebarSmall ? `w-12 px-0` : "w-48 px-4"
       }`}
     >
@@ -86,7 +86,7 @@ const Sidebar = () => {
           ""
         ) : (
           <div className="w-auto h-full flex justify-start text-nowrap">
-            "IC Solutions"
+            IC Solutions
           </div>
         )}
       </div>
@@ -123,7 +123,7 @@ const Sidebar = () => {
                         : "justify-start gap-2 p-2"
                     }${
                       isActive
-                        ? " bg-primary text-primary-content pointer-events-none"
+                        ? " bg-primary font-bold text-primary-content pointer-events-none"
                         : ""
                     }`}
                   >

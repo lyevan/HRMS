@@ -111,8 +111,14 @@ const PendingEmployeeTable = () => {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan="7" className="text-center h-32">
+                <td colSpan="7" className="text-center h-120">
                   <LoadingSpinner />
+                </td>
+              </tr>
+            ) : employeeData.length === 0 ? (
+              <tr>
+                <td colSpan="7" className="text-center h-120">
+                  <h1 className="text-lg font-bold">No Pending Employees Found</h1>
                 </td>
               </tr>
             ) : (

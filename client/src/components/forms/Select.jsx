@@ -8,24 +8,31 @@ const Select = ({
   onChange,
   options = [],
   value = "",
+  placeholder = "Choose an option",
+  width = "",
 }) => {
   return (
-    <section className="flex flex-col gap-2">
-      <span className="label-text">
-        {!required ? (
-          label
-        ) : (
-          <>
-            {label} <span className="text-error">*</span>
-          </>
-        )}
-      </span>
-      <label className="select text-neutral pl-3 focus-within:ring-none focus-within:outline-none">
+    <section className="flex flex-col gap-2 justify-center">
+      {label && (
+        <span className="label-text">
+          {!required ? (
+            label
+          ) : (
+            <>
+              {label} <span className="text-error">*</span>
+            </>
+          )}
+        </span>
+      )}
+      <label
+        className="select items-center text-neutral pl-3 focus-within:ring-none focus-within:outline-none"
+        style={{ width }}
+      >
         {icon && (
           <span className="flex text-base-content items-center pr-2 z-50 border-r border-neutral">
             {icon}
           </span>
-        )}{" "}
+        )}
         <select
           className="grow validator text-base-content"
           name={name}
@@ -34,7 +41,7 @@ const Select = ({
           value={value}
         >
           <option disabled value={""}>
-            {`Choose ${label.toLowerCase()}`}
+            {label ? `Choose ${label.toLowerCase()}` : placeholder}
           </option>
           {options.map((option) => (
             <option key={option.value} value={option.value}>

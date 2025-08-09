@@ -45,11 +45,22 @@ export const addDepartment = async (req, res) => {
   }
 
   try {
+    // Check if department already exists
+    const existingDepartment = await pool.query(
+      "SELECT * FROM departments WHERE name = $1",
+      [name]
+    );
+    if (existingDepartment.rows.length > 0) {
+      return res.status(409).json({ message: "Department already exists" });
+    }
     const result = await pool.query(
       "INSERT INTO departments (name, description) VALUES ($1, $2) RETURNING *",
       [name, description]
     );
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json({
+      result: result.rows[0],
+      message: "Department added successfully",
+    });
   } catch (error) {
     console.error("Error adding department:", error);
     return res.status(500).json({ message: "Internal server error" });

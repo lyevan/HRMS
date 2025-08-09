@@ -2,13 +2,15 @@ import React from "react";
 import axios from "axios";
 import Input from "./Input";
 import Select from "./Select";
+import { capitalizeEachWord } from "../../utils/stringUtils";
 
-import { Building, BadgeInfo } from "lucide-react";
+import { BriefcaseBusiness, BadgeInfo } from "lucide-react";
 import useToastStore from "../../store/toastStore";
 
-const AddDepartment = ({ isModalOpen, setIsModalOpen }) => {
+const AddPosition = ({ isModalOpen, setIsModalOpen, department }) => {
   const [formData, setFormData] = React.useState({
     name: "",
+    department_id: department?.id,
     description: "",
   });
   const [isLoading, setIsLoading] = React.useState(false);
@@ -16,20 +18,23 @@ const AddDepartment = ({ isModalOpen, setIsModalOpen }) => {
   const handleSubmit = async () => {
     const submissionData = {
       name: formData.name.toLowerCase().trim(),
+      department_id: department?.id,
       description: formData.description.toLowerCase().trim(),
     };
     try {
       setIsLoading(true);
 
       console.log("Submitting form data:", submissionData);
-      const response = await axios.post("/departments", submissionData);
+      const response = await axios.post("/positions", submissionData);
       console.log("Response:", response.data);
       clearForm(); // Clear form fields after submission
-      showToast("Department added successfully!", "success");
+      showToast("Position added successfully!", "success");
       setIsModalOpen(false); // Close modal after successful submission
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Failed to add department.",
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to add position.",
         "error"
       );
     } finally {
@@ -59,13 +64,16 @@ const AddDepartment = ({ isModalOpen, setIsModalOpen }) => {
             }
           }}
         >
-          <h3 className="font-bold text-lg">Add Departments</h3>
+          <h3 className="font-bold text-lg">
+            Add Positions for{" "}
+            <strong>{capitalizeEachWord(department?.name)}</strong>
+          </h3>
           <p className="pt-4 pb-1 text-xs">Please fill in the details below:</p>
           <p className="pb-4 pl-2 text-error text-xs">* Required</p>
           <div className="fieldset grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              icon={<Building />}
-              label="Department Name"
+              icon={<BriefcaseBusiness />}
+              label="Position Name"
               name="name"
               type="text"
               value={formData.name}
@@ -113,4 +121,4 @@ const AddDepartment = ({ isModalOpen, setIsModalOpen }) => {
   );
 };
 
-export default AddDepartment;
+export default AddPosition;
