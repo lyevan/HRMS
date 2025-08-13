@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
+import { sendOTPEmail } from "./emailController.js";
 
 export const getAllUsers = async (req, res) => {
   try {
@@ -254,6 +255,169 @@ export const loginUser = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
     console.log("Login error:", error.message);
+  }
+};
+
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString(); // Generates a 6-digit OTP
+};
+
+export const sendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    // Check if user exists with this email
+    const userResult = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address",
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    // Store OTP in database (create table if not exists)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS otps (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(100) NOT NULL,
+        otp VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Delete any existing OTPs for this email
+    await pool.query("DELETE FROM otps WHERE email = $1", [email]);
+
+    // Store new OTP
+    await pool.query(
+      "INSERT INTO otps (email, otp, expires_at) VALUES ($1, $2, $3)",
+      [email, otp, expiresAt]
+    );
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail({ to: email, otp });
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email",
+        error: emailResult.error,
+      });
+    }
+
+    // Don't send OTP in response for security reasons
+    res.status(200).json({
+      success: true,
+      message: "OTP sent successfully to your email",
+      expiresIn: "10 minutes",
+    });
+  } catch (error) {
+    console.error("Send OTP error:", error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const verifyOTPAndLogin = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    // Check if OTP exists and is valid
+    const otpResult = await pool.query(
+      "SELECT * FROM otps WHERE email = $1 AND otp = $2 AND used = FALSE AND expires_at > NOW()",
+      [email, otp]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // Mark OTP as used
+    await pool.query(
+      "UPDATE otps SET used = TRUE WHERE email = $1 AND otp = $2",
+      [email, otp]
+    );
+
+    // Get user details
+    const userResult = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Create JWT payload (same as login function)
+    const payload = {
+      id: user.employee_id,
+      username: user.username,
+      role: user.role,
+    };
+
+    console.log("OTP Login payload:", payload);
+
+    // Generate JWT token (same as login function)
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRATION,
+    });
+
+    // Set cookie (same as login function)
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: process.env.COOKIE_EXPIRATION,
+      path: "/",
+    });
+
+    // Return user object (same format as login function)
+    res.status(200).json({
+      success: true,
+      message: "Login successful via OTP",
+      user: {
+        id: user.id,
+        employee_id: user.employee_id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      },
+    });
+  } catch (error) {
+    console.error("OTP verification error:", error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

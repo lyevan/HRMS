@@ -8,6 +8,8 @@ import {
   deleteUser,
   loginUser,
   logoutUser,
+  sendOTP,
+  verifyOTPAndLogin,
 } from "../controllers/userController.js";
 import verifyToken from "../middleware/verifyToken.js";
 import { verifyAdmin } from "../middleware/verifyRole.js";
@@ -25,5 +27,9 @@ router.delete("/:id", verifyToken, verifyAdmin, deleteUser);
 router.post("/login", loginUser);
 router.post("/logout", verifyToken, logoutUser);
 router.post("/verify", verifyToken, verifyUser);
+
+// OTP Authentication routes
+router.post("/send-otp", sendOTP);
+router.post("/verify-otp", verifyOTPAndLogin);
 
 export default router;

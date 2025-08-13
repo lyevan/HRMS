@@ -4,12 +4,16 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import OnboardingTemplate from "../templates/OnboardingTemplate.js";
 import InvitationTemplate from "../templates/InvitationTemplate.js";
+import OTPTemplate from "../templates/OTPTemplate.js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const company_name = process.env.COMPANY_NAME || "Your Company";
+const company_email =
+  process.env.COMPANY_EMAIL ||
+  `noreply@${company_name.trim().toLowerCase().replace(/\s+/g, "")}.com`;
 
 const baseEmail = async ({ to, subject, html }) => {
   const transport = nodemailer.createTransport({
@@ -21,8 +25,10 @@ const baseEmail = async ({ to, subject, html }) => {
   });
 
   const mailOptions = {
-    from: `"${company_name}" <${process.env.GMAIL_USER}>`,
-    replyTo: `noreply@${company_name}.com`,
+    from: `"${company_name}" <${company_email}>`,
+    replyTo: `noreply@${company_name.trim()
+      .toLowerCase()
+      .replace(/\s+/g, "")}.com`,
     to,
     subject: subject,
     html: html,
@@ -57,6 +63,7 @@ const sendOnboardingEmail = async ({
         username,
         position,
         company_name,
+        email: company_email,
         portal_url: process.env.FRONTEND_URL || "http://localhost:5173",
       }),
     });
@@ -76,6 +83,7 @@ const sendInvitationEmail = async ({ to, url }) => {
       html: InvitationTemplate({
         company_name,
         url,
+        email: company_email,
       }),
     });
     console.log("Invitation email sent successfully to:", to);
@@ -86,4 +94,19 @@ const sendInvitationEmail = async ({ to, url }) => {
   }
 };
 
-export { sendOnboardingEmail, sendInvitationEmail };
+const sendOTPEmail = async ({ to, otp }) => {
+  try {
+    const result = await baseEmail({
+      to,
+      subject: `Your OTP Code`,
+      html: OTPTemplate({ company_name, otp, email: company_email }),
+    });
+    console.log("OTP email sent successfully to:", to);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error("Error sending OTP email:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export { sendOnboardingEmail, sendInvitationEmail, sendOTPEmail };

@@ -127,6 +127,14 @@ const LoginForm = () => {
         >
           {isLoading ? <LoadingSpinner /> : "Login"}
         </button>
+        <p>or</p>
+        <button
+          type="button"
+          className="btn btn-accent w-full"
+          onClick={() => navigate("/auth/email-login")}
+        >
+          Login with Email
+        </button>
       </form>
     </fieldset>
   );

@@ -2,6 +2,8 @@ import React, { useEffect } from "react";
 import { Navigate } from "react-router";
 import { BrowserRouter, Routes, Route } from "react-router";
 import Authentication from "./pages/Authentication";
+import OTPLoginForm from "./components/OTPLoginForm";
+import ThemeSwitcher from "./components/ThemeSwitcher";
 import Unauthorized from "./pages/Unauthorized";
 import AdminDashboard from "./pages/adminPages/_AdminDashboard";
 import EmployeeDashboard from "./pages/employeePages/_EmployeeDashboard";
@@ -17,11 +19,6 @@ import { useTheme } from "./store/themeStore";
 import axios from "axios";
 import Toast from "./components/Toast";
 import useToastStore from "./store/toastStore";
-
-// Expose store to window for dev tools testing (remove in production)
-if (process.env.NODE_ENV === "development") {
-  window.useUserSessionStore = useUserSessionStore;
-}
 
 function App() {
   axios.defaults.baseURL = "http://192.168.254.107:3000/api";
@@ -45,6 +42,17 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/auth" replace />} />
           <Route path="/auth" element={<Authentication />} />
+          <Route
+            path="/auth/email-login"
+            element={
+              <div className="relative w-full h-full justify-center items-center flex flex-col">
+                <OTPLoginForm />
+                <div className="absolute bottom-4 left-4">
+                  <ThemeSwitcher />
+                </div>
+              </div>
+            }
+          />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route
             path="/registration-success"
