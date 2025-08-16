@@ -64,6 +64,7 @@ const ProtectedRoute = ({
     return <Navigate to="/auth" replace />;
   }
 
+  console.log("User session:", requiredRole, isAuthorized, user);
   // Redirect to unauthorized if role check failed
   if (requiredRole && !isAuthorized) {
     return <Navigate to="/unauthorized" replace />;

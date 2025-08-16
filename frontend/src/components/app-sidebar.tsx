@@ -20,6 +20,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "./ui/button";
 import { useUserSessionStore } from "@/store/userSessionStore";
@@ -84,8 +85,8 @@ export function AppSidebar() {
   const { logout } = useUserSessionStore();
   const navigate = useNavigate();
   return (
-    <Sidebar collapsible="icon">
-      <SidebarContent>
+    <Sidebar collapsible="icon" className="w-50 overflow-hidden">
+      <SidebarContent className="overflow-x-hidden">
         <SidebarGroup></SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>HRMS</SidebarGroupLabel>
@@ -104,7 +105,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
+        <SidebarSeparator className="transform -translate-x-2" />
         <SidebarGroup>
           <SidebarGroupLabel>Administration</SidebarGroupLabel>
           <SidebarGroupContent>

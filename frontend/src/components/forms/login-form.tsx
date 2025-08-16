@@ -2,17 +2,28 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
+
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+
 import {
   Mail,
   LockKeyhole,
   UserRound,
   LucideEyeClosed,
   LucideEye,
+  Check,
 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, Navigate } from "react-router";
+import { useNavigate } from "react-router";
 import axios from "axios";
 import { useUserSessionStore } from "@/store/userSessionStore";
+import Spinner from "../spinner";
 
 export function LoginForm({
   className,
@@ -22,24 +33,18 @@ export function LoginForm({
     username: "",
     password: "",
   });
+  const [email, setEmail] = useState("");
+  const [isEmailSent, setIsEmailSent] = useState(false);
+  const [otpFormData, setOtpFormData] = useState({
+    email: "",
+    otp: "",
+  });
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isEmailLogin, setIsEmailLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login, isAuthenticated, user } = useUserSessionStore();
+  const { login } = useUserSessionStore();
   const navigate = useNavigate();
-
-  // Redirect if already authenticated
-  if (isAuthenticated()) {
-    if (user?.role === "admin") {
-      return <Navigate to="/app/admin" replace />;
-    } else if (user?.role === "staff") {
-      return <Navigate to="/app/staff" replace />;
-    } else if (user?.role === "employee") {
-      return <Navigate to="/app/employee" replace />;
-    }
-    // Fallback redirect
-    return <Navigate to="/auth" replace />;
-  }
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -60,20 +65,16 @@ export function LoginForm({
       // Store user in Zustand
       login(userData);
 
-      // Navigate based on role
+      console.log("User logged in:", userData); // Navigate based on role
       if (userData.role === "admin") {
-        navigate("/dashboard/admin");
-       
+        navigate("/app/admin");
       } else if (userData.role === "staff") {
-        navigate("/dashboard/staff");
-
+        navigate("/app/staff");
       } else if (userData.role === "employee") {
-        navigate("/dashboard/employee");
-     
+        navigate("/app/employee");
       } else {
         // Fallback for unknown roles
-        navigate("/dashboard/employee");
-    
+        navigate("/app/employee");
       }
     } catch (error) {
       console.error("Login failed:", error);
@@ -88,12 +89,80 @@ export function LoginForm({
       setIsLoading(false);
     }
   };
+
+  const handleOtpLogin = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await axios.post("/users/verify-otp", {
+        email: otpFormData.email,
+        otp: otpFormData.otp,
+      });
+
+      // Extract user data from response
+      const userData = response.data.user;
+
+      if (!userData) {
+        throw new Error("Invalid response from server");
+      }
+
+      // Store user in Zustand
+      login(userData);
+
+      if (userData.role === "admin") {
+        navigate("/app/admin");
+      } else if (userData.role === "staff") {
+        navigate("/app/staff");
+      } else if (userData.role === "employee") {
+        navigate("/app/employee");
+      } else {
+        // Fallback for unknown roles
+        navigate("/app/employee");
+      }
+    } catch (error) {
+      console.error("OTP login failed:", error);
+      setError(
+        (typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as any).response?.data?.message) ||
+          "OTP login failed. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailSend = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post("/users/send-otp", {
+        email,
+      });
+      if (response.data.success) {
+        setIsEmailSent(true);
+        setOtpFormData({ ...otpFormData, email });
+        setError("");
+      } else {
+        throw new Error("Failed to send OTP");
+      }
+    } catch (error) {
+      console.error("Error sending email:", error);
+      setError(
+        (typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          (error as any).response?.data?.message) ||
+          "Failed to send email. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <form
-      className={cn(
-        "flex flex-col gap-6 border border-secondary/50 shadow-xs shadow-secondary drop rounded p-4",
-        className
-      )}
+      className={cn("flex flex-col gap-6", className)}
       {...props}
       onSubmit={(e) => {
         e.preventDefault();
@@ -101,93 +170,193 @@ export function LoginForm({
       }}
     >
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-xl font-[Lato] font-bold self-start 2xl:text-2xl">
-          Login to your Account
+        <h1 className="text-2xl font-medium font-[Lato]">
+          Login to your account
         </h1>
+        <p className="text-muted-foreground text-sm text-balance">
+          Enter your {isEmailLogin ? "email" : "username"} below to login to
+          your account
+        </p>
       </div>
-      <div className="grid gap-2 font-[Lato]">
-        <div className="grid gap-3">
-          <Label htmlFor="username" className="font-normal 2xl:text-lg">
-            Username
-          </Label>
-          <label className="relative h-10 w-full flex flex-col items-center justify-center">
-            <UserRound className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
-            <Input
-              id="username"
-              type="text"
-              value={formData.username}
-              onChange={(e) =>
-                setFormData({ ...formData, username: e.target.value })
-              }
-              placeholder="Enter your username"
-              className="pl-12 pr-3 py-2 text-md w-full border border-secondary rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6E23DD] focus:border-transparent 2xl:text-lg 2xl:h-12"
-              required
-              autoComplete="none"
-            />
-          </label>
-        </div>
-        <div className="grid gap-3">
-          <div className="flex items-center">
-            <Label htmlFor="password" className="font-normal 2xl:text-lg">
-              Password
-            </Label>
+      {!isEmailLogin ? (
+        <div className="grid gap-6">
+          <div className="grid gap-3">
+            <Label htmlFor="username">Username</Label>
+            <label className="relative h-10 w-full flex flex-col items-center justify-center">
+              <UserRound className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
+              <Input
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
+                placeholder="Enter your username"
+                className="pl-12 pr-3 py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
+                required
+              />
+            </label>
           </div>
-          <label className="relative h-10 w-full flex flex-col items-center justify-center">
-            <LockKeyhole className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
-            {!isPasswordVisible ? (
-              <LucideEyeClosed
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10"
-                onClick={() => setIsPasswordVisible(true)}
+          <div className="grid gap-3">
+            <div className="flex items-center">
+              <Label htmlFor="password">Password</Label>
+              <a
+                href="#"
+                className="ml-auto text-sm underline-offset-4 hover:underline"
+              >
+                Forgot your password?
+              </a>
+            </div>
+            <label className="relative h-10 w-full flex flex-col items-center justify-center">
+              <LockKeyhole className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
+              {!isPasswordVisible ? (
+                <LucideEyeClosed
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10"
+                  onClick={() => setIsPasswordVisible(true)}
+                />
+              ) : (
+                <LucideEye
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10"
+                  onClick={() => setIsPasswordVisible(false)}
+                />
+              )}
+              <Input
+                id="password"
+                type={isPasswordVisible ? "text" : "password"}
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                required
+                placeholder="Enter your password"
+                className="pl-12 pr-3 py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
               />
-            ) : (
-              <LucideEye
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10"
-                onClick={() => setIsPasswordVisible(false)}
-              />
+            </label>
+          </div>
+          {error && (
+            <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
+          <Button
+            type="submit"
+            className="w-full cursor-pointer"
+            disabled={isLoading}
+          >
+            {isLoading ? "Logging in..." : "Login"}
+          </Button>
+          <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+            <span className="bg-background text-muted-foreground relative z-10 px-2">
+              Or continue with
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 w-full">
+          <div className="grid gap-3 w-full">
+            <Label htmlFor="email">Email</Label>
+            <label className="relative h-10 w-full flex flex-col items-center justify-center">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
+              {!isEmailSent ? (
+                <div
+                  className="absolute cursor-pointer font-[Lato] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
+                  onClick={() => {
+                    handleEmailSend();
+                  }}
+                >
+                  {isLoading ? <Spinner /> : "Send OTP"}
+                </div>
+              ) : (
+                <div
+                  className="absolute cursor-pointer font-[Lato] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
+                  onClick={() => {
+                    handleEmailSend();
+                  }}
+                >
+                  <Check className="inline mr-1 text-primary" />
+                </div>
+              )}
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="pl-12 pr-3 py-2 text-md w-full border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1"
+                required
+              ></Input>
+            </label>
+            {isEmailSent && (
+              <div className="flex items-center justify-center w-full">
+                <InputOTP
+                  maxLength={6}
+                  pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+                  required
+                  value={otpFormData.otp}
+                  onChange={(value) =>
+                    setOtpFormData({ ...otpFormData, otp: value })
+                  }
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot
+                      index={0}
+                      className="border-b-4 border-primary border-b-primary focus:bg-primary"
+                    />
+
+                    <InputOTPSlot
+                      index={1}
+                      className="border-b-4 border-primary border-b-primary"
+                    />
+                    <InputOTPSlot
+                      index={2}
+                      className="border-b-4 border-primary border-b-primary"
+                    />
+                    <InputOTPSlot
+                      index={3}
+                      className="border-b-4 border-primary border-b-primary"
+                    />
+                    <InputOTPSlot
+                      index={4}
+                      className="border-b-4 border-primary border-b-primary"
+                    />
+                    <InputOTPSlot
+                      index={5}
+                      className="border-b-4 border-primary border-b-primary"
+                    />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
             )}
-            <Input
-              id="password"
-              type={isPasswordVisible ? "text" : "password"}
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              required
-              placeholder="Enter your password"
-              className="pl-12 pr-3 py-2  text-md w-full border border-secondary rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-[#6E23DD] focus:border-transparent 2xl:text-lg 2xl:h-12"
-              autoComplete="none"
-            />
-          </label>
+          </div>
+          {error && (
+            <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
         </div>
-        <a
-          href="#"
-          className="ml-auto text-xs font-bold underline-offset-4 underline 2xl:text-sm"
-        >
-          Forgot Password?
-        </a>
-        {error && (
-          <div className="text-red-500 text-sm text-center">{error}</div>
-        )}
-        <Button
-          type="submit"
-          className="w-full font-bold 2xl:text-lg 2xl:h-12 "
-          disabled={isLoading}
-        >
-          {isLoading ? "Logging in..." : "Login"}
-        </Button>
-        <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
-          <span className="bg-background text-foreground font-bold relative z-10 px-2 2xl:text-base">
-            Or
-          </span>
-        </div>
+      )}
+
+      {!isEmailLogin ? (
         <Button
           variant="outline"
-          className="w-full bg-secondary text-secondary-foreground font-bold 2xl:text-lg 2xl:h-12"
+          className="w-full border-primary hover:bg-primary/10 cursor-pointer"
+          onClick={() => {
+            setIsEmailLogin(!isEmailLogin);
+            setFormData({ username: "", password: "" });
+          }}
         >
           <Mail />
-          Sign in with Email
+          Login with Email
         </Button>
-      </div>
+      ) : (
+        <Button
+          variant="outline"
+          className="w-full bg-primary text-primary-foreground hover:text-primary-foreground hover:bg-primary/90 cursor-pointer"
+          disabled={!isEmailSent || isLoading || !otpFormData.otp}
+          onClick={() => {
+            handleOtpLogin();
+          }}
+        >
+          <Mail />
+          Login with Email
+        </Button>
+      )}
     </form>
   );
 }
