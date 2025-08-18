@@ -55,7 +55,7 @@ function App() {
                     <Route path="schedule" element={<div>Schedule Page</div>} />
                     <Route
                       path="pending"
-                      element={<div>Pending Applications</div>}
+                      element={<div>Pending Employee Applications</div>}
                     />
                     <Route path="settings" element={<div>Settings Page</div>} />
                   </Routes>
