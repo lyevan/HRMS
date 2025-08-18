@@ -18,6 +18,7 @@ import {
   LucideEyeClosed,
   LucideEye,
   Check,
+  ChevronLeft,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -170,7 +171,12 @@ export function LoginForm({
       }}
     >
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-medium font-[Lato]">
+        <h1 className={`text-2xl font-medium font-[Lato] flex flex-row items-center w-full ${isEmailLogin ? "justify-start" : "justify-center"}`}>
+          {isEmailLogin && (
+            <span className="justify-self-start mr-6" onClick={() => setIsEmailLogin(false)}>
+              <ChevronLeft />
+            </span>
+          )}
           Login to your account
         </h1>
         <p className="text-muted-foreground text-sm text-balance">
@@ -286,7 +292,9 @@ export function LoginForm({
             </label>
             {isEmailSent && (
               <div className="flex flex-col items-center justify-center w-full">
-                <h1 className="font-normal font-[Lato] my-4">Enter the OTP sent to your email</h1>
+                <h1 className="font-normal font-[Lato] my-4">
+                  Enter the OTP sent to your email
+                </h1>
                 <InputOTP
                   maxLength={6}
                   pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
