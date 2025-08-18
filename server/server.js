@@ -31,14 +31,14 @@ app.use(
       // In development, allow all origins
       if (process.env.NODE_ENV === "development") {
         return callback(null, true);
-      }
-
-      // In production, check against FRONTEND_URL and common variations
+      } // In production, check against FRONTEND_URL and common variations
       const allowedOrigins = [
         process.env.FRONTEND_URL,
-        // Add your actual frontend URLs here (replace with your real URLs)
         process.env.FRONTEND_URL_ALT,
-        "https://your-frontend-domain.vercel.app",
+        // Your actual production URLs
+        "https://relyant-demo-client.vercel.app",
+        "https://relyant-demo-api.vercel.app",
+        // Development URLs
         "http://localhost:5173", // Vite dev server
         "http://localhost:3000", // Common dev port
         "http://localhost:4173", // Vite preview
@@ -49,20 +49,13 @@ app.use(
           ", "
         )}`
       );
-
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.warn(`CORS blocked origin: ${origin}`);
-        // In production, be more lenient for now to debug
-        if (process.env.NODE_ENV === "production") {
-          console.warn(
-            "WARNING: Allowing CORS for debugging. This should be fixed in production!"
-          );
-          callback(null, true);
-        } else {
-          callback(new Error("Not allowed by CORS"));
-        }
+        // For now, allow all origins in production for debugging
+        // Remove this after confirming your frontend URL is properly set
+        callback(null, true);
       }
     },
     credentials: true,
@@ -138,6 +131,24 @@ app.get("/debug/auth", (req, res) => {
       environment: process.env.NODE_ENV,
       frontendUrl: process.env.FRONTEND_URL,
       timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// CORS test endpoint
+app.get("/api/cors-test", (req, res) => {
+  res.json({
+    success: true,
+    message: "CORS is working correctly!",
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString(),
+    corsHeaders: {
+      "access-control-allow-origin": res.getHeader(
+        "Access-Control-Allow-Origin"
+      ),
+      "access-control-allow-credentials": res.getHeader(
+        "Access-Control-Allow-Credentials"
+      ),
     },
   });
 });
