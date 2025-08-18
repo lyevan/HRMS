@@ -9,9 +9,13 @@ import ProtectedRoute from "./components/protected-route";
 import { Toaster } from "./components/ui/sonner";
 import { useUserSessionStore } from "./store/userSessionStore";
 import { useEffect } from "react";
+import config, { validateEnvironment } from "./lib/config";
 
 function App() {
-  axios.defaults.baseURL = "http://192.168.254.100:3000/api";
+  // Validate environment variables and configure axios
+  validateEnvironment();
+
+  axios.defaults.baseURL = config.api.baseUrl;
   axios.defaults.withCredentials = true;
 
   const { initialize } = useUserSessionStore();
