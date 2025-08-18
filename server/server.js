@@ -30,17 +30,17 @@ app.use((req, res, next) => {
 
   console.log(`🔍 Request from origin: ${origin}`);
   console.log(`📋 Allowed origins: ${allowedOrigins.join(", ")}`);
-
-  // Set CORS headers for allowed origins
+  // Set CORS headers for allowed origins only
   if (allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
     console.log(`✅ Origin allowed: ${origin}`);
-  } else if (!origin) {
-    // Allow requests with no origin (Postman, mobile apps, etc.)
+  } else if (!origin && process.env.NODE_ENV === "development") {
+    // Only allow no-origin requests in development (Postman, etc.)
     res.header("Access-Control-Allow-Origin", "*");
-    console.log(`✅ No origin - allowing all`);
+    console.log(`✅ Dev mode - no origin allowed`);
   } else {
     console.log(`❌ Origin blocked: ${origin}`);
+    // Don't set CORS headers for blocked origins
   }
 
   res.header("Access-Control-Allow-Credentials", "true");

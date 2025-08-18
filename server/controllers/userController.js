@@ -178,7 +178,7 @@ export const logoutUser = (req, res) => {
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
       path: "/",
     });
     res.status(200).json({ success: true, message: "Logged out successfully" });
@@ -220,24 +220,28 @@ export const loginUser = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Invalid credentials" });
     }
-
     const payload = {
       id: user.employee_id,
       username: user.username,
       role: user.role,
     };
 
-    console.log(payload);
+    // Only log payload in development for security
+    if (process.env.NODE_ENV === "development") {
+      console.log("Login payload:", payload);
+    }
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRATION,
     });
+
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS in production
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Allow cross-site cookies in production
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax", // More secure in production
       maxAge: process.env.COOKIE_EXPIRATION, // 7 days
       path: "/", // Available on all routes
+      domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Let browser handle domain
     });
 
     // Return user object that matches what verify endpoint returns
