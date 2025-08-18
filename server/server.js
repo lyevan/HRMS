@@ -22,54 +22,18 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 
 // Enhanced CORS configuration for production
+// Simplified CORS for production
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-
-      // In development, allow all origins
-      if (process.env.NODE_ENV === "development") {
-        return callback(null, true);
-      } // In production, check against FRONTEND_URL and common variations
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        process.env.FRONTEND_URL_ALT,
-        // Your actual production URLs
-        "https://relyant-demo-client.vercel.app",
-        "https://relyant-demo-api.vercel.app",
-        // Development URLs
-        "http://localhost:5173", // Vite dev server
-        "http://localhost:3000", // Common dev port
-        "http://localhost:4173", // Vite preview
-      ].filter(Boolean);
-
-      console.log(
-        `Checking origin: ${origin} against allowed: ${allowedOrigins.join(
-          ", "
-        )}`
-      );
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn(`CORS blocked origin: ${origin}`);
-        // For now, allow all origins in production for debugging
-        // Remove this after confirming your frontend URL is properly set
-        callback(null, true);
-      }
-    },
+    origin: [
+      "https://relyant-demo-client.vercel.app",
+      "http://localhost:5173",
+      process.env.FRONTEND_URL
+    ].filter(Boolean),
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cookie",
-      "Set-Cookie",
-      "Access-Control-Allow-Credentials",
-      "X-Requested-With",
-    ],
-    exposedHeaders: ["Set-Cookie"],
-    optionsSuccessStatus: 200, // For legacy browser support
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    exposedHeaders: ["Set-Cookie"]
   })
 );
 
