@@ -13,36 +13,94 @@ import rfidRoutes from "./routes/rfidRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
 import { pool } from "./config/db.js";
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
-app.use(express.json());
+// CORS Configuration - MUST BE FIRST!
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
 
-// Enhanced CORS configuration for production
-// Simplified CORS for production
-app.use(
-  cors({
-    origin: [
+    const allowedOrigins = [
       "https://relyant-demo-client.vercel.app",
       "http://localhost:5173",
-      process.env.FRONTEND_URL
-    ].filter(Boolean),
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
-    exposedHeaders: ["Set-Cookie"]
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
+
+    console.log(`🔍 CORS Check - Origin: ${origin}`);
+    console.log(`📋 Allowed origins: ${allowedOrigins.join(", ")}`);
+
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ Origin allowed: ${origin}`);
+      return callback(null, true);
+    } else {
+      console.log(`❌ Origin blocked: ${origin}`);
+      return callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cookie",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  exposedHeaders: ["Set-Cookie"],
+  optionsSuccessStatus: 200,
+};
+
+// Apply CORS before any other middleware
+app.use(cors(corsOptions));
+
+// Explicit preflight handler
+app.options("*", (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://relyant-demo-client.vercel.app",
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+
+  console.log(`🚀 Preflight request from: ${origin}`);
+
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type,Authorization,Cookie,X-Requested-With,Accept,Origin"
+    );
+    res.header("Access-Control-Max-Age", "86400");
+    console.log(`✅ Preflight response sent for: ${origin}`);
+    return res.status(200).end();
+  } else {
+    console.log(`❌ Preflight blocked for: ${origin}`);
+    return res.status(403).end();
+  }
+});
+
+// Other middlewares AFTER CORS
+app.use(express.json());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
+app.use(morgan("dev"));
+app.use(cookieParser());
 
-// Handle preflight requests
-app.options("*", cors());
-app.use(helmet()); // For security (HTTP Headers)
-app.use(morgan("dev")); // For request logging
-app.use(cookieParser()); // For parsing cookies
-
+// Rest of your routes...
 app.get("/", (req, res) => {
   res.send("Hello from the backend");
 });
