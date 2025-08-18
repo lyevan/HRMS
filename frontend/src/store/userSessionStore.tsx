@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import axios from "axios";
 import { toast } from "sonner";
+import config from "@/lib/config";
 
 interface User {
   id: string;
@@ -66,16 +67,46 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
 
     set({ isLoading: true });
     try {
-      const response = await axios.post("/users/verify");
+      // Add debug logging for production
+      if (config.isProduction) {
+        console.log("Production auth check:", {
+          baseURL: axios.defaults.baseURL,
+          withCredentials: axios.defaults.withCredentials,
+          currentPath,
+        });
+      }
+
+      const response = await axios.post(
+        "/users/verify",
+        {},
+        {
+          timeout: 10000, // 10 second timeout
+          withCredentials: true, // Ensure credentials are sent
+        }
+      );
+
       if (response.data && response.data.success) {
         // Store fresh user data from database verification
         set({ user: response.data.user, isLoading: false });
+        if (config.isProduction) {
+          console.log("Production auth success:", response.data.user.role);
+        }
       } else {
         console.log("No user data in response");
         set({ user: null, isLoading: false });
       }
     } catch (error: any) {
       console.log("User not authenticated:", error.message);
+
+      // Enhanced error logging for production debugging
+      if (config.isProduction) {
+        console.error("Production auth error details:", {
+          status: error.response?.status,
+          message: error.response?.data?.message || error.message,
+          baseURL: axios.defaults.baseURL,
+          withCredentials: axios.defaults.withCredentials,
+        });
+      }
 
       // Check if it's a role mismatch requiring re-authentication
       if (error.response?.data?.requiresReauth) {

@@ -18,6 +18,35 @@ function App() {
   axios.defaults.baseURL = config.api.baseUrl;
   axios.defaults.withCredentials = true;
 
+  // Add request interceptor for production debugging
+  if (config.isProduction) {
+    axios.interceptors.request.use(
+      (config) => {
+        console.log(`Making request to: ${config.baseURL}${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error("Request error:", error);
+        return Promise.reject(error);
+      }
+    );
+
+    axios.interceptors.response.use(
+      (response) => {
+        return response;
+      },
+      (error) => {
+        console.error("Response error:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          message: error.response?.data?.message || error.message,
+          url: error.config?.url,
+        });
+        return Promise.reject(error);
+      }
+    );
+  }
+
   const { initialize } = useUserSessionStore();
 
   // Initialize authentication check on app load
