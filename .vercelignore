@@ -1,0 +1,40 @@
+# Development files
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (keep only what's needed)
+.env.local
+.env.development
+.env.test
+
+# Build outputs from other projects
+frontend/build
+frontend/dist
+frontend/node_modules
+client/dist
+client/node_modules
+backend/dist
+backend/node_modules
+
+# Development tools
+.vscode
+.idea
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation and guides
+README.md
+*.md
+!package.json
+
+# Test files
+*.test.js
+*.spec.js
+
+# TypeScript backend (we're deploying legacy server)
+backend/
