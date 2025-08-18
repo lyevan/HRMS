@@ -285,7 +285,8 @@ export function LoginForm({
               ></Input>
             </label>
             {isEmailSent && (
-              <div className="flex items-center justify-center w-full">
+              <div className="flex flex-col items-center justify-center w-full">
+                <h1 className="font-normal font-[Lato] my-4">Enter the OTP sent to your email</h1>
                 <InputOTP
                   maxLength={6}
                   pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
