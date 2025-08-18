@@ -180,7 +180,6 @@ export const logoutUser = (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? undefined : undefined,
     });
     res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (error) {
@@ -190,7 +189,7 @@ export const logoutUser = (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
-    const { username, password } = req.body;  
+    const { username, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -232,13 +231,13 @@ export const loginUser = async (req, res) => {
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRATION,
-    });    res.cookie("token", token, {
+    });
+    res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS in production
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Allow cross-site cookies in production
       maxAge: process.env.COOKIE_EXPIRATION, // 7 days
       path: "/", // Available on all routes
-      domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Let browser handle domain
     });
 
     // Return user object that matches what verify endpoint returns
@@ -392,14 +391,13 @@ export const verifyOTPAndLogin = async (req, res) => {
     // Generate JWT token (same as login function)
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRATION,
-    });    // Set cookie (same as login function)
+    }); // Set cookie (same as login function)
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: process.env.COOKIE_EXPIRATION,
       path: "/",
-      domain: process.env.NODE_ENV === "production" ? undefined : undefined,
     });
 
     // Return user object (same format as login function)
