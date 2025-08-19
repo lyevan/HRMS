@@ -6,7 +6,13 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { TrendingUp, UserPlusIcon, Megaphone, FileCheck2, BanknoteArrowUp } from "lucide-react";
+import {
+  TrendingUp,
+  UserPlusIcon,
+  Megaphone,
+  FileCheck2,
+  BanknoteArrowUp,
+} from "lucide-react";
 import { Pie, PieChart } from "recharts";
 import { useState } from "react";
 
@@ -87,6 +93,7 @@ const Dashboard = () => {
   ];
   return (
     <>
+      {/* Add Employee Modal */}
       <Modal
         open={open}
         setOpen={setOpen}
@@ -95,6 +102,13 @@ const Dashboard = () => {
       >
         <AddEmployeeForm setOpen={setOpen} />
       </Modal>
+
+      {/* TODO Quick announce Modal */}
+
+      {/* TODO Approve Leave Modal */}
+
+      {/* TODO Run Payroll Modal */}
+
       <div className="flex flex-col w-full gap-4">
         <Card className="w-40 max-h-full">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
