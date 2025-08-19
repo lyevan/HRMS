@@ -84,26 +84,21 @@ export const createEmployee = async (req, res) => {
       first_name,
       last_name,
       email,
-      phone,
-      department,
-      position,
-      hourly_rate,
-      hire_date,
       status = "active",
       account_type = "employee",
     } = req.body;
 
     if (!allowedAccountTypes.includes(account_type)) {
-      return res.status(403).json({ success: false, message: "Only admins can create staff and other admin accounts" });
+      return res.status(403).json({
+        success: false,
+        message: "Only admins can create staff and other admin accounts",
+      });
     }
 
     const requiredFields = {
       first_name,
       last_name,
       email,
-      department,
-      position,
-      hourly_rate,
     };
 
     const missingFields = Object.entries(requiredFields)
@@ -122,24 +117,12 @@ export const createEmployee = async (req, res) => {
     // 1. Insert into employees
     const insertEmployeeQuery = `
       INSERT INTO employees (
-        employee_id, first_name, last_name, email, phone, 
-        department, position, hourly_rate, hire_date, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        employee_id, first_name, last_name, email, status
+      ) VALUES ($1,$2,$3,$4,$5)
       RETURNING *
     `;
 
-    const employeeValues = [
-      employee_id,
-      first_name,
-      last_name,
-      email,
-      phone,
-      department,
-      position,
-      hourly_rate,
-      hire_date,
-      status,
-    ];
+    const employeeValues = [employee_id, first_name, last_name, email, status];
 
     const employeeResult = await pool.query(
       insertEmployeeQuery,
@@ -176,12 +159,14 @@ export const createEmployee = async (req, res) => {
       first_name: insertedEmployee.first_name,
       employee_id: insertedEmployee.employee_id,
       username,
-      position: insertedEmployee.position,
+      position: insertedEmployee.position
+        ? insertedEmployee.position
+        : "Employee",
       company_name: process.env.COMPANY_NAME,
     });
 
     console.log(
-      `Employee with position -${position}- created successfully.\nEmployee ID: ${employee_id}`
+      `Employee with position -${"Employee"}- created successfully.\nEmployee ID: ${employee_id}`
     );
     console.log(
       `Employee account with role -${account_type}- created successfully.\nUsername: ${username}`

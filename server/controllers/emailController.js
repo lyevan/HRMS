@@ -26,7 +26,8 @@ const baseEmail = async ({ to, subject, html }) => {
 
   const mailOptions = {
     from: `"${company_name}" <${company_email}>`,
-    replyTo: `noreply@${company_name.trim()
+    replyTo: `noreply@${company_name
+      .trim()
       .toLowerCase()
       .replace(/\s+/g, "")}.com`,
     to,
@@ -34,8 +35,8 @@ const baseEmail = async ({ to, subject, html }) => {
     html: html,
     attachments: [
       {
-        filename: "emplore-light.png",
-        path: path.join(__dirname, "../assets/images/emplore-light.png"),
+        filename: "company-logo.png",
+        path: path.join(__dirname, "../assets/images/company-logo.png"),
         cid: "companylogo",
       },
     ],
@@ -64,7 +65,8 @@ const sendOnboardingEmail = async ({
         position,
         company_name,
         email: company_email,
-        portal_url: process.env.FRONTEND_URL || "http://localhost:5173",
+        portal_url:
+          process.env.FRONTEND_URL + "/auth" || "http://localhost:5173/auth",
       }),
     });
     console.log("Onboarding email sent successfully to:", to);

@@ -10,6 +10,9 @@ import { Toaster } from "./components/ui/sonner";
 import { useUserSessionStore } from "./store/userSessionStore";
 import { useEffect } from "react";
 import config, { validateEnvironment } from "./lib/config";
+import LandingLayout from "./pages/public/layout";
+import { Landing } from "./pages/public/landing";
+import { useIsMobile } from "./hooks/use-mobile";
 
 function App() {
   // Validate environment variables and configure axios
@@ -48,6 +51,7 @@ function App() {
   }
 
   const { initialize } = useUserSessionStore();
+  const isMobile = useIsMobile();
 
   // Initialize authentication check on app load
   useEffect(() => {
@@ -56,13 +60,40 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Toaster richColors expand={true} position="top-right" />
+      <Toaster
+        richColors
+        expand={false}
+        position={isMobile ? "bottom-center" : "top-right"}
+      />
       <div className="min-h-screen bg-background">
         <Routes>
           {/* Root redirect */}
-          <Route path="/" element={<Navigate to="/auth" replace />} />
+          <Route path="/" element={<Navigate to="/home" />} />
+          <Route
+            path="/home"
+            element={
+              <LandingLayout>
+                <Landing
+                  heading="Outsource and Consultancy Services"
+                  subheading=""
+                  description="Unlock seamless business operations with our expert outsourcing services. We help streamline your processes, reduce costs, and drive efficiency, so you can focus on what matters most, growing your business."
+                  buttons={{
+                    primary: {
+                      text: "Inquire Now",
+                      url: "",
+                    },
+                  }}
+                  image={{
+                    src: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-7-tall.svg",
+                    alt: "Placeholder",
+                  }}
+                />
+              </LandingLayout>
+            }
+          />
 
           {/* Public routes */}
+
           <Route path="/auth" element={<LoginPage />} />
           <Route
             path="/unauthorized"
@@ -76,7 +107,11 @@ function App() {
               <ProtectedRoute requiredRole="admin">
                 <AdminLayout>
                   <Routes>
-                    <Route index element={<Dashboard />} />
+                    <Route
+                      path="/"
+                      element={<Navigate to="dashboard" replace />}
+                    />
+                    <Route path="dashboard" element={<Dashboard />} />
                     <Route path="employees" element={<EmployeesPage />} />
                     <Route path="attendance" element={<AttendancePage />} />
                     <Route

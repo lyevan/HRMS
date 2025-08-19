@@ -24,9 +24,9 @@ const OnboardingTemplate = ({
                       <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
 
                           <!-- Header -->
-                          <div style="background-color:#1a368b; padding: 40px 20px; text-align: center;">
+                          <div style="background-color:#ffffff; padding: 40px 20px; text-align: center;">
                               <img src="cid:companylogo" alt="${company_name} Logo" style="width: 180px; height: auto; margin-bottom: 20px;">
-                              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Welcome to the Team!</h1>
+                              <h1 style="color: #333333; margin: 0; font-size: 28px;">Welcome to the Team!</h1>
                           </div>
 
                           <!-- Content -->
@@ -51,7 +51,7 @@ const OnboardingTemplate = ({
                               </p>
 
                               <!-- Employee Details Card -->
-                              <div style="background-color: #f8f9fa; border-left: 4px solid #1a368b; padding: 20px; margin: 20px 0;">
+                              <div style="background-color: #f8f9fa; border-left: 4px solid #2C666E; padding: 20px; margin: 20px 0;">
                                   <h3 style="color: #333333; margin-top: 0;">Your Employee Details</h3>
                                   <table style="width: 100%; border-collapse: collapse;">
                                       <tr>
@@ -81,8 +81,8 @@ const OnboardingTemplate = ({
 
                               <!-- CTA Button -->
                               <div style="text-align: center; margin: 30px 0;">
-                                  <a href="${portal_url}" style="background-color:#1a368b; 
-                    color: #ffffff; 
+                                  <a href="${portal_url}" style="background-color:#FFBF3F; 
+                    color: #171717; 
                     text-decoration: none; 
                     padding: 15px 30px; 
                     border-radius: 5px; 

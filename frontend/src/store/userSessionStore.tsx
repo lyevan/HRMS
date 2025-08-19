@@ -56,6 +56,12 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
       "/unauthorized",
       "/public",
       "/reset-password",
+      "/home",
+      "/about",
+      "/services",
+      "/pricing",
+      "/testimonials",
+      "/contact", 
     ];
     const currentPath = window.location.pathname;
 

@@ -41,7 +41,7 @@ export const verifyUser = async (req, res) => {
 
     // Always fetch fresh user data from database to ensure current role
     const result = await pool.query(
-      "SELECT id, employee_id, username, email, role, created_at, updated_at FROM users WHERE employee_id = $1 AND username = $2",
+      "SELECT employee_id, username, email, role, created_at, updated_at FROM users WHERE employee_id = $1 AND username = $2",
       [employee_id, username]
     );
 
@@ -77,7 +77,6 @@ export const verifyUser = async (req, res) => {
     res.status(200).json({
       success: true,
       user: {
-        id: dbUser.id,
         employee_id: dbUser.employee_id,
         username: dbUser.username,
         email: dbUser.email,
@@ -248,7 +247,6 @@ export const loginUser = async (req, res) => {
     res.status(200).json({
       success: true,
       user: {
-        id: user.id,
         employee_id: user.employee_id,
         username: user.username,
         email: user.email,
@@ -409,7 +407,6 @@ export const verifyOTPAndLogin = async (req, res) => {
       success: true,
       message: "Login successful via OTP",
       user: {
-        id: user.id,
         employee_id: user.employee_id,
         username: user.username,
         email: user.email,
