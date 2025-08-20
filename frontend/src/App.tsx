@@ -2,7 +2,7 @@ import AdminLayout from "./pages/admin/layout";
 import LoginPage from "./pages/authentication";
 import Dashboard from "./pages/admin/dashboard";
 import EmployeesPage from "./pages/admin/employees";
-import AttendancePage from "./pages/admin/attendance";
+import TimekeepingPage from "./pages/admin/timekeeping";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import axios from "axios";
 import ProtectedRoute from "./components/protected-route";
@@ -113,7 +113,7 @@ function App() {
                     />
                     <Route path="dashboard" element={<Dashboard />} />
                     <Route path="employees" element={<EmployeesPage />} />
-                    <Route path="attendance" element={<AttendancePage />} />
+                    <Route path="timekeeping" element={<TimekeepingPage />} />
                     <Route
                       path="departments"
                       element={<div>Departments Page</div>}

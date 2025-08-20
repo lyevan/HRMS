@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
 import { useUserSessionStore } from "../store/userSessionStore";
+import DashboardSkeleton from "../pages/dashboard-skeleton";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -53,9 +54,10 @@ const ProtectedRoute = ({
   // Show loading spinner while validating
   if (isLoading || isValidating) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <span className="ml-2">Verifying access... {user?.name}</span>
-      </div>
+      // <div className="flex justify-center items-center h-screen">
+      //   <span className="ml-2">Verifying access... {user?.name}</span>
+      // </div>
+      <DashboardSkeleton />
     );
   }
 

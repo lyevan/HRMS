@@ -1,28 +1,36 @@
 import {
-  Calendar,
   LayoutDashboard,
   Users,
-  UserCheck,
   Settings,
-  Building2,
   ClipboardList,
   DollarSign,
   Clock,
+  ChevronRight,
+  Network,
+  LayoutList,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
+  // SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Button } from "../ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+// import { Button } from "../ui/button";
 import { useUserSessionStore } from "@/store/userSessionStore";
 import { useNavigate, useLocation } from "react-router";
 
@@ -37,18 +45,45 @@ const items = [
   },
   {
     title: "Employees",
-    url: `${baseUrl}/employees`,
+    children: [
+      {
+        title: "Dashboard",
+        url: `${baseUrl}/emp/dashboard`,
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Employee List",
+        url: `${baseUrl}/emp/e`,
+        icon: LayoutList,
+      },
+      {
+        title: "Organization",
+        url: `${baseUrl}/emp/organization`,
+        icon: Network,
+      },
+    ],
     icon: Users,
   },
   {
-    title: "Attendance",
-    children: [],
+    title: "Timekeeping",
+    children: [
+      {
+        title: "Dashboard",
+        url: `${baseUrl}/tk/dashboard`,
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Attendance List",
+        url: `${baseUrl}/tk/attendance-list`,
+        icon: Clock,
+      },
+      {
+        title: "Leave Requests",
+        url: `${baseUrl}/tk/leave-requests`,
+        icon: ClipboardList,
+      },
+    ],
     icon: Clock,
-  },
-  {
-    title: "Departments",
-    url: `${baseUrl}/departments`,
-    icon: Building2,
   },
   {
     title: "Payroll",
@@ -56,38 +91,44 @@ const items = [
     icon: DollarSign,
   },
   {
-    title: "Requests",
-    url: `${baseUrl}/requests`,
+    title: "ATS",
+    children: [
+      {
+        title: "Job Postings",
+        url: `${baseUrl}/ats/jobs`,
+        icon: ClipboardList,
+      },
+      {
+        title: "Applications",
+        url: `${baseUrl}/ats/applications`,
+        icon: Users,
+      },
+    ],
+    icon: BriefcaseBusiness,
+  },
+  {
+    title: "Reports",
+    url: `${baseUrl}/reports`,
     icon: ClipboardList,
-  },
-  {
-    title: "Schedule",
-    url: `${baseUrl}/schedule`,
-    icon: Calendar,
-  },
-  {
-    title: "Pending Applications",
-    url: `${baseUrl}/pending`,
-    icon: UserCheck,
   },
 ];
 
 const adminItems = [
   {
     title: "Settings",
-    url: "/admin/settings",
+    url: `${baseUrl}/settings`,
     icon: Settings,
   },
 ];
 
 export function AppAdminSidebar() {
-  const { logout, user } = useUserSessionStore();
+  const { user } = useUserSessionStore();
   const navigate = useNavigate();
   const location = useLocation();
 
   if (user?.role === "admin") {
     return (
-      <Sidebar collapsible="icon" className="w-52 overflow-hidden">
+      <Sidebar collapsible="icon" className="">
         <SidebarContent className="overflow-x-hidden">
           <SidebarGroup></SidebarGroup>
           <SidebarGroup>
@@ -96,26 +137,88 @@ export function AppAdminSidebar() {
               <SidebarMenu>
                 {items.map((item) => {
                   const isActive = location.pathname === item.url;
-                  return (
-                    <SidebarMenuItem key={item.title} className="relative">
-                      <SidebarMenuButton
-                        asChild
-                        className={`cursor-pointer rounded-l-none hover:bg-primary/10 ${
-                          isActive ? "bg-primary/10" : ""
-                        }`}
-                      >
-                        <p onClick={() => navigate(item.url ? item.url : "")}>
-                          {isActive && (
-                            <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r">
-                              {" "}
-                            </span>
-                          )}
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </p>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                  const hasChildren = item.children && item.children.length > 0;
+                  const hasChildActive = item.children?.some(
+                    (child) => location.pathname === child.url
                   );
+
+                  if (hasChildren) {
+                    return (
+                      <Collapsible
+                        key={item.title}
+                        className="group/collapsible"
+                        defaultOpen={hasChildActive}
+                      >
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton className="cursor-pointer font-[Lato] font-normal">
+                              <item.icon />
+                              <span>{item.title}</span>
+                              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.children.map((child) => {
+                                const isChildActive =
+                                  location.pathname === child.url;
+                                return (
+                                  <SidebarMenuSubItem
+                                    key={child.title}
+                                    className="relative"
+                                  >
+                                    <SidebarMenuButton
+                                      asChild
+                                      className={`cursor-pointer w-full ${
+                                        isChildActive ? "bg-primary/10" : ""
+                                      }`}
+                                    >
+                                      <div
+                                        onClick={() =>
+                                          navigate(child.url || "")
+                                        }
+                                        className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                                      >
+                                        {isChildActive && (
+                                          <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r" />
+                                        )}
+                                        <child.icon className="h-4 w-4" />
+                                        <span>{child.title}</span>
+                                      </div>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuSubItem>
+                                );
+                              })}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  } else {
+                    return (
+                      <SidebarMenuItem key={item.title} className="relative">
+                        <SidebarMenuButton
+                          asChild
+                          className={`cursor-pointer rounded-l-none hover:bg-primary/10 ${
+                            isActive ? "bg-primary/10" : ""
+                          }`}
+                        >
+                          <div
+                            onClick={() => navigate(item.url ? item.url : "")}
+                            className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                          >
+                            {isActive && (
+                              <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r">
+                                {" "}
+                              </span>
+                            )}
+                            <item.icon />
+                            <span>{item.title}</span>
+                          </div>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  }
                 })}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -125,30 +228,46 @@ export function AppAdminSidebar() {
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <a href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {adminItems.map((item) => {
+                  const isActive = location.pathname === item.url;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        className={`cursor-pointer rounded-l-none hover:bg-primary/10 ${
+                          isActive ? "bg-primary/10" : ""
+                        }`}
+                      >
+                        <div
+                          onClick={() => navigate(item.url ? item.url : "")}
+                          className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                        >
+                          {isActive && (
+                            <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r">
+                              {" "}
+                            </span>
+                          )}
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </div>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
+        {/* <SidebarFooter>
           <div className="">
-            <Button
+            <SidebarMenuButton
               className="text-sm text-muted-foreground hover:underline"
               onClick={logout}
             >
               Logout
-            </Button>
+            </SidebarMenuButton>
           </div>
-        </SidebarFooter>
+        </SidebarFooter> */}
       </Sidebar>
     );
   }
