@@ -13,6 +13,7 @@ import config, { validateEnvironment } from "./lib/config";
 import LandingLayout from "./pages/public/layout";
 import { Landing } from "./pages/public/landing";
 import { useIsMobile } from "./hooks/use-mobile";
+import { ThemeProvider } from "@/components/theme-provider";
 
 function App() {
   // Validate environment variables and configure axios
@@ -59,104 +60,115 @@ function App() {
   }, [initialize]);
 
   return (
-    <BrowserRouter>
-      <Toaster
-        richColors
-        expand={false}
-        position={isMobile ? "bottom-center" : "top-right"}
-      />
-      <div className="min-h-screen bg-background">
-        <Routes>
-          {/* Root redirect */}
-          <Route path="/" element={<Navigate to="/home" />} />
-          <Route
-            path="/home"
-            element={
-              <LandingLayout>
-                <Landing
-                  heading="Outsource and Consultancy Services"
-                  subheading=""
-                  description="Unlock seamless business operations with our expert outsourcing services. We help streamline your processes, reduce costs, and drive efficiency, so you can focus on what matters most, growing your business."
-                  buttons={{
-                    primary: {
-                      text: "Inquire Now",
-                      url: "",
-                    },
-                  }}
-                  image={{
-                    src: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-7-tall.svg",
-                    alt: "Placeholder",
-                  }}
-                />
-              </LandingLayout>
-            }
-          />
+    <ThemeProvider>
+      <BrowserRouter>
+        <Toaster
+          richColors
+          expand={false}
+          position={isMobile ? "bottom-center" : "top-right"}
+        />
+        <div className="min-h-screen bg-background">
+          <Routes>
+            {/* Root redirect */}
+            <Route path="/" element={<Navigate to="/home" />} />
+            <Route
+              path="/home"
+              element={
+                <LandingLayout>
+                  <Landing
+                    heading="Outsource and Consultancy Services"
+                    subheading=""
+                    description="Unlock seamless business operations with our expert outsourcing services. We help streamline your processes, reduce costs, and drive efficiency, so you can focus on what matters most, growing your business."
+                    buttons={{
+                      primary: {
+                        text: "Inquire Now",
+                        url: "",
+                      },
+                    }}
+                    image={{
+                      src: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-7-tall.svg",
+                      alt: "Placeholder",
+                    }}
+                  />
+                </LandingLayout>
+              }
+            />
 
-          {/* Public routes */}
+            {/* Public routes */}
 
-          <Route path="/auth" element={<LoginPage />} />
-          <Route
-            path="/unauthorized"
-            element={<div>Unauthorized Access</div>}
-          />
+            <Route path="/auth" element={<LoginPage />} />
+            <Route
+              path="/unauthorized"
+              element={<div>Unauthorized Access</div>}
+            />
 
-          {/* Protected Admin Routes */}
-          <Route
-            path="/app/admin/*"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminLayout>
-                  <Routes>
-                    <Route
-                      path="/"
-                      element={<Navigate to="dashboard" replace />}
-                    />
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="employees" element={<EmployeesPage />} />
-                    <Route path="timekeeping" element={<TimekeepingPage />} />
-                    <Route
-                      path="departments"
-                      element={<div>Departments Page</div>}
-                    />
-                    <Route path="payroll" element={<div>Payroll Page</div>} />
-                    <Route path="requests" element={<div>Requests Page</div>} />
-                    <Route path="schedule" element={<div>Schedule Page</div>} />
-                    <Route
-                      path="pending"
-                      element={<div>Pending Employee Applications</div>}
-                    />
-                    <Route path="settings" element={<div>Settings Page</div>} />
-                  </Routes>
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Admin Routes */}
+            <Route
+              path="/app/admin/*"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminLayout>
+                    <Routes>
+                      <Route
+                        path="/"
+                        element={<Navigate to="dashboard" replace />}
+                      />
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="employees" element={<EmployeesPage />} />
+                      <Route path="timekeeping" element={<TimekeepingPage />} />
+                      <Route
+                        path="departments"
+                        element={<div>Departments Page</div>}
+                      />
+                      <Route path="payroll" element={<div>Payroll Page</div>} />
+                      <Route
+                        path="requests"
+                        element={<div>Requests Page</div>}
+                      />
+                      <Route
+                        path="schedule"
+                        element={<div>Schedule Page</div>}
+                      />
+                      <Route
+                        path="pending"
+                        element={<div>Pending Employee Applications</div>}
+                      />
+                      <Route
+                        path="settings"
+                        element={<div>Settings Page</div>}
+                      />
+                    </Routes>
+                  </AdminLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Protected Staff Routes (future expansion) */}
-          <Route
-            path="/app/staff/*"
-            element={
-              <ProtectedRoute requiredRole="staff">
-                <div>Staff Dashboard - Coming Soon</div>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Staff Routes (future expansion) */}
+            <Route
+              path="/app/staff/*"
+              element={
+                <ProtectedRoute requiredRole="staff">
+                  <div>Staff Dashboard - Coming Soon</div>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Protected Employee Routes (future expansion) */}
-          <Route
-            path="/app/employee/*"
-            element={
-              <ProtectedRoute requiredRole="employee">
-                <div>Employee Dashboard - Coming Soon</div>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Employee Routes (future expansion) */}
+            <Route
+              path="/app/employee/*"
+              element={
+                <ProtectedRoute requiredRole="employee">
+                  <div>Employee Dashboard - Coming Soon</div>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Catch-all route */}
-          <Route path="*" element={<Navigate to="/auth" replace />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+            {/* Catch-all route */}
+            <Route path="*" element={<Navigate to="/auth" replace />} />
+          </Routes>
+        </div>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

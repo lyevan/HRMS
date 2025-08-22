@@ -128,8 +128,8 @@ export function AppAdminSidebar() {
 
   if (user?.role === "admin") {
     return (
-      <Sidebar collapsible="icon" className="">
-        <SidebarContent className="overflow-x-hidden">
+      <Sidebar collapsible="icon">
+        <SidebarContent className="overflow-x-hidden h-screen">
           <SidebarGroup></SidebarGroup>
           <SidebarGroup>
             <SidebarGroupLabel>HRMS</SidebarGroupLabel>
@@ -146,13 +146,21 @@ export function AppAdminSidebar() {
                     return (
                       <Collapsible
                         key={item.title}
-                        className="group/collapsible"
+                        className={`group/collapsible ${
+                          hasChildActive ? "bg-primary/3 rounded-lg" : ""
+                        }`}
                         defaultOpen={hasChildActive}
                       >
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
                             <SidebarMenuButton className="cursor-pointer font-[Lato] font-normal">
-                              <item.icon />
+                              <item.icon
+                                className={
+                                  hasChildActive
+                                    ? "text-primary"
+                                    : "text-sidebar-foreground"
+                                }
+                              />
                               <span>{item.title}</span>
                               <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                             </SidebarMenuButton>
@@ -182,7 +190,13 @@ export function AppAdminSidebar() {
                                         {isChildActive && (
                                           <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r" />
                                         )}
-                                        <child.icon className="h-4 w-4" />
+                                        <child.icon
+                                          className={`h-4 w-4 ${
+                                            isChildActive
+                                              ? "text-primary"
+                                              : "text-sidebar-foreground"
+                                          }`}
+                                        />
                                         <span>{child.title}</span>
                                       </div>
                                     </SidebarMenuButton>
@@ -212,7 +226,13 @@ export function AppAdminSidebar() {
                                 {" "}
                               </span>
                             )}
-                            <item.icon />
+                            <item.icon
+                              className={`h-4 w-4 ${
+                                isActive
+                                  ? "text-primary"
+                                  : "text-sidebar-foreground"
+                              }`}
+                            />
                             <span>{item.title}</span>
                           </div>
                         </SidebarMenuButton>
