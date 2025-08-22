@@ -4,9 +4,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { UserCircle2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { AppAdminSidebar } from "@/components/sidebars/app-admin-sidebar";
 import { useUserSessionStore } from "@/store/userSessionStore";
 import { ModeToggle } from "@/components/dark-light-toggle";
@@ -16,20 +19,20 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { logout } = useUserSessionStore();
+  const { logout, user, employee } = useUserSessionStore();
   return (
     <SidebarProvider>
       <AppAdminSidebar />
       <main className="flex h-screen w-full flex-col relative">
         <div className="flex flex-col h-full">
-          <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background sm:static sm:border-0 sm:bg-transparent sm:px-6">
+          <header className="sticky top-0 z-30 flex h-18 items-center gap-4 border-b bg-background sm:static sm:border-0 sm:bg-transparent sm:px-6">
             <SidebarTrigger className="-ml-3" />
             <div className="relative ml-auto flex-1 flex items-center gap-2 md:grow-0">
               <div className="flex flex-col mr-2 items-end w-50">
-                <p>Employee Name</p>
-                <p className="text-xs text-muted-foreground">
-                  user@example.com
+                <p>
+                  {employee?.first_name} {employee?.last_name}
                 </p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -48,18 +51,22 @@ export default function AdminLayout({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-48" align="end" forceMount>
-                  {/* <DropdownMenuLabel className="font-normal">
+                  <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        User Name
+                        Account role
                       </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        user@example.com
-                      </p>
+                      <Badge>
+                        {user?.role &&
+                          user?.role.charAt(0).toUpperCase() +
+                            user?.role.slice(1)}
+                      </Badge>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator /> */}
-                  <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={logout}>
+                    Logout
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <ModeToggle />

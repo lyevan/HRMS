@@ -5,18 +5,28 @@ import config from "@/lib/config";
 
 interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
   role: string;
   // Add other user properties as needed
 }
 
+interface Employee {
+  employee_id: string;
+  first_name: string;
+  last_name: string;
+  position: string;
+  department: string;
+  hire_date: string;
+}
+
 interface UserSessionStore {
   user: User | null;
+  employee: Employee | null;
   isLoading: boolean;
   setUser: (userData: User) => void;
   clearUser: () => void;
-  login: (userData: User) => void;
+  login: (userData: User, employeeData: Employee) => void;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   hasRole: (requiredRole: string) => boolean;
@@ -27,14 +37,17 @@ interface UserSessionStore {
 
 const useUserSessionStore = create<UserSessionStore>((set, get) => ({
   user: null,
+  employee: null,
   isLoading: true,
 
   setUser: (userData: User) => set({ user: userData }),
+  setEmployee: (employeeData: Employee) => set({ employee: employeeData }),
 
   clearUser: () => set({ user: null }),
 
-  login: (userData: User) => {
+  login: (userData: User, employeeData: Employee) => {
     set({ user: userData });
+    set({ employee: employeeData });
     toast.success("Login successful!");
   },
 
@@ -93,7 +106,7 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
 
       if (response.data && response.data.success) {
         // Store fresh user data from database verification
-        set({ user: response.data.user, isLoading: false });
+        set({ user: response.data.user, employee: response.data.employee, isLoading: false });
         if (config.isProduction) {
           console.log("Production auth success:", response.data.user.role);
         }

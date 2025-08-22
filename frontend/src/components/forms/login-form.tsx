@@ -58,13 +58,14 @@ export function LoginForm({
 
       // Extract user data from response
       const userData = response.data.user;
+      const employeeData = response.data.employee;
 
       if (!userData) {
         throw new Error("Invalid response from server");
       }
 
       // Store user in Zustand
-      login(userData);
+      login(userData, employeeData);
 
       console.log("User logged in:", userData); // Navigate based on role
       if (userData.role === "admin") {
@@ -102,13 +103,14 @@ export function LoginForm({
 
       // Extract user data from response
       const userData = response.data.user;
+      const employeeData = response.data.employee;
 
       if (!userData) {
         throw new Error("Invalid response from server");
       }
 
       // Store user in Zustand
-      login(userData);
+      login(userData, employeeData);
 
       if (userData.role === "admin") {
         navigate("/app/admin");

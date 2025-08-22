@@ -12,7 +12,7 @@ const ProtectedRoute = ({
   children,
   requiredRole = null,
 }: ProtectedRouteProps) => {
-  const { user, isLoading, checkAuthStatus, validateRole, isAuthenticated } =
+  const { isLoading, checkAuthStatus, validateRole, isAuthenticated } =
     useUserSessionStore();
   const [isValidating, setIsValidating] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -66,7 +66,7 @@ const ProtectedRoute = ({
     return <Navigate to="/auth" replace />;
   }
 
-  console.log("User session:", requiredRole, isAuthorized, user);
+  // console.log("User session:", requiredRole, isAuthorized, user);
   // Redirect to unauthorized if role check failed
   if (requiredRole && !isAuthorized) {
     return <Navigate to="/unauthorized" replace />;

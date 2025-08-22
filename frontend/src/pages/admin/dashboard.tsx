@@ -112,7 +112,7 @@ const Dashboard = () => {
 
       {/* Dashboard Cards */}
 
-      <div className="flex flex-col h-[calc(100vh-3.5rem)] md:grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-5 lg:grid-rows-4 w-full">
+      <div className="flex flex-col h-[calc(100vh-4.5rem)] md:grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-5 2xl:grid-rows-6 lg:grid-rows-4 w-full">
         <Card className="flex flex-col row-span-1 col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -173,7 +173,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-4 w-full col-span-1 row-span-3 flex-1">
+        <div className="flex flex-col items-center gap-4 w-full col-span-1 row-span-3 flex-1">
           <Calendar
             mode="single"
             selected={date}
@@ -181,7 +181,7 @@ const Dashboard = () => {
             className="rounded-lg border h-fit"
           />
 
-          <Card className="h-full">
+          <Card className="h-full w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-md font-medium">
                 Quick Actions
@@ -193,9 +193,10 @@ const Dashboard = () => {
                   <Tooltip key={action.label}>
                     <TooltipTrigger className="cursor-pointer flex items-center justify-center">
                       <Button
+                        asChild
                         variant="outline"
                         size="icon"
-                        className="bg-primary text-primary-foreground cursor-pointer"
+                        className="bg-primary text-primary-foreground p-2 cursor-pointer"
                         onClick={action.onClick}
                       >
                         {action.icon}
@@ -220,12 +221,13 @@ const Dashboard = () => {
               <Tooltip>
                 <TooltipTrigger>
                   <Button
+                    asChild
                     variant="outline"
-                    size="icon"
-                    className="bg-card"
+                    size={"icon"}
+                    className="bg-card cursor-pointer"
                     onClick={() => toast.info("Notes feature coming soon")}
                   >
-                    <Menu />
+                    <Menu className="p-2" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="pointer-events-none">
@@ -251,7 +253,7 @@ const Dashboard = () => {
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-md font-medium">Holidays</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-y-auto max-h-40 no-scrollbar">
+            <CardContent className="overflow-y-auto max-h-40 2xl:max-h-35 no-scrollbar">
               <ul className="list-disc list-inside marker:text-muted-foreground text-sm font-[Lato]">
                 {/* Philippine Holidays */}
                 <li>New Year's Day - January 1</li>

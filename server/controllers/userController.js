@@ -53,6 +53,18 @@ export const verifyUser = async (req, res) => {
       });
     }
 
+    const employee = await pool.query(
+      "SELECT * FROM employees WHERE employee_id = $1",
+      [employee_id]
+    );
+    if (employee.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Employee record not found in database",
+      });
+    }
+
+    const employeeData = employee.rows[0];
     const dbUser = result.rows[0];
 
     // Check if the role in JWT matches the role in database
@@ -83,6 +95,14 @@ export const verifyUser = async (req, res) => {
         role: dbUser.role,
         created_at: dbUser.created_at,
         updated_at: dbUser.updated_at,
+      },
+      employee: {
+        employee_id: employeeData.employee_id,
+        first_name: employeeData.first_name,
+        last_name: employeeData.last_name,
+        position: employeeData.position,
+        department: employeeData.department,
+        hire_date: employeeData.hire_date,
       },
     });
   } catch (error) {
@@ -209,6 +229,20 @@ export const loginUser = async (req, res) => {
 
     const user = result.rows[0];
 
+    const employee = await pool.query(
+      "SELECT * FROM employees WHERE employee_id = $1",
+      [user.employee_id]
+    );
+
+    if (employee.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee record not found in database",
+      });
+    }
+
+    const employeeData = employee.rows[0];
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       console.log(
@@ -253,6 +287,14 @@ export const loginUser = async (req, res) => {
         role: user.role,
         created_at: user.created_at,
         updated_at: user.updated_at,
+      },
+      employee: {
+        employee_id: employeeData.employee_id,
+        first_name: employeeData.first_name,
+        last_name: employeeData.last_name,
+        position: employeeData.position,
+        department: employeeData.department,
+        hire_date: employeeData.hire_date,
       },
     });
   } catch (error) {
@@ -381,6 +423,20 @@ export const verifyOTPAndLogin = async (req, res) => {
 
     const user = userResult.rows[0];
 
+    const employee = await pool.query(
+      "SELECT * FROM employees WHERE employee_id = $1",
+      [user.employee_id]
+    );
+
+    if (employee.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
+
+    const employeeData = employee.rows[0];
+
     // Create JWT payload (same as login function)
     const payload = {
       id: user.employee_id,
@@ -413,6 +469,14 @@ export const verifyOTPAndLogin = async (req, res) => {
         role: user.role,
         created_at: user.created_at,
         updated_at: user.updated_at,
+      },
+      employee: {
+        employee_id: employeeData.employee_id,
+        first_name: employeeData.first_name,
+        last_name: employeeData.last_name,
+        position: employeeData.position,
+        department: employeeData.department,
+        hire_date: employeeData.hire_date,
       },
     });
   } catch (error) {
