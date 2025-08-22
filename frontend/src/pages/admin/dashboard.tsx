@@ -4,15 +4,12 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
 } from "@/components/ui/card";
 import {
-  TrendingUp,
   UserPlusIcon,
   Megaphone,
   FileCheck2,
   BanknoteArrowUp,
-  FileEditIcon,
   Menu,
 } from "lucide-react";
 import { Pie, PieChart } from "recharts";
@@ -37,7 +34,6 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Input } from "@/components/ui/input";
 
 export const description = "Attendance today";
 const chartData = [
