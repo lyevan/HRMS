@@ -67,7 +67,8 @@ const Dashboard = () => {
       label: "Add Employee",
       icon: <UserPlusIcon />,
       onClick: () => {
-        setOpen(true);
+        // setOpen(true);
+        toast.error("Add Employee currently in maintenance");
       },
     },
     {

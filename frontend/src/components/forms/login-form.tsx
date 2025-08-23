@@ -21,7 +21,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Navigate } from "react-router";
 import axios from "axios";
 import { useUserSessionStore } from "@/store/userSessionStore";
 import Spinner from "../spinner";
@@ -44,8 +44,21 @@ export function LoginForm({
   const [isEmailLogin, setIsEmailLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useUserSessionStore();
+  const { login, isAuthenticated, user } = useUserSessionStore();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  if (isAuthenticated()) {
+    if (user?.role === "admin") {
+      return <Navigate to="/app/admin" replace />;
+    } else if (user?.role === "staff") {
+      return <Navigate to="/app/staff" replace />;
+    } else if (user?.role === "employee") {
+      return <Navigate to="/app/employee" replace />;
+    }
+    // Fallback redirect
+    return <Navigate to="/auth" replace />;
+  }
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -173,9 +186,16 @@ export function LoginForm({
       }}
     >
       <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className={`text-2xl font-medium font-[Lato] flex flex-row items-center w-full ${isEmailLogin ? "justify-start" : "justify-center"}`}>
+        <h1
+          className={`text-2xl font-medium font-[Lato] flex flex-row items-center w-full ${
+            isEmailLogin ? "justify-start" : "justify-center"
+          }`}
+        >
           {isEmailLogin && (
-            <span className="justify-self-start mr-6" onClick={() => setIsEmailLogin(false)}>
+            <span
+              className="justify-self-start mr-6"
+              onClick={() => setIsEmailLogin(false)}
+            >
               <ChevronLeft />
             </span>
           )}
@@ -200,7 +220,7 @@ export function LoginForm({
                   setFormData({ ...formData, username: e.target.value })
                 }
                 placeholder="Enter your username"
-                className="pl-12 pr-3 py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
                 required
               />
             </label>
@@ -237,7 +257,7 @@ export function LoginForm({
                 }
                 required
                 placeholder="Enter your password"
-                className="pl-12 pr-3 py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
               />
             </label>
           </div>
@@ -288,7 +308,7 @@ export function LoginForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="pl-12 pr-3 py-2 text-md w-full border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1"
                 required
               ></Input>
             </label>

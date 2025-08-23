@@ -1,7 +1,6 @@
 import AdminLayout from "./pages/admin/layout";
 import LoginPage from "./pages/authentication";
 import Dashboard from "./pages/admin/dashboard";
-import EmployeesPage from "./pages/admin/employees";
 import TimekeepingPage from "./pages/admin/timekeeping";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import axios from "axios";
@@ -14,6 +13,8 @@ import LandingLayout from "./pages/public/layout";
 import { Landing } from "./pages/public/landing";
 import { useIsMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
+import EmployeeDashboard from "./pages/admin/employees/dashboard";
+
 
 function App() {
   // Validate environment variables and configure axios
@@ -114,12 +115,17 @@ function App() {
                         element={<Navigate to="dashboard" replace />}
                       />
                       <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="employees" element={<EmployeesPage />} />
-                      <Route path="timekeeping" element={<TimekeepingPage />} />
+                      {/* Admin Employee Group Routes */}
                       <Route
-                        path="departments"
-                        element={<div>Departments Page</div>}
+                        path="emp"
+                        element={<Navigate to="/emp/dashboard" />}
                       />
+                      <Route path="emp/dashboard" element={<EmployeeDashboard />} />
+
+                      {/* Admin Timekeeping Group Routes */}
+                      <Route path="timekeeping" element={<TimekeepingPage />} />
+
+                      {/* Admin Payroll Group Routes */}
                       <Route path="payroll" element={<div>Payroll Page</div>} />
                       <Route
                         path="requests"

@@ -1,0 +1,194 @@
+import {
+  type ColumnDef,
+  flexRender,
+  type ColumnFiltersState,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+
+import { Funnel, UserPlus, Download, Calendar } from "lucide-react";
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useState } from "react";
+import { Input } from "../ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Button } from "../ui/button";
+import { toast } from "sonner";
+// import { type DateRange } from "react-day-picker";
+// import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+
+interface EmployeeTableProps<TData, TValue> {
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+}
+
+export function EmployeeTable<TData, TValue>({
+  columns,
+  data,
+}: EmployeeTableProps<TData, TValue>) {
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [filterInput, setFilterInput] = useState("last_name");
+  //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
+  //     from: new Date(2025, 8, 15),
+  //     to: new Date(2025, 9, 6),
+  //   });
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    state: {
+      columnFilters,
+    },
+  });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between w-full gap-2 py-4 font-[Lato]">
+        <div className="flex items-center gap-2 w-xs">
+          <Input
+            placeholder={`Search by ${filterInput.split("_").join(" ")}...`}
+            value={
+              (table.getColumn(filterInput)?.getFilterValue() as string) ?? ""
+            }
+            onChange={(event) =>
+              table.getColumn(filterInput)?.setFilterValue(event.target.value)
+            }
+            className="max-w-xs"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size={"icon"}>
+                <Funnel />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 font-[Lato]">
+              <DropdownMenuLabel>Filter by:</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={filterInput}
+                onValueChange={setFilterInput}
+              >
+                <DropdownMenuRadioItem defaultChecked value="employee_id">
+                  Employee ID
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="first_name">
+                  First Name
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="last_name">
+                  Last Name
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="email">
+                  Email
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="department_name">
+                  Department
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.warning("Add employee implementation coming soon")
+            }
+          >
+            <UserPlus />
+            Add Employee
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.warning("Export employee table implementation coming soon")
+            }
+          >
+            <Download />
+            Export as
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.warning("Hire date filter implementation coming soon")
+            }
+          >
+            <Calendar />
+            Date Range
+          </Button>
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Lato]">
+        <Table>
+          <TableHeader className="bg-primary text-primary-foreground border border-muted-foreground/30">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-primary">
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="border-b border-muted-foreground/30"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

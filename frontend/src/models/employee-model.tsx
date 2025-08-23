@@ -1,0 +1,60 @@
+import axios from "axios";
+
+export type LeaveBalance = {
+  leave_type: string;
+  balance: number;
+  year?: number;
+};
+
+export type Employee = {
+  employee_id: string;
+  system_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  date_of_birth: string | null; // Can be null, API returns string
+  status: string;
+  created_at: string;
+  updated_at: string;
+  contract_id: number;
+  // From joined tables
+  department_name: string;
+  position_title: string;
+  department_id: number;
+  position_id: number;
+  contract_start_date: string;
+  contract_end_date: string | null;
+  salary_rate: number;
+  rate_type: string;
+  employment_type: string;
+  leave_balances: LeaveBalance[];
+  // Convenience properties for easier access
+  department: string; // alias for department_name
+  position: string; // alias for position_title
+};
+
+export type EmployeeResponse = {
+  success: boolean;
+  results: Employee[];
+};
+
+export const fetchAllEmployees = async (): Promise<EmployeeResponse> => {
+  try {
+    const response = await axios.get("/employees");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    throw error;
+  }
+};
+
+// Function to get employee data
+export const getEmployeeData = async (): Promise<Employee[]> => {
+  try {
+    const response = await fetchAllEmployees();
+    return response.results;
+  } catch (error) {
+    console.error("Error getting employee data:", error);
+    return [];
+  }
+};

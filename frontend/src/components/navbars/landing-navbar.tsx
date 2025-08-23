@@ -77,7 +77,7 @@ const LandingNavbar = () => {
             <Button
               variant="outline"
               className="hover:bg-background cursor-pointer"
-              onClick={() => navigate("/auth")}
+              onClick={() => window.location.href = "/auth"}
             >
               Sign in
             </Button>

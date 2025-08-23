@@ -7,8 +7,8 @@ import {
   Clock,
   ChevronRight,
   Network,
-  LayoutList,
   BriefcaseBusiness,
+  UserCog,
 } from "lucide-react";
 
 import {
@@ -52,9 +52,9 @@ const items = [
         icon: LayoutDashboard,
       },
       {
-        title: "Employee List",
-        url: `${baseUrl}/emp/e`,
-        icon: LayoutList,
+        title: "Management",
+        url: `${baseUrl}/emp/management`,
+        icon: UserCog,
       },
       {
         title: "Organization",

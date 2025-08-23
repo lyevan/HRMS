@@ -9,10 +9,50 @@ export const getAllEmployees = async (req, res) => {
   if (role !== "admin") {
     return res.status(403).json({ success: false, message: "Access denied" });
   }
+  
   try {
-    const result = await pool.query("SELECT * FROM employees ORDER BY id ASC");
-    res.status(200).json({ success: true, data: result.rows });
+    const result = await pool.query(`
+      SELECT 
+        e.*,
+        -- Get department and position through contract
+        d.name AS department_name,
+        p.title AS position_title,
+        p.department_id,
+        p.position_id,
+        c.start_date AS contract_start_date,
+        c.end_date AS contract_end_date,
+        c.rate AS salary_rate,
+        c.rate_type AS rate_type,
+        et.name AS employment_type,
+        -- Aggregate leave balances into JSON
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'leave_type', lt.name,
+              'balance', lb.balance
+            ) ORDER BY lt.name
+          ) FILTER (WHERE lb.leave_balance_id IS NOT NULL), 
+          '[]'::json
+        ) AS leave_balances
+      FROM employees e
+      -- Join through contract to get position and department
+      INNER JOIN contracts c ON e.contract_id = c.contract_id
+      INNER JOIN positions p ON c.position_id = p.position_id
+      INNER JOIN departments d ON p.department_id = d.department_id
+      LEFT JOIN employment_types et ON c.employment_type_id = et.employment_type_id
+      LEFT JOIN leave_balance lb ON e.employee_id = lb.employee_id
+      LEFT JOIN leave_types lt ON lb.leave_type_id = lt.leave_type_id
+      GROUP BY 
+        e.employee_id, e.system_id, e.first_name, e.last_name, e.email, 
+        e.date_of_birth, e.status, e.created_at, e.updated_at, e.contract_id,
+        d.name, d.department_id, p.title, p.position_id, p.department_id,
+        c.start_date, c.end_date, c.rate, c.rate_type, et.name
+      ORDER BY e.created_at DESC
+    `);
+    
+    res.status(200).json({ success: true, results: result.rows });
   } catch (error) {
+    console.error("Error fetching employees:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -31,7 +71,7 @@ export const getEmployee = async (req, res) => {
         .json({ success: false, message: "Employee not found" });
     }
 
-    res.status(200).json({ success: true, data: result.rows[0] });
+    res.status(200).json({ success: true, results: result.rows[0] });
   } catch (error) {
     console.error("Error fetching employee:", error);
     res.status(500).json({ success: false, message: error.message });
