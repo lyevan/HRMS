@@ -10,17 +10,25 @@ interface ModalProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   title: string;
-  description: string;
+  description: string | null;
   children?: React.ReactNode;
+  className?: string | undefined;
 }
 
-const Modal = ({ open, setOpen, title, description, children }: ModalProps) => {
+const Modal = ({
+  open,
+  setOpen,
+  title,
+  description = null,
+  children,
+  className,
+}: ModalProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+      <DialogContent className={className}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {children}
       </DialogContent>
