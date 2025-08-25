@@ -63,7 +63,7 @@ export function EmployeeTable<TData, TValue>({
 
   return (
     <div>
-      <div className="flex items-center justify-between w-full gap-2 py-4 font-[Lato]">
+      <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
         <div className="flex items-center gap-2 w-xs">
           <Input
             placeholder={`Search by ${filterInput.split("_").join(" ")}...`}
@@ -81,7 +81,7 @@ export function EmployeeTable<TData, TValue>({
                 <Funnel />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 font-[Lato]">
+            <DropdownMenuContent className="w-56 font-[Nunito]">
               <DropdownMenuLabel>Filter by:</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup
@@ -138,7 +138,7 @@ export function EmployeeTable<TData, TValue>({
           </Button>
         </div>
       </div>
-      <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Lato]">
+      <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Nunito]">
         <Table>
           <TableHeader className="bg-primary text-primary-foreground border border-muted-foreground/30">
             {table.getHeaderGroups().map((headerGroup) => (

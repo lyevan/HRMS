@@ -42,14 +42,14 @@ const Landing = ({
   },
 }: LandingProps) => {
   return (
-    <section className="bg-background h-[200vh] font-[Lato]">
+    <section className="bg-background h-[200vh] font-[Nunito]">
       <div className="container flex flex-col items-center gap-10 lg:my-0 lg:flex-row">
         <div className="flex flex-col gap-7 lg:w-2/3">
           <h2 className="text-5xl font-semibold text-foreground md:text-5xl lg:text-8xl">
             <span>{heading}</span>
             <span className="text-muted-foreground">{subheading}</span>
           </h2>
-          <p className="text-base font-[Lato] text-muted-foreground md:text-lg lg:text-xl">
+          <p className="text-base font-[Nunito] text-muted-foreground md:text-lg lg:text-xl">
             {description}
           </p>
           <div className="flex flex-wrap items-start gap-5 lg:gap-7">

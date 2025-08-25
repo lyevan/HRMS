@@ -153,7 +153,7 @@ export function AppAdminSidebar() {
                       >
                         <SidebarMenuItem>
                           <CollapsibleTrigger asChild>
-                            <SidebarMenuButton className="cursor-pointer font-[Lato] font-normal">
+                            <SidebarMenuButton className="cursor-pointer font-[Nunito] font-normal">
                               <item.icon
                                 className={
                                   hasChildActive
@@ -185,7 +185,7 @@ export function AppAdminSidebar() {
                                         onClick={() =>
                                           navigate(child.url || "")
                                         }
-                                        className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                                        className="flex items-center gap-2 w-full font-[Nunito] font-normal"
                                       >
                                         {isChildActive && (
                                           <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r" />
@@ -219,7 +219,7 @@ export function AppAdminSidebar() {
                         >
                           <div
                             onClick={() => navigate(item.url ? item.url : "")}
-                            className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                            className="flex items-center gap-2 w-full font-[Nunito] font-normal"
                           >
                             {isActive && (
                               <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r">
@@ -260,7 +260,7 @@ export function AppAdminSidebar() {
                       >
                         <div
                           onClick={() => navigate(item.url ? item.url : "")}
-                          className="flex items-center gap-2 w-full font-[Lato] font-normal"
+                          className="flex items-center gap-2 w-full font-[Nunito] font-normal"
                         >
                           {isActive && (
                             <span className="bg-primary h-full w-1.5 absolute -left-0.75 rounded-r">

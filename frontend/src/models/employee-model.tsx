@@ -11,7 +11,9 @@ export type Employee = {
   system_id: number;
   first_name: string;
   last_name: string;
+  avatar_url?: string | null; // Can be null, API returns string
   email: string;
+  phone?: string | null; // Can be null, API returns string
   date_of_birth: string | null; // Can be null, API returns string
   status: string;
   created_at: string;

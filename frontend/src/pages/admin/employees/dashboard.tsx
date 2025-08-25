@@ -3,8 +3,17 @@ import { type Employee } from "@/models/employee-model";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useState } from "react";
 import Modal from "@/components/modal";
+import { List, LayoutGrid } from "lucide-react";
 import employeeColumns from "@/components/tables/columns/employee-columns";
 import EmployeeDirectory from "@/components/modal-contents/employee-directory";
+import { Button } from "@/components/ui/button";
+import EmployeeGrid from "@/components/grids/employee-grid";
+import useEmployeeViewStore from "@/store/employeeViewStore";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const EmployeeDashboard = () => {
   const { employees, loading, error } = useEmployees();
@@ -12,6 +21,7 @@ const EmployeeDashboard = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
+  const { isTableView, setIsTableView } = useEmployeeViewStore();
 
   const columns = employeeColumns(setIsViewEmployeeModalOpen, (employee) => {
     setSelectedEmployee(employee);
@@ -46,8 +56,32 @@ const EmployeeDashboard = () => {
       >
         <EmployeeDirectory employee={selectedEmployee} />
       </Modal>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            className="mb-4"
+            size={"icon"}
+            onClick={() => setIsTableView(!isTableView)}
+          >
+            {isTableView ? <LayoutGrid /> : <List />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          Switch to {isTableView ? "Card" : "Table"} View
+        </TooltipContent>
+      </Tooltip>
+
       <div className="space-y-4">
-        <EmployeeTable<Employee, any> columns={columns} data={employees} />
+        {isTableView ? (
+          <EmployeeTable<Employee, any> columns={columns} data={employees} />
+        ) : (
+          <EmployeeGrid
+            employees={employees}
+            setSelectedEmployee={setSelectedEmployee}
+            setIsViewEmployeeModalOpen={setIsViewEmployeeModalOpen}
+          />
+        )}
       </div>
     </>
   );

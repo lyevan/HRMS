@@ -7,7 +7,6 @@ export default function LoginPage() {
   const { isLoading } = useUserSessionStore();
 
   if (!isLoading) {
-  
     return (
       <div className="grid min-h-svh lg:grid-cols-2 2xl:grid-cols-3">
         <div className="flex flex-col gap-4 p-6 md:p-6 2xl:col-span-1">
@@ -25,7 +24,7 @@ export default function LoginPage() {
                 <p className="text-3xl font-normal 2xl:text-5xl mb-3">
                   Welcome back!
                 </p>
-                <h3 className="text-sm 2xl:text-lg font-[Lato]">
+                <h3 className="text-sm 2xl:text-lg font-[Nunito]">
                   Pick up right where you left off
                 </h3>
               </div>

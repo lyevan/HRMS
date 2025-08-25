@@ -255,7 +255,7 @@ const Dashboard = () => {
               <CardTitle className="text-md font-medium">Holidays</CardTitle>
             </CardHeader>
             <CardContent className="overflow-y-auto max-h-40 2xl:max-h-35 no-scrollbar">
-              <ul className="list-disc list-inside marker:text-muted-foreground text-sm font-[Lato]">
+              <ul className="list-disc list-inside marker:text-muted-foreground text-sm font-[Nunito]">
                 {/* Philippine Holidays */}
                 <li>New Year's Day - January 1</li>
                 <li>EDSA People Power Revolution - February 25</li>

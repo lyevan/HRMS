@@ -187,7 +187,7 @@ export function LoginForm({
     >
       <div className="flex flex-col items-center gap-2 text-center">
         <h1
-          className={`text-2xl font-medium font-[Lato] flex flex-row items-center w-full ${
+          className={`text-2xl font-medium font-[Nunito] flex flex-row items-center w-full ${
             isEmailLogin ? "justify-start" : "justify-center"
           }`}
         >
@@ -220,7 +220,7 @@ export function LoginForm({
                   setFormData({ ...formData, username: e.target.value })
                 }
                 placeholder="Enter your username"
-                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Nunito] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
                 required
               />
             </label>
@@ -257,7 +257,7 @@ export function LoginForm({
                 }
                 required
                 placeholder="Enter your password"
-                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Nunito] py-2 text-md w-full border border-primary/40 rounded shadow-sm focus:outline-none focus:ring-1"
               />
             </label>
           </div>
@@ -285,7 +285,7 @@ export function LoginForm({
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10" />
               {!isEmailSent ? (
                 <div
-                  className="absolute cursor-pointer font-[Lato] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
+                  className="absolute cursor-pointer font-[Nunito] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
                   onClick={() => {
                     handleEmailSend();
                   }}
@@ -294,7 +294,7 @@ export function LoginForm({
                 </div>
               ) : (
                 <div
-                  className="absolute cursor-pointer font-[Lato] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
+                  className="absolute cursor-pointer font-[Nunito] font-bold text-sm right-3 top-1/2 transform -translate-y-1/2 z-10 align-middle text-primary"
                   onClick={() => {
                     handleEmailSend();
                   }}
@@ -308,13 +308,13 @@ export function LoginForm({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="pl-12 pr-3 font-[Lato] py-2 text-md w-full border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1"
+                className="pl-12 pr-3 font-[Nunito] py-2 text-md w-full border border-gray-300 rounded shadow-sm focus:outline-none focus:ring-1"
                 required
               ></Input>
             </label>
             {isEmailSent && (
               <div className="flex flex-col items-center justify-center w-full">
-                <h1 className="font-normal font-[Lato] my-4">
+                <h1 className="font-normal font-[Nunito] my-4">
                   Enter the OTP sent to your email
                 </h1>
                 <InputOTP
