@@ -117,7 +117,7 @@ const EmployeeDirectory = ({
   return (
     <div className="flex flex-1">
       <Tabs defaultValue="personal" className="w-full">
-        <TabsList>
+        <TabsList className="w-full sticky top-0 z-9999 md:w-fit">
           {isMobile ? (
             <>
               <TabsTrigger value="personal">
@@ -151,11 +151,11 @@ const EmployeeDirectory = ({
           )}
         </TabsList>
         {/* Outer Container */}
-        <div className="flex flex-1 justify-center items-start mt-10">
+        <div className="flex flex-1 justify-center items-start mt-10 flex-col sm:flex-row">
           {/*---------------------------*/}
           {/* Avatar and Name Container */}
           {/*---------------------------*/}
-          <div className="flex flex-col items-center gap-2 flex-1">
+          <div className="flex flex-col items-center gap-2 flex-1 w-full">
             <AvatarSection employee={employee} />
             <p className="text-2xl font-semibold text-primary">
               {employee?.first_name} {employee?.last_name}

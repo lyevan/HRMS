@@ -31,6 +31,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 // import { type DateRange } from "react-day-picker";
 // import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
@@ -45,6 +46,7 @@ export function EmployeeTable<TData, TValue>({
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("last_name");
+  const isMobile = useIsMobile();
   //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
   //     from: new Date(2025, 8, 15),
   //     to: new Date(2025, 9, 6),
@@ -66,7 +68,7 @@ export function EmployeeTable<TData, TValue>({
       <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
         <div className="flex items-center gap-2 w-xs">
           <Input
-            placeholder={`Search by ${filterInput.split("_").join(" ")}...`}
+            placeholder={!isMobile ? `Search by ${filterInput.split("_").join(" ")}...` : "Search..."}
             value={
               (table.getColumn(filterInput)?.getFilterValue() as string) ?? ""
             }
@@ -110,31 +112,34 @@ export function EmployeeTable<TData, TValue>({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            size={isMobile ? "icon" : "default"}
             onClick={() =>
               toast.warning("Add employee implementation coming soon")
             }
           >
             <UserPlus />
-            Add Employee
+            {!isMobile && "Add Employee"}
           </Button>
           <Button
             variant="outline"
+            size={isMobile ? "icon" : "default"}
             onClick={() =>
               toast.warning("Export employee table implementation coming soon")
             }
           >
             <Download />
-            Export as
+            {!isMobile && "Export as"}
           </Button>
 
           <Button
             variant="outline"
+            size={isMobile ? "icon" : "default"}
             onClick={() =>
               toast.warning("Hire date filter implementation coming soon")
             }
           >
             <Calendar />
-            Date Range
+            {!isMobile && "Date Range"}
           </Button>
         </div>
       </div>

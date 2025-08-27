@@ -67,12 +67,13 @@ const EmployeeDashboard = () => {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant="outline"
+            // variant="primary"
             className="mb-4"
-            size={"icon"}
+           
             onClick={() => setIsTableView(!isTableView)}
           >
             {isTableView ? <LayoutGrid /> : <List />}
+            Change View
           </Button>
         </TooltipTrigger>
         <TooltipContent side="right">
