@@ -1,7 +1,13 @@
 import { type Employee } from "@/models/employee-model";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
-import { BookUser, UserRoundSearch, Info, HandCoins } from "lucide-react";
+import {
+  BookUser,
+  UserRoundSearch,
+  Info,
+  HandCoins,
+  IdCard,
+} from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import LabelAndInput from "../label-input-readonly";
 import AvatarSection from "../avatar-section";
@@ -23,21 +29,34 @@ const EmployeeDirectory = ({
   const [isReadOnly, setIsReadOnly] = useState(initialReadOnlyState);
 
   const personalInformation = [
-    { id: "nickname", label: "Nickname", value: "Nickname", type: "text" },
+    {
+      id: "first-name",
+      label: "First Name",
+      value: employee?.first_name,
+      type: "text",
+    },
+    { id: "middle-name", label: "Middle Name", value: "--", type: "text" },
+    {
+      id: "last-name",
+      label: "Last Name",
+      value: employee?.last_name,
+      type: "text",
+    },
+    { id: "nickname", label: "Nickname", value: "--", type: "text" },
     { id: "age", label: "Age", value: "--", type: "text" },
-    { id: "birthdate", label: "Birthdate", value: "00/00/0000", type: "text" },
-    { id: "gender", label: "Gender", value: "Male", type: "text" },
+    { id: "birthdate", label: "Birthdate", value: "--", type: "text" },
+    { id: "gender", label: "Gender", value: "--", type: "text" },
     {
       id: "civil-status",
       label: "Civil Status",
-      value: "Civil Status",
+      value: "--",
       type: "text",
     },
-    { id: "religion", label: "Religion", value: "Religion", type: "text" },
+    { id: "religion", label: "Religion", value: "--", type: "text" },
     {
       id: "nationality",
       label: "Nationality",
-      value: "Nationality",
+      value: "--",
       type: "text",
     },
   ];
@@ -46,18 +65,18 @@ const EmployeeDirectory = ({
     {
       id: "current-address",
       label: "Current Address",
-      value: "Current Address",
+      value: "--",
       type: "text",
     },
     {
       id: "permanent-address",
       label: "Permanent Address",
-      value: "Permanent Address",
+      value: "--",
       type: "text",
     },
     { id: "email", label: "Email", value: employee?.email, type: "email" },
-    { id: "mobile", label: "Mobile", value: "Mobile", type: "tel" },
-    { id: "telephone", label: "Telephone", value: "Telephone", type: "tel" },
+    { id: "mobile", label: "Mobile", value: "--", type: "tel" },
+    { id: "telephone", label: "Telephone", value: "--", type: "tel" },
   ];
 
   const employeeProfile = [
@@ -114,6 +133,51 @@ const EmployeeDirectory = ({
     },
   ];
 
+  const compensationInformation = [
+    {
+      id: "rate-type",
+      label: "Rate Type",
+      value:
+        employee?.rate_type &&
+        employee?.rate_type.charAt(0).toUpperCase() +
+          employee?.rate_type.slice(1),
+      type: "text",
+    },
+    {
+      id: "salary-rate",
+      label: "Salary Rate",
+      value: employee?.salary_rate,
+      type: "text",
+    },
+  ];
+
+  const identificationInformation = [
+    {
+      id: "sss-number",
+      label: "SSS Number",
+      value: "--",
+      type: "text",
+    },
+    {
+      id: "pagibig-number",
+      label: "Pag-IBIG Number",
+      value: "--",
+      type: "text",
+    },
+    {
+      id: "philhealth-number",
+      label: "PhilHealth Number",
+      value: "--",
+      type: "text",
+    },
+    {
+      id: "tin-number",
+      label: "TIN Number",
+      value: "--",
+      type: "text",
+    },
+  ];
+
   return (
     <div className="flex flex-1">
       <Tabs defaultValue="personal" className="w-full">
@@ -132,6 +196,9 @@ const EmployeeDirectory = ({
               <TabsTrigger value="compensation">
                 <HandCoins />
               </TabsTrigger>
+              <TabsTrigger value="identification">
+                <IdCard />
+              </TabsTrigger>
             </>
           ) : (
             <>
@@ -145,7 +212,10 @@ const EmployeeDirectory = ({
                 <Info /> Employment Information
               </TabsTrigger>
               <TabsTrigger value="compensation">
-                <HandCoins /> Compensation and Benefits
+                <HandCoins /> Compensation and Deductions
+              </TabsTrigger>
+              <TabsTrigger value="identification">
+                <IdCard /> Identification
               </TabsTrigger>
             </>
           )}
@@ -172,9 +242,12 @@ const EmployeeDirectory = ({
               <Label htmlFor="readonly-mode" className="text-sm">
                 Read-Only Mode
               </Label>
-              
             </div>
-            {!isReadOnly && <Button className="text-sm" variant="outline">Save Changes</Button>}
+            {!isReadOnly && (
+              <Button className="text-sm" variant="outline">
+                Save Changes
+              </Button>
+            )}
           </div>
 
           {/*-----------------------*/}
@@ -187,7 +260,7 @@ const EmployeeDirectory = ({
                   {/*---------*/}
                   {/* Details */}
                   {/*---------*/}
-                  <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10">
+                  <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
                     {/*------------------*/}
                     {/* Personal Details */}
                     {/*------------------*/}
@@ -226,10 +299,10 @@ const EmployeeDirectory = ({
               )}
             </TabsContent>
             <TabsContent value="profile">
-              <div className="flex flex-col sm:flex-row items-center justify-center ">
-                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10">
-                  <div className="flex flex-col gap-2">
-                    <p className="font-black mb-2">Employee Profile</p>
+              <div className="flex flex-col sm:flex-row items-center justify-center w-full ">
+                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Employee Details</p>
                     {employeeProfile.map((info) => (
                       <LabelAndInput
                         key={info.id}
@@ -245,9 +318,9 @@ const EmployeeDirectory = ({
             </TabsContent>
             <TabsContent value="employment">
               <div className="flex flex-col sm:flex-row items-center justify-center ">
-                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10">
-                  <div className="flex flex-col gap-2">
-                    <p className="font-black mb-2">Employee Profile</p>
+                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Contract Information</p>
                     {employmentInformation.map((info) => (
                       <LabelAndInput
                         key={info.id}
@@ -257,6 +330,10 @@ const EmployeeDirectory = ({
                         isReadOnly={isReadOnly}
                       />
                     ))}
+                  </div>
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Leaves Information</p>
+
                     {employee?.leave_balances.map((leave) => (
                       <LabelAndInput
                         key={leave.leave_type}
@@ -272,7 +349,47 @@ const EmployeeDirectory = ({
               </div>
             </TabsContent>
             <TabsContent value="compensation">
-              {employee?.rate_type} {employee?.salary_rate}
+              <div className="flex flex-col sm:flex-row items-center justify-center ">
+                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Compensation and Benefits</p>
+                    {compensationInformation.map((info) => (
+                      <LabelAndInput
+                        key={info.id}
+                        id={info.id}
+                        label={info.label}
+                        value={
+                          info.value !== undefined && info.value !== null
+                            ? info.value.toString()
+                            : "--"
+                        }
+                        isReadOnly={isReadOnly}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Active Loans</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="identification">
+              <div className="flex flex-col sm:flex-row items-center justify-center w-full ">
+                <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
+                  <div className="flex flex-col gap-2 w-full">
+                    <p className="font-black mb-2">Government Numbers</p>
+                    {identificationInformation.map((info) => (
+                      <LabelAndInput
+                        key={info.id}
+                        id={info.id}
+                        label={info.label}
+                        value={info.value}
+                        isReadOnly={isReadOnly}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           </div>
         </div>
