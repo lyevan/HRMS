@@ -5,13 +5,44 @@ import {
   getEmployee,
   updateEmployee,
   deleteEmployee,
+  uploadOwnAvatar,
+  uploadAvatar,
 } from "../controllers/employeeController.js";
+import multer from "multer";
 
 const router = express.Router();
 import verifyToken from "../middleware/verifyToken.js";
 import { verifyAdmin, verifyStaff } from "../middleware/verifyRole.js";
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"), false);
+    }
+  },
+});
+
+router.post(
+  "/upload-own-avatar",
+  verifyToken,
+  upload.single("avatar"),
+  uploadOwnAvatar
+);
+
 // Staff can view, create, and update employees, Admin can do everything
+router.post(
+  "/upload-avatar",
+  verifyToken,
+  verifyStaff,
+  upload.single("avatar"),
+  uploadAvatar
+);
 router.get("/", verifyToken, verifyStaff, getAllEmployees);
 router.post("/get-employee", verifyToken, verifyStaff, getEmployee);
 router.post("/", verifyToken, verifyStaff, createEmployee);

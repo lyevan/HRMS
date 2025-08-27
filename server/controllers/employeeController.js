@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import bcrypt from "bcryptjs";
 import { sendOnboardingEmail } from "./emailController.js";
+import { supabase } from "../config/supabase.config.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -9,7 +10,7 @@ export const getAllEmployees = async (req, res) => {
   if (role !== "admin") {
     return res.status(403).json({ success: false, message: "Access denied" });
   }
-  
+
   try {
     const result = await pool.query(`
       SELECT 
@@ -49,7 +50,7 @@ export const getAllEmployees = async (req, res) => {
         c.start_date, c.end_date, c.rate, c.rate_type, et.name
       ORDER BY e.created_at DESC
     `);
-    
+
     res.status(200).json({ success: true, results: result.rows });
   } catch (error) {
     console.error("Error fetching employees:", error);
@@ -272,6 +273,147 @@ export const deleteEmployee = async (req, res) => {
 
     res.status(200).json({ success: true, result: result.rows[0] });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const uploadOwnAvatar = async (req, res) => {
+  try {
+    const { avatar } = req.file;
+    const { employee_id } = req.user;
+
+    if (!file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+
+    // Upload to Supabase
+    const { data, error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(`public/${Date.now()}_${avatar.originalname}`, avatar.buffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: avatar.mimetype,
+      });
+
+    if (uploadError) {
+      console.error("Supabase upload error:", uploadError);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error uploading file" });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(data.path);
+
+    const avatar_url = urlData.publicUrl;
+
+    // Update employee record
+    const result = await pool.query(
+      "UPDATE employees SET avatar_url = $1 WHERE employee_id = $2 RETURNING *",
+      [avatar_url, employee_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Avatar uploaded",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error uploading avatar:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const uploadAvatar = async (req, res) => {
+  try {
+    const { employeeId } = req.body;
+    const avatar = req.file;
+
+    if (!avatar) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+
+    // Get file extension from original filename
+    const fileExtension = avatar.originalname.split(".").pop();
+    const fileName = `${employeeId}@${Date.now()}.${fileExtension}`; // Add extension!
+
+    console.log("Avatar to be uploaded:", {
+      originalname: avatar.originalname,
+      mimetype: avatar.mimetype,
+      size: avatar.size,
+      fileName: fileName,
+    });
+
+    // Delete previous avatar except this file name
+    // Filter to avoid deleting the newly uploaded file if it has the same name
+    const { error: deleteError } = await supabase.storage
+      .from("hrms")
+      .remove([`avatars/${employeeId}@*`]);
+
+    if (deleteError) {
+      console.error("Supabase delete error:", deleteError);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error deleting old avatar" });
+    }
+
+    // Upload to Supabase with proper filename
+    const { data, error: uploadError } = await supabase.storage
+      .from("hrms")
+      .upload(`avatars/${fileName}`, avatar.buffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: avatar.mimetype,
+      });
+
+    if (uploadError) {
+      console.error("Supabase upload error:", uploadError);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error uploading file" });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("hrms")
+      .getPublicUrl(data.path);
+
+    const avatar_url = urlData.publicUrl;
+
+    console.log("Generated avatar URL:", avatar_url); // Debug log
+
+    // Update employee record
+    const result = await pool.query(
+      "UPDATE employees SET avatar_url = $1 WHERE employee_id = $2 RETURNING *",
+      [avatar_url, employeeId]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Avatar uploaded successfully",
+      data: result.rows[0],
+      avatar_url: avatar_url, // Return the URL for debugging
+    });
+  } catch (error) {
+    console.error("Error uploading avatar:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
