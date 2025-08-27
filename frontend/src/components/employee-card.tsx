@@ -33,12 +33,14 @@ interface EmployeeCardProps {
   employee: Employee;
   setIsViewEmployeeModalOpen?: (isOpen: boolean) => void;
   setSelectedEmployee?: (employee: Employee | null) => void;
+  setIsEditing?: (isEditing: boolean) => void;
 }
 
 const EmployeeCard = ({
   employee,
   setIsViewEmployeeModalOpen,
   setSelectedEmployee,
+  setIsEditing,
 }: EmployeeCardProps) => {
   const { copyToClipboard, isCopying } = useCopyToClipboard();
   const placeholderNumber = "09991234567"; // Placeholder number since API doesn't provide one
@@ -79,6 +81,7 @@ const EmployeeCard = ({
                 onClick={() => {
                   setIsViewEmployeeModalOpen?.(true);
                   setSelectedEmployee?.(employee);
+                  setIsEditing?.(false);
                 }}
               >
                 <span className="mr-1">
@@ -87,7 +90,11 @@ const EmployeeCard = ({
                 View
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => alert(`Editing ${employee.first_name}`)}
+                onClick={() => {
+                  setIsViewEmployeeModalOpen?.(true);
+                  setSelectedEmployee?.(employee);
+                  setIsEditing?.(true);
+                }}
               >
                 <span className="mr-1">
                   <SquarePen />
@@ -168,6 +175,7 @@ const EmployeeCard = ({
             onClick={() => {
               setIsViewEmployeeModalOpen?.(true);
               setSelectedEmployee?.(employee);
+              setIsEditing?.(false);
             }}
           >
             <SquareArrowOutUpRight />

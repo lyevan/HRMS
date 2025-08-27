@@ -25,8 +25,11 @@ const Modal = ({
 }: ModalProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className={className}>
-        <DialogHeader>
+      <DialogContent
+        className={className}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="h-fit">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

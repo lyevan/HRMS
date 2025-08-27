@@ -9,12 +9,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EllipsisVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
 const columnHelper = createColumnHelper<Employee>();
 
 const employeeColumns = (
   setIsModalOpen: (isOpen: boolean) => void,
+  setIsEditing: (isEditing: boolean) => void,
   onViewEmployee: (employee: Employee) => void
 ) => {
   return [
@@ -72,15 +72,19 @@ const employeeColumns = (
             </DropdownMenuTrigger>
             <DropdownMenuContent onCloseAutoFocus={(e) => e.preventDefault()}>
               <DropdownMenuItem
-                onClick={() =>
-                  toast.warning("Editing employees implementation coming soon")
-                }
+                onClick={() => {
+                  const employee = info.row.original; // ✅ Get the complete row data
+                  setIsEditing(true);
+                  onViewEmployee?.(employee); // ✅ Pass to callback
+                  setIsModalOpen(true);
+                }}
               >
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   const employee = info.row.original; // ✅ Get the complete row data
+                  setIsEditing(false);
                   onViewEmployee?.(employee); // ✅ Pass to callback
                   setIsModalOpen(true);
                 }}

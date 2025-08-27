@@ -22,11 +22,16 @@ const EmployeeDashboard = () => {
     null
   );
   const { isTableView, setIsTableView } = useEmployeeViewStore();
+  const [isEditing, setIsEditing] = useState(false);
 
-  const columns = employeeColumns(setIsViewEmployeeModalOpen, (employee) => {
-    setSelectedEmployee(employee);
-    setIsViewEmployeeModalOpen(true);
-  });
+  const columns = employeeColumns(
+    setIsViewEmployeeModalOpen,
+    setIsEditing,
+    (employee) => {
+      setSelectedEmployee(employee);
+      setIsViewEmployeeModalOpen(true);
+    }
+  );
 
   if (loading) {
     return (
@@ -52,9 +57,12 @@ const EmployeeDashboard = () => {
         setOpen={setIsViewEmployeeModalOpen}
         title={"Employee Directory"}
         description=""
-        className="w-full"
+        className="sm:max-w-[calc(100%-4rem)] h-9/10 flex flex-col overflow-auto"
       >
-        <EmployeeDirectory employee={selectedEmployee} />
+        <EmployeeDirectory
+          employee={selectedEmployee}
+          isReadOnly={!isEditing}
+        />
       </Modal>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -80,6 +88,7 @@ const EmployeeDashboard = () => {
             employees={employees}
             setSelectedEmployee={setSelectedEmployee}
             setIsViewEmployeeModalOpen={setIsViewEmployeeModalOpen}
+            setIsEditing={setIsEditing}
           />
         )}
       </div>

@@ -5,12 +5,14 @@ interface EmployeeGridProps {
   employees: Employee[];
   setIsViewEmployeeModalOpen?: (isOpen: boolean) => void;
   setSelectedEmployee?: (employee: Employee | null) => void;
+  setIsEditing?: (isEditing: boolean) => void;
 }
 
 const EmployeeGrid = ({
   employees,
   setIsViewEmployeeModalOpen,
   setSelectedEmployee,
+  setIsEditing,
 }: EmployeeGridProps) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
@@ -20,6 +22,7 @@ const EmployeeGrid = ({
           employee={employee}
           setIsViewEmployeeModalOpen={setIsViewEmployeeModalOpen}
           setSelectedEmployee={setSelectedEmployee}
+          setIsEditing={setIsEditing}
         />
       ))}
     </div>
