@@ -7,6 +7,7 @@ import {
   deleteEmployee,
   uploadOwnAvatar,
   uploadAvatar,
+  deleteAvatar,
 } from "../controllers/employeeController.js";
 import multer from "multer";
 
@@ -42,6 +43,12 @@ router.post(
   verifyStaff,
   upload.single("avatar"),
   uploadAvatar
+);
+router.delete(
+  "/delete-avatar/:employeeId",
+  verifyToken,
+  verifyStaff,
+  deleteAvatar
 );
 router.get("/", verifyToken, verifyStaff, getAllEmployees);
 router.post("/get-employee", verifyToken, verifyStaff, getEmployee);

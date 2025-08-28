@@ -347,7 +347,7 @@ export const uploadAvatar = async (req, res) => {
 
     // Get file extension from original filename
     const fileExtension = avatar.originalname.split(".").pop();
-    const fileName = `${employeeId}@${Date.now()}.${fileExtension}`; // Add extension!
+    const fileName = `${employeeId}.${fileExtension}`; // Add extension!
 
     console.log("Avatar to be uploaded:", {
       originalname: avatar.originalname,
@@ -356,25 +356,14 @@ export const uploadAvatar = async (req, res) => {
       fileName: fileName,
     });
 
-    // Delete previous avatar except this file name
-    // Filter to avoid deleting the newly uploaded file if it has the same name
-    const { error: deleteError } = await supabase.storage
-      .from("hrms")
-      .remove([`avatars/${employeeId}@*`]);
 
-    if (deleteError) {
-      console.error("Supabase delete error:", deleteError);
-      return res
-        .status(500)
-        .json({ success: false, message: "Error deleting old avatar" });
-    }
 
     // Upload to Supabase with proper filename
     const { data, error: uploadError } = await supabase.storage
       .from("hrms")
       .upload(`avatars/${fileName}`, avatar.buffer, {
-        cacheControl: "3600",
-        upsert: false,
+        cacheControl: "0",
+        upsert: true,
         contentType: avatar.mimetype,
       });
 
@@ -390,7 +379,7 @@ export const uploadAvatar = async (req, res) => {
       .from("hrms")
       .getPublicUrl(data.path);
 
-    const avatar_url = urlData.publicUrl;
+    const avatar_url = urlData.publicUrl + "?t=" + Date.now(); // Cache busting
 
     console.log("Generated avatar URL:", avatar_url); // Debug log
 
@@ -414,6 +403,45 @@ export const uploadAvatar = async (req, res) => {
     });
   } catch (error) {
     console.error("Error uploading avatar:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteAvatar = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+
+    // Delete from Supabase
+    const { error: deleteError } = await supabase.storage
+      .from("hrms")
+      .remove([`avatars/${employeeId}`]);
+
+    if (deleteError) {
+      console.error("Supabase delete error:", deleteError);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error deleting file" });
+    }
+
+    // Update employee record
+    const result = await pool.query(
+      "UPDATE employees SET avatar_url = NULL WHERE employee_id = $1 RETURNING *",
+      [employeeId]
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Employee not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Avatar deleted successfully",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error deleting avatar:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
