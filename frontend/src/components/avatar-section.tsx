@@ -226,7 +226,7 @@ const AvatarSection = ({
                 <img
                   src={`${displayedEmployee.avatar_url}?v=${Date.now()}`}
                   alt="Employee Avatar"
-                  className="object-cover w-full h-full rounded-full"
+                  className="w-39 h-39 object-cover object-center rounded-full absolute bottom-1/2 right-1/2 transform translate-x-1/2 translate-y-1/2"
                   onError={(e) => {
                     console.error("Image failed to load:", e.currentTarget.src);
                   }}
