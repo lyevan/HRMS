@@ -1,7 +1,12 @@
 import { EmployeeTable } from "@/components/tables/employee-table";
 import { type Employee } from "@/models/employee-model";
-import { useEmployees } from "@/hooks/useEmployees";
-import { useState } from "react";
+import {
+  useEmployees,
+  useFetchEmployees,
+  useEmployeeLoading,
+  useEmployeeError,
+} from "@/store/employeeStore";
+import { useEffect, useState } from "react";
 import Modal from "@/components/modal";
 import { List, LayoutGrid } from "lucide-react";
 import employeeColumns from "@/components/tables/columns/employee-columns";
@@ -16,7 +21,17 @@ import {
 } from "@/components/ui/tooltip";
 
 const EmployeeDashboard = () => {
-  const { employees, loading, error } = useEmployees();
+  // const { employees, loading, error } = useEmployees();
+  const employees = useEmployees();
+  const loading = useEmployeeLoading();
+  const error = useEmployeeError();
+  const fetchEmployees = useFetchEmployees();
+
+  useEffect(() => {
+    console.log("🔍 Dashboard: Fetching employees...");
+    fetchEmployees();
+  }, [fetchEmployees]);
+
   const [isViewEmployeeModalOpen, setIsViewEmployeeModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
@@ -69,7 +84,6 @@ const EmployeeDashboard = () => {
           <Button
             // variant="primary"
             className="mb-4"
-           
             onClick={() => setIsTableView(!isTableView)}
           >
             {isTableView ? <LayoutGrid /> : <List />}

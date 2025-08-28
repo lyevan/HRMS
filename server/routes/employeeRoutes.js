@@ -46,7 +46,7 @@ router.post(
 router.get("/", verifyToken, verifyStaff, getAllEmployees);
 router.post("/get-employee", verifyToken, verifyStaff, getEmployee);
 router.post("/", verifyToken, verifyStaff, createEmployee);
-router.put("/update-employee", verifyToken, verifyStaff, updateEmployee);
+router.put("/:id", verifyToken, verifyStaff, updateEmployee);
 
 // Only admin can delete employees
 router.delete("/delete-employee", verifyToken, verifyAdmin, deleteEmployee);

@@ -6,11 +6,12 @@ export const useEmployees = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadEmployees = async () => {
+  // parameter to bust cache or not
+  const loadEmployees = async (bustCache = false) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetchAllEmployees();
+      const response = await fetchAllEmployees(bustCache);
       setEmployees(response.results);
     } catch (err) {
       setError("Failed to fetch employees");
@@ -24,10 +25,15 @@ export const useEmployees = () => {
     loadEmployees();
   }, []);
 
+  // pass a parameter whether to bust cache or not
+  const refetch = (bustCache = false) => {
+    loadEmployees(bustCache);
+  };
+
   return {
     employees,
     loading,
     error,
-    refetch: loadEmployees,
+    refetch,
   };
 };

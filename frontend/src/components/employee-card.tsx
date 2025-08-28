@@ -28,6 +28,7 @@ import { type Employee } from "@/models/employee-model";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { useCopyToClipboard } from "@/store/useCopyToClipboard";
+import { useEmployees } from "@/store/employeeStore"; // Add this import
 
 interface EmployeeCardProps {
   employee: Employee;
@@ -37,16 +38,22 @@ interface EmployeeCardProps {
 }
 
 const EmployeeCard = ({
-  employee,
+  employee: propEmployee,
   setIsViewEmployeeModalOpen,
   setSelectedEmployee,
   setIsEditing,
 }: EmployeeCardProps) => {
   const { copyToClipboard, isCopying } = useCopyToClipboard();
-  const placeholderNumber = "09991234567"; // Placeholder number since API doesn't provide one
+  const employees = useEmployees(); // Get employees from store
+  
+  // Find the current employee from store to get latest data (including avatar updates)
+  const employee = employees.find(emp => emp.employee_id === propEmployee.employee_id) || propEmployee;
+  
+  const placeholderNumber = "09991234567";
   const formatPhoneNumber = (number: string) => {
     return number.replace(/(\d{4})(\d{3})(\d{4})/, "$1-$2-$3");
   };
+
   return (
     <Card>
       <CardHeader>
@@ -54,9 +61,9 @@ const EmployeeCard = ({
           <div className="flex items-center">
             {employee.avatar_url ? (
               <img
-                src={employee.avatar_url}
+                src={`${employee.avatar_url}?v=${Date.now()}`} // Add cache busting
                 alt={`${employee.first_name} ${employee.last_name}`}
-                className="w-10 h-10 rounded-full mr-2"
+                className="w-10 h-10 rounded-full mr-2 object-cover object-center"
               />
             ) : (
               <UserCircle2 className="w-10 h-10 mr-2" />

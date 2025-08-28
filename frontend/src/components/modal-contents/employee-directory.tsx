@@ -1,6 +1,6 @@
 import { type Employee } from "@/models/employee-model";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BookUser,
   UserRoundSearch,
@@ -14,6 +14,10 @@ import AvatarSection from "../avatar-section";
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
+import {
+  useSelectedEmployee,
+  useSetSelectedEmployee,
+} from "@/store/employeeStore";
 
 interface EmployeeDirectoryProps {
   employee: Employee | null;
@@ -21,13 +25,27 @@ interface EmployeeDirectoryProps {
 }
 
 const EmployeeDirectory = ({
-  employee,
+  employee: initialEmployee,
   isReadOnly: initialReadOnlyState = true,
 }: EmployeeDirectoryProps) => {
   const isMobile = useIsMobile();
-
   const [isReadOnly, setIsReadOnly] = useState(initialReadOnlyState);
 
+  // Use Zustand store
+  const selectedEmployee = useSelectedEmployee();
+  const setSelectedEmployee = useSetSelectedEmployee();
+
+  // IMPORTANT: Use selectedEmployee from store as primary source
+  const employee = selectedEmployee || initialEmployee;
+
+  // Set employee in store when prop changes
+  useEffect(() => {
+    if (initialEmployee && initialEmployee.employee_id !== selectedEmployee?.employee_id) {
+      setSelectedEmployee(initialEmployee);
+    }
+  }, [initialEmployee, selectedEmployee, setSelectedEmployee]);
+
+  // Personal Information array
   const personalInformation = [
     {
       id: "first-name",
@@ -220,12 +238,10 @@ const EmployeeDirectory = ({
             </>
           )}
         </TabsList>
-        {/* Outer Container */}
+
         <div className="flex flex-1 justify-center items-start mt-10 flex-col sm:flex-row">
-          {/*---------------------------*/}
-          {/* Avatar and Name Container */}
-          {/*---------------------------*/}
           <div className="flex flex-col items-center gap-2 flex-1 w-full">
+            {/* Pass the employee from store to AvatarSection */}
             <AvatarSection employee={employee} />
             <p className="text-2xl font-semibold text-primary">
               {employee?.first_name} {employee?.last_name}
@@ -250,20 +266,11 @@ const EmployeeDirectory = ({
             )}
           </div>
 
-          {/*-----------------------*/}
-          {/* Information Container */}
-          {/*-----------------------*/}
           <div className="flex-2">
             <TabsContent value="personal">
               {employee ? (
                 <div className="flex flex-col sm:flex-row items-center justify-center ">
-                  {/*---------*/}
-                  {/* Details */}
-                  {/*---------*/}
                   <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
-                    {/*------------------*/}
-                    {/* Personal Details */}
-                    {/*------------------*/}
                     <div className="flex flex-col gap-2">
                       <p className="font-black mb-2">Personal Information</p>
                       {personalInformation.map((info) => (
@@ -277,9 +284,6 @@ const EmployeeDirectory = ({
                         />
                       ))}
                     </div>
-                    {/*-----------------*/}
-                    {/* Contact Details */}
-                    {/*-----------------*/}
                     <div className="flex flex-col gap-2">
                       <p className="font-black mb-2">Contact Information</p>
                       {contactInformation.map((info) => (
@@ -298,6 +302,7 @@ const EmployeeDirectory = ({
                 <p>No employee selected</p>
               )}
             </TabsContent>
+
             <TabsContent value="profile">
               <div className="flex flex-col sm:flex-row items-center justify-center w-full ">
                 <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
@@ -316,6 +321,7 @@ const EmployeeDirectory = ({
                 </div>
               </div>
             </TabsContent>
+
             <TabsContent value="employment">
               <div className="flex flex-col sm:flex-row items-center justify-center ">
                 <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
@@ -333,8 +339,7 @@ const EmployeeDirectory = ({
                   </div>
                   <div className="flex flex-col gap-2 w-full">
                     <p className="font-black mb-2">Leaves Information</p>
-
-                    {employee?.leave_balances.map((leave) => (
+                    {employee?.leave_balances?.map((leave) => (
                       <LabelAndInput
                         key={leave.leave_type}
                         id={leave.leave_type}
@@ -343,11 +348,16 @@ const EmployeeDirectory = ({
                         isReadOnly={isReadOnly}
                         type="number"
                       />
-                    ))}
+                    )) || (
+                      <p className="text-sm text-gray-500">
+                        No leave balances available
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
             </TabsContent>
+
             <TabsContent value="compensation">
               <div className="flex flex-col sm:flex-row items-center justify-center ">
                 <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
@@ -373,6 +383,7 @@ const EmployeeDirectory = ({
                 </div>
               </div>
             </TabsContent>
+
             <TabsContent value="identification">
               <div className="flex flex-col sm:flex-row items-center justify-center w-full ">
                 <div className="flex flex-col sm:grid grid-cols-2 gap-8 mt-4 sm:mt-0 sm:ml-10 w-full">
@@ -399,32 +410,3 @@ const EmployeeDirectory = ({
 };
 
 export default EmployeeDirectory;
-
-{
-  /* <p>ID: {employee.employee_id}</p>
-                <p>Department: {employee.department_name}</p>
-                <p>Position: {employee.position_title}</p>
-                <p>Status: {employee.status}</p>
-                 <p>
-                  Hired Date:{" "}
-                  {new Date(employee.contract_start_date).toLocaleDateString()}
-                </p>
-                <p>
-                  End of Contract Date:{" "}
-                  {employee.contract_end_date
-                    ? new Date(employee.contract_end_date).toLocaleDateString()
-                    : "N/A"}
-                </p>
-                <p>Employement Type: {employee.employment_type}</p>
-                <p>Rate Type: {employee.rate_type}</p>
-                <p>Salary: {employee.salary_rate}</p>
-
-                <ul>
-                  <p>Leaves:</p>
-                  {employee.leave_balances.map((leave) => (
-                    <li className="ml-4" key={leave.leave_type}>
-                      {leave.leave_type}: {leave.balance} days
-                    </li>
-                  ))}
-                </ul> */
-}

@@ -40,9 +40,21 @@ export type EmployeeResponse = {
   results: Employee[];
 };
 
-export const fetchAllEmployees = async (): Promise<EmployeeResponse> => {
+// Parameter to decide whether to bust cache or not
+
+export const fetchAllEmployees = async (
+  bustCache = false
+): Promise<EmployeeResponse> => {
+  if (bustCache) {
+    console.log("Fetching employees with cache busting");
+  }
+  // If bust cache is true, add a timestamp to the query param to avoid cached responses
+  // If not true just fetch normally, and dont use query param
   try {
-    const response = await axios.get("/employees");
+    let response;
+    bustCache
+      ? (response = await axios.get("/employees", { params: { t: Date.now() } }))
+      : (response = await axios.get("/employees"));
     return response.data;
   } catch (error) {
     console.error("Error fetching employees:", error);

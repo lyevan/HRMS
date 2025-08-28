@@ -13,7 +13,7 @@ import {
   Menu,
 } from "lucide-react";
 import { Pie, PieChart } from "recharts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 
 import {
@@ -34,6 +34,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useFetchEmployees, useEmployeeError, useEmployeeLoading, useEmployees } from "../../store/employeeStore";
 
 export const description = "Attendance today";
 const chartData = [
@@ -62,6 +63,26 @@ const chartConfig = {
 const Dashboard = () => {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const employees = useEmployees();
+  const loading = useEmployeeLoading();
+  const error = useEmployeeError();
+  const fetchEmployees = useFetchEmployees();
+
+  useEffect(() => {
+    console.log("🔍 Dashboard: Fetching employees...");
+    fetchEmployees();
+  }, [fetchEmployees]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log("📊 Dashboard state:", {
+      employeeCount: employees.length,
+      loading,
+      error,
+      employees: employees.slice(0, 2), // Show first 2 employees for debugging
+    });
+  }, [employees, loading, error]);
+
   const quickActions = [
     {
       label: "Add Employee",
@@ -121,7 +142,7 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">245</div>
+            <div className="text-2xl font-bold">{employees.length}</div>
             <p className="text-xs text-muted-foreground">
               +20% from last month
             </p>
