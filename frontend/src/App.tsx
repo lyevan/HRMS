@@ -14,6 +14,7 @@ import { Landing } from "./pages/public/landing";
 import { useIsMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 import EmployeeDashboard from "./pages/admin/employees/dashboard";
+import EmployeeManagement from "./pages/admin/employees/management";
 
 
 function App() {
@@ -121,6 +122,7 @@ function App() {
                         element={<Navigate to="/emp/dashboard" />}
                       />
                       <Route path="emp/dashboard" element={<EmployeeDashboard />} />
+                      <Route path="emp/management" element={<EmployeeManagement />} />
 
                       {/* Admin Timekeeping Group Routes */}
                       <Route path="timekeeping" element={<TimekeepingPage />} />

@@ -10,10 +10,20 @@ export type Employee = {
   employee_id: string;
   system_id: number;
   first_name: string;
+  middle_name?: string | null; // Can be null, API returns string
   last_name: string;
+  nickname?: string | null; // Can be null, API returns string
+  suffix?: string | null; // Can be null, API returns string
+  gender: string | null; // Can be null, API returns string
+  civil_status: string | null; // Can be null, API returns string
+  religion?: string | null; // Can be null, API returns string
+  citizenship?: string | null; // Can be null, API returns string
+  current_address?: string | null; // Can be null, API returns string
+  permanent_address?: string | null; // Can be null, API returns string
   avatar_url?: string | null; // Can be null, API returns string
   email: string;
   phone?: string | null; // Can be null, API returns string
+  telephone?: string | null; // Can be null, API returns string
   date_of_birth: string | null; // Can be null, API returns string
   status: string;
   created_at: string;
@@ -33,6 +43,10 @@ export type Employee = {
   // Convenience properties for easier access
   department: string; // alias for department_name
   position: string; // alias for position_title
+  sss_number?: string | null; // Can be null, API returns string
+  philhealth_number?: string | null; // Can be null, API returns string
+  hdmf_number?: string | null; // Can be null, API returns string
+  tin_number?: string | null; // Can be null, API returns string
 };
 
 export type EmployeeResponse = {

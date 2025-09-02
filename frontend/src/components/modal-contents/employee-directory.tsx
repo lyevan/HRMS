@@ -19,6 +19,14 @@ import {
   useSetSelectedEmployee,
 } from "@/store/employeeStore";
 import Modal from "../modal";
+import {
+  getCompensationInformation,
+  getContactInformation,
+  getEmployeeProfile,
+  getEmploymentInformation,
+  getIdentificationInformation,
+  getPersonalInformation,
+} from "@/lib/employeeInformation";
 
 interface EmployeeDirectoryProps {
   employee: Employee | null;
@@ -33,12 +41,19 @@ const EmployeeDirectory = ({
   const [isReadOnly, setIsReadOnly] = useState(initialReadOnlyState);
   const [isViewImageOpen, setViewImageOpen] = useState(false);
 
+
   // Use Zustand store
   const selectedEmployee = useSelectedEmployee();
   const setSelectedEmployee = useSetSelectedEmployee();
 
   // IMPORTANT: Use selectedEmployee from store as primary source
   const employee = selectedEmployee || initialEmployee;
+
+  // const onChangeEventHandler = (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   // Handle input changes if needed
+  //   const key = event.target.name;
+  //   const value = event.target.value;
+  // };
 
   // Set employee in store when prop changes
   useEffect(() => {
@@ -51,157 +66,17 @@ const EmployeeDirectory = ({
   }, [initialEmployee, selectedEmployee, setSelectedEmployee]);
 
   // Personal Information array
-  const personalInformation = [
-    {
-      id: "first-name",
-      label: "First Name",
-      value: employee?.first_name,
-      type: "text",
-    },
-    { id: "middle-name", label: "Middle Name", value: "--", type: "text" },
-    {
-      id: "last-name",
-      label: "Last Name",
-      value: employee?.last_name,
-      type: "text",
-    },
-    { id: "nickname", label: "Nickname", value: "--", type: "text" },
-    { id: "age", label: "Age", value: "--", type: "text" },
-    { id: "birthdate", label: "Birthdate", value: "--", type: "text" },
-    { id: "gender", label: "Gender", value: "--", type: "text" },
-    {
-      id: "civil-status",
-      label: "Civil Status",
-      value: "--",
-      type: "text",
-    },
-    { id: "religion", label: "Religion", value: "--", type: "text" },
-    {
-      id: "nationality",
-      label: "Nationality",
-      value: "--",
-      type: "text",
-    },
-  ];
-
-  const contactInformation = [
-    {
-      id: "current-address",
-      label: "Current Address",
-      value: "--",
-      type: "text",
-    },
-    {
-      id: "permanent-address",
-      label: "Permanent Address",
-      value: "--",
-      type: "text",
-    },
-    { id: "email", label: "Email", value: employee?.email, type: "email" },
-    { id: "mobile", label: "Mobile", value: "--", type: "tel" },
-    { id: "telephone", label: "Telephone", value: "--", type: "tel" },
-  ];
-
-  const employeeProfile = [
-    {
-      id: "employee-id",
-      label: "Employee ID",
-      value: employee?.employee_id,
-      type: "text",
-    },
-    {
-      id: "department",
-      label: "Department",
-      value: employee?.department_name,
-      type: "text",
-    },
-    {
-      id: "position",
-      label: "Position",
-      value: employee?.position_title,
-      type: "text",
-    },
-  ];
-
-  const employmentInformation = [
-    {
-      id: "hire-date",
-      label: "Hire Date",
-      value: employee?.contract_start_date
-        ? new Date(employee?.contract_start_date).toLocaleDateString()
-        : "--",
-      type: "text",
-    },
-    {
-      id: "end-date",
-      label: "End Date",
-      value: employee?.contract_end_date
-        ? new Date(employee?.contract_end_date).toLocaleDateString()
-        : "--",
-      type: "text",
-    },
-    {
-      id: "status",
-      label: "Status",
-      value:
-        employee?.status &&
-        employee?.status.charAt(0).toUpperCase() + employee?.status.slice(1),
-      type: "text",
-    },
-    {
-      id: "employment-type",
-      label: "Employment Type",
-      value: employee?.employment_type,
-      type: "text",
-    },
-  ];
-
-  const compensationInformation = [
-    {
-      id: "rate-type",
-      label: "Rate Type",
-      value:
-        employee?.rate_type &&
-        employee?.rate_type.charAt(0).toUpperCase() +
-          employee?.rate_type.slice(1),
-      type: "text",
-    },
-    {
-      id: "salary-rate",
-      label: "Salary Rate",
-      value: employee?.salary_rate,
-      type: "text",
-    },
-  ];
-
-  const identificationInformation = [
-    {
-      id: "sss-number",
-      label: "SSS Number",
-      value: "--",
-      type: "text",
-    },
-    {
-      id: "pagibig-number",
-      label: "Pag-IBIG Number",
-      value: "--",
-      type: "text",
-    },
-    {
-      id: "philhealth-number",
-      label: "PhilHealth Number",
-      value: "--",
-      type: "text",
-    },
-    {
-      id: "tin-number",
-      label: "TIN Number",
-      value: "--",
-      type: "text",
-    },
-  ];
-
-
+  const personalInformation = getPersonalInformation(employee);
+  // Contact Information array
+  const contactInformation = getContactInformation(employee);
+  // Employee Profile array
+  const employeeProfile = getEmployeeProfile(employee);
+  // Employment Information array
+  const employmentInformation = getEmploymentInformation(employee);
+  // Compensation Information array
+  const compensationInformation = getCompensationInformation(employee);
+  // Identification Information array
+  const identificationInformation = getIdentificationInformation(employee);
 
   return (
     <>
@@ -217,7 +92,7 @@ const EmployeeDirectory = ({
           className="max-w-full max-h-full object-contain"
         />
       </Modal>
-  
+
       <div className="flex flex-1">
         <Tabs defaultValue="personal" className="w-full">
           <TabsList className="w-full sticky top-0 z-9999 md:w-fit">

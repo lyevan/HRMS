@@ -132,7 +132,7 @@ export function AppAdminSidebar() {
         <SidebarContent className="overflow-x-hidden h-screen">
           <SidebarGroup></SidebarGroup>
           <SidebarGroup>
-            <SidebarGroupLabel>HRMS</SidebarGroupLabel>
+            <SidebarGroupLabel>Main</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {items.map((item) => {
