@@ -18,6 +18,7 @@ import { Button } from "../ui/button";
 
 interface EmployeeGridProps {
   employees: Employee[];
+  setIsAddEmployeeModalOpen: (open: boolean) => void;
   setIsViewEmployeeModalOpen?: (isOpen: boolean) => void;
   setSelectedEmployee?: (employee: Employee | null) => void;
   setIsEditing?: (isEditing: boolean) => void;
@@ -25,6 +26,7 @@ interface EmployeeGridProps {
 
 const EmployeeGrid = ({
   employees,
+  setIsAddEmployeeModalOpen,
   setIsViewEmployeeModalOpen,
   setSelectedEmployee,
   setIsEditing,
@@ -92,9 +94,7 @@ const EmployeeGrid = ({
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning("Add employee implementation coming soon")
-            }
+            onClick={() => setIsAddEmployeeModalOpen(true)}
           >
             <UserPlus />
             {!isMobile && "Add Employee"}

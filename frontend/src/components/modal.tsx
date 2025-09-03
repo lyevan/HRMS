@@ -27,7 +27,7 @@ const Modal = ({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         className={className}
-        onPointerDownOutside={(e) =>  e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="h-fit">
           <DialogTitle>{title}</DialogTitle>

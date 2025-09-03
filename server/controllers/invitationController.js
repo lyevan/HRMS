@@ -8,17 +8,16 @@ dotenv.config();
 
 export const createPendingEmployee = async (req, res) => {
   const {
-    email,
-    phone,
-    department,
-    position,
-    hourly_rate,
-    hire_date,
+    employee_information: ei,
+    contract_information: ci,
     account_type = "employee",
     status = "registering",
   } = req.body;
 
-  if (!email) {
+  console.log("Received employee information:", ei);
+  console.log("Received contract information:", ci);
+
+  if (!ei.email) {
     return res.status(400).json({ error: "Email is required" });
   }
 
@@ -26,7 +25,7 @@ export const createPendingEmployee = async (req, res) => {
     // Check if the employee already exists
     const result = await pool.query(
       "SELECT * FROM pending_employees WHERE email = $1",
-      [email]
+      [ei.email]
     );
 
     if (result.rows.length > 0) {
@@ -38,7 +37,7 @@ export const createPendingEmployee = async (req, res) => {
     // Next check if the email exists on the employees table
     const existingEmployee = await pool.query(
       "SELECT * FROM employees WHERE email = $1",
-      [email]
+      [ei.email]
     );
 
     if (existingEmployee.rows.length > 0) {
@@ -47,35 +46,47 @@ export const createPendingEmployee = async (req, res) => {
         .json({ error: "Email is already in use by an existing employee" });
     }
 
-    const inviteToken = generateInviteToken(email);
-    await pool.query(
-      "INSERT INTO pending_employees (email, phone, department, position, hourly_rate, hire_date, account_type, token, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    // Create Contract First
+    const contractResult = await pool.query(
+      "INSERT INTO contracts (start_date, end_date, rate, rate_type, position_id, employment_type_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING contract_id",
       [
-        email,
-        phone,
-        department,
-        position,
-        hourly_rate,
-        hire_date,
-        account_type,
+        ci.contract_start_date,
+        ci.contract_end_date || null,
+        ci.salary_rate,
+        ci.rate_type,
+        ci.position_id,
+        ci.employment_type_id,
+      ]
+    );
+
+    const contractId = contractResult.rows[0].contract_id;
+
+    const inviteToken = generateInviteToken(ei.email);
+    await pool.query(
+      "INSERT INTO pending_employees (first_name, last_name, email, phone, contract_id, token, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [
+        ei.first_name,
+        ei.last_name,
+        ei.email,
+        ei.phone,
+        contractId,
         inviteToken,
         status,
       ]
     );
 
     await sendInvitationEmail({
-      to: email,
+      to: ei.email,
       url: `${process.env.FRONTEND_URL}/complete-registration/${inviteToken}`,
     });
 
     return res.status(201).json({
       employmentData: {
-        email,
-        phone,
-        department,
-        position,
-        hourly_rate,
-        hire_date,
+        first_name: ei.first_name,
+        last_name: ei.last_name,
+        email: ei.email,
+        phone: ei.phone,
+        contract_id: ci.contract_id,
         account_type,
         status,
       },

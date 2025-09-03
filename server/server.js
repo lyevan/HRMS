@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import userRoutes from "./routes/userRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
+import employmentTypeRoutes from "./routes/employmentTypeRoutes.js";
 import attendanceRoutes from "./routes/attendanceRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
@@ -25,6 +26,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     "https://relyant-demo-client.vercel.app",
     "http://localhost:5173",
+    "http://192.168.0.109:5173",
     process.env.FRONTEND_URL,
   ].filter(Boolean);
 
@@ -81,6 +83,7 @@ app.get("/", (req, res) => {
 app.use("/api/rfid", rfidRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/employment-types", employmentTypeRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/invite", invitationRoutes);
 app.use("/api/departments", departmentRoutes);

@@ -38,11 +38,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface EmployeeTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  setIsAddEmployeeModalOpen: (open: boolean) => void;
 }
 
 export function EmployeeTable<TData, TValue>({
   columns,
   data,
+  setIsAddEmployeeModalOpen,
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("last_name");
@@ -68,7 +70,11 @@ export function EmployeeTable<TData, TValue>({
       <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
         <div className="flex items-center gap-2 w-xs">
           <Input
-            placeholder={!isMobile ? `Search by ${filterInput.split("_").join(" ")}...` : "Search..."}
+            placeholder={
+              !isMobile
+                ? `Search by ${filterInput.split("_").join(" ")}...`
+                : "Search..."
+            }
             value={
               (table.getColumn(filterInput)?.getFilterValue() as string) ?? ""
             }
@@ -113,9 +119,7 @@ export function EmployeeTable<TData, TValue>({
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning("Add employee implementation coming soon")
-            }
+            onClick={() => setIsAddEmployeeModalOpen(true)}
           >
             <UserPlus />
             {!isMobile && "Add Employee"}

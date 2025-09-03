@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import AddEmployeeForm from "@/components/forms/add-employee-form";
 
 const EmployeeDashboard = () => {
   // const { employees, loading, error } = useEmployees();
@@ -33,6 +34,7 @@ const EmployeeDashboard = () => {
   }, [fetchEmployees]);
 
   const [isViewEmployeeModalOpen, setIsViewEmployeeModalOpen] = useState(false);
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
@@ -67,6 +69,7 @@ const EmployeeDashboard = () => {
 
   return (
     <>
+      {/* Employee Directory Modal */}
       <Modal
         open={isViewEmployeeModalOpen}
         setOpen={setIsViewEmployeeModalOpen}
@@ -78,6 +81,17 @@ const EmployeeDashboard = () => {
           employee={selectedEmployee}
           isReadOnly={!isEditing}
         />
+      </Modal>
+
+      {/* Add Employee Modal */}
+      <Modal
+        open={isAddEmployeeModalOpen}
+        setOpen={setIsAddEmployeeModalOpen}
+        title={"Send Onboarding Form"}
+        className="sm:max-w-[calc(50%-4rem)] h-fit max-h-9/10 flex flex-col overflow-auto"
+        description="Send an onboarding form to the new employee with the email they have provided."
+      >
+        <AddEmployeeForm setOpen={setIsAddEmployeeModalOpen} />
       </Modal>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -97,10 +111,15 @@ const EmployeeDashboard = () => {
 
       <div className="space-y-4">
         {isTableView ? (
-          <EmployeeTable<Employee, any> columns={columns} data={employees} />
+          <EmployeeTable<Employee, any>
+            columns={columns}
+            data={employees}
+            setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
+          />
         ) : (
           <EmployeeGrid
             employees={employees}
+            setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
             setSelectedEmployee={setSelectedEmployee}
             setIsViewEmployeeModalOpen={setIsViewEmployeeModalOpen}
             setIsEditing={setIsEditing}
