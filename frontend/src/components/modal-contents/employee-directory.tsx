@@ -46,16 +46,88 @@ const EmployeeDirectory = ({
   const isMobile = useIsMobile();
   const [isReadOnly, setIsReadOnly] = useState(initialReadOnlyState);
   const [isViewImageOpen, setViewImageOpen] = useState(false);
-
   // Use Zustand store
   const selectedEmployee = useSelectedEmployee();
   const setSelectedEmployee = useSetSelectedEmployee();
+
+  // Helper function to safely convert date to YYYY-MM-DD format with timezone compensation
+  const safeDateToYMD = (dateString: string | null): string | null => {
+    if (!dateString) return null;
+
+    console.log("Original date string:", dateString);
+
+    // If it's already in YYYY-MM-DD format, return as is
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      console.log("Already in YYYY-MM-DD format, returning:", dateString);
+      return dateString;
+    }
+
+    // If it's an ISO string (contains T), extract the date part and apply timezone compensation
+    if (dateString.includes("T")) {
+      const datePart = dateString.split("T")[0];
+      console.log("Extracted from ISO string:", datePart);
+
+      // Add +1 day compensation for timezone issues in edit mode
+      const date = new Date(datePart + "T12:00:00"); // Use noon to avoid timezone edge cases
+      date.setDate(date.getDate() + 1);
+
+      const compensatedDate = date.toISOString().split("T")[0];
+      console.log("Applied +1 day compensation:", {
+        original: datePart,
+        compensated: compensatedDate,
+      });
+
+      return compensatedDate;
+    }
+
+    // For date strings that might be in various formats, try regex first
+    const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const result = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
+      console.log("Matched simple date format:", result);
+      return result;
+    }
+
+    // If we can't parse it safely, return the original string
+    console.log("Could not parse date safely, returning original:", dateString);
+    return dateString;
+  };
+  // Helper function to convert employee data for form initialization
+  const transformEmployeeDataForForm = (employee: Employee) => {
+    const transformedData = { ...employee };
+
+    // Convert dates to YYYY-MM-DD format for date inputs
+    if (employee.date_of_birth) {
+      const convertedDate =
+        safeDateToYMD(employee.date_of_birth) || employee.date_of_birth;
+      console.log("🔍 Form initialization - date_of_birth:", {
+        original: employee.date_of_birth,
+        converted: convertedDate,
+        willBeUsedForFormInput: convertedDate,
+      });
+      transformedData.date_of_birth = convertedDate;
+    }
+
+    if (employee.contract_start_date) {
+      transformedData.contract_start_date =
+        safeDateToYMD(employee.contract_start_date) ||
+        employee.contract_start_date;
+    }
+
+    if (employee.contract_end_date) {
+      transformedData.contract_end_date =
+        safeDateToYMD(employee.contract_end_date) || employee.contract_end_date;
+    }
+
+    console.log("🚀 Final transformed data for form:", transformedData);
+    return transformedData;
+  };
 
   // IMPORTANT: Use selectedEmployee from store as primary source
   const employee = selectedEmployee || initialEmployee;
   // Initialize React Hook Form
   const form = useForm<Employee>({
-    defaultValues: employee || {},
+    defaultValues: employee ? transformEmployeeDataForForm(employee) : {},
   });
 
   const selectFields = [
@@ -80,6 +152,7 @@ const EmployeeDirectory = ({
     {
       id: "suffix",
       options: [
+        { value: "none", label: "--" },
         { value: "Jr.", label: "Jr." },
         { value: "Sr.", label: "Sr." },
         { value: "II", label: "II" },
@@ -107,14 +180,27 @@ const EmployeeDirectory = ({
     "hdmf_number",
     "philhealth_number",
     "tin_number",
-  ];
-
-  // Update form when employee changes
+    "status",
+    "employee_id",
+  ]; // Update form when employee changes
   useEffect(() => {
     if (employee) {
-      form.reset(employee);
+      const transformedEmployee = transformEmployeeDataForForm(employee);
+      form.reset(transformedEmployee);
     }
   }, [employee, form]);
+
+  // Debug form values when switching between read-only and edit modes
+  useEffect(() => {
+    const currentValues = form.getValues();
+    console.log(`🔄 Mode changed to: ${isReadOnly ? "READ-ONLY" : "EDIT"}`, {
+      mode: isReadOnly ? "read-only" : "edit",
+      dateOfBirth: currentValues.date_of_birth,
+      contractStartDate: currentValues.contract_start_date,
+      allFormValues: currentValues,
+    });
+  }, [isReadOnly, form]);
+
   // Handle form submission
   const onSubmit = async (data: Employee) => {
     try {
@@ -126,7 +212,9 @@ const EmployeeDirectory = ({
       console.log("Submitting form data: ", filteredData);
       await axios.put(`/employees/${data.employee_id}`, filteredData);
       console.log("Updating employee:", filteredData);
-      toast.success("Employee updated successfully!");
+      toast.success("Employee updated successfully!", {
+        description: "Reload the page to see updated data.",
+      });
       setIsReadOnly(true);
     } catch (error) {
       console.error("Error updating employee:", error);
@@ -285,6 +373,9 @@ const EmployeeDirectory = ({
                                 label={info.label}
                                 isReadOnly={isReadOnly}
                                 type={info.type}
+                                displayValue={
+                                  isReadOnly ? info.value : undefined
+                                }
                                 excludeFromForm={excludedFields.includes(
                                   info.id
                                 )}
@@ -301,6 +392,8 @@ const EmployeeDirectory = ({
                             name={info.id}
                             label={info.label}
                             isReadOnly={isReadOnly}
+                            type={info.type}
+                            displayValue={isReadOnly ? info.value : undefined}
                             excludeFromForm={excludedFields.includes(info.id)}
                           />
                         ))}
@@ -324,6 +417,7 @@ const EmployeeDirectory = ({
                           name={info.id}
                           label={info.label}
                           isReadOnly={isReadOnly}
+                          displayValue={isReadOnly ? info.value : undefined}
                           excludeFromForm={excludedFields.includes(info.id)}
                         />
                       ))}
@@ -344,13 +438,15 @@ const EmployeeDirectory = ({
                           name={info.id}
                           label={info.label}
                           isReadOnly={isReadOnly}
+                          type={info.type}
+                          displayValue={isReadOnly ? info.value : undefined}
                           excludeFromForm={excludedFields.includes(info.id)}
                         />
                       ))}
                     </div>{" "}
                     <div className="flex flex-col gap-2 w-full">
                       <p className="font-black mb-2">Leaves Information</p>
-                      <LeaveBalancesSection isReadOnly={isReadOnly} />
+                      <LeaveBalancesSection isReadOnly={true} />
                     </div>
                   </div>
                 </div>
@@ -370,6 +466,8 @@ const EmployeeDirectory = ({
                           name={info.id}
                           label={info.label}
                           isReadOnly={isReadOnly}
+                          type={info.type}
+                          displayValue={isReadOnly ? info.value : undefined}
                           excludeFromForm={excludedFields.includes(info.id)}
                         />
                       ))}
@@ -393,6 +491,8 @@ const EmployeeDirectory = ({
                           name={info.id}
                           label={info.label}
                           isReadOnly={isReadOnly}
+                          type={info.type}
+                          displayValue={isReadOnly ? info.value : undefined}
                           excludeFromForm={excludedFields.includes(info.id)}
                         />
                       ))}

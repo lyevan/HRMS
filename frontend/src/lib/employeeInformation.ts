@@ -16,19 +16,19 @@ export const getPersonalInformation = (employee: Employee | null) => {
     {
       id: "first_name",
       label: "First Name",
-      value: capitalizeFirstLetter(employee?.first_name || "--"),
+      value: toTitleCase(employee?.first_name || "--"),
       type: "text",
     },
     {
       id: "middle_name",
       label: "Middle Name",
-      value: capitalizeFirstLetter(employee?.middle_name || "--"),
+      value: toTitleCase(employee?.middle_name || "--"),
       type: "text",
     },
     {
       id: "last_name",
       label: "Last Name",
-      value: capitalizeFirstLetter(employee?.last_name || "--"),
+      value: toTitleCase(employee?.last_name || "--"),
       type: "text",
     },
     {
@@ -40,7 +40,7 @@ export const getPersonalInformation = (employee: Employee | null) => {
     {
       id: "nickname",
       label: "Nickname",
-      value: capitalizeFirstLetter(employee?.nickname || "--"),
+      value: toTitleCase(employee?.nickname || "--"),
       type: "text",
     },
     {
@@ -53,12 +53,12 @@ export const getPersonalInformation = (employee: Employee | null) => {
       id: "date_of_birth",
       label: "Birthdate",
       value: formatDate(employee?.date_of_birth || null) || "--",
-      type: "text",
+      type: "date",
     },
     {
       id: "sex",
       label: "Sex",
-      value: capitalizeFirstLetter(employee?.sex || "--"),
+      value: toTitleCase(employee?.sex || "--"),
       type: "text",
     },
     {
@@ -70,13 +70,13 @@ export const getPersonalInformation = (employee: Employee | null) => {
     {
       id: "religion",
       label: "Religion",
-      value: capitalizeFirstLetter(employee?.religion || "--"),
+      value: toTitleCase(employee?.religion || "--"),
       type: "text",
     },
     {
       id: "citizenship",
       label: "Citizenship",
-      value: capitalizeFirstLetter(employee?.citizenship || "--"),
+      value: toTitleCase(employee?.citizenship || "--"),
       type: "text",
     },
   ];
@@ -145,7 +145,7 @@ export const getEmploymentInformation = (employee: Employee | null) => {
       id: "contract_start_date",
       label: "Hire Date",
       value: formatDate(employee?.contract_start_date || null) || "--",
-      type: "date",
+      type: "text", // Changed from "date" to "text" since this field is read-only
     },
     {
       id: "contract_end_date",
@@ -156,7 +156,7 @@ export const getEmploymentInformation = (employee: Employee | null) => {
     {
       id: "status",
       label: "Status",
-      value: capitalizeFirstLetter(employee?.status || "--"),
+      value: toTitleCase(employee?.status || "--"),
       type: "text",
     },
     {

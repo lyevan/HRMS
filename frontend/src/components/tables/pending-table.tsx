@@ -38,11 +38,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface EmployeeTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  setIsAddEmployeeModalOpen: (isOpen: boolean) => void;
 }
 
 export function PendingEmployeeTable<TData, TValue>({
   columns,
   data,
+  setIsAddEmployeeModalOpen,
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("last_name");
@@ -65,7 +67,6 @@ export function PendingEmployeeTable<TData, TValue>({
 
   return (
     <div>
-      <p className="text-red-500 font-black">PLACEHOLDER DATA FOR NOW</p>
       <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
         <div className="flex items-center gap-2 w-xs">
           <Input
@@ -118,9 +119,7 @@ export function PendingEmployeeTable<TData, TValue>({
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning("Onboarding employee implementation coming soon")
-            }
+            onClick={() => setIsAddEmployeeModalOpen(true)}
           >
             <UserPlus />
             {!isMobile && "Onboard Employee"}

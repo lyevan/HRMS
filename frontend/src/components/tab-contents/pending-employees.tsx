@@ -8,10 +8,12 @@ import {
 import { type PendingEmployee } from "@/models/pending-employee-model";
 import Modal from "../modal";
 import PendingEmployeeDirectory from "../modal-contents/pending-employee-directory";
+import AddEmployeeForm from "../forms/add-employee-form";
 
 const PendingEmployees = () => {
   const [isViewPendingEmployeeModalOpen, setIsViewPendingEmployeeModalOpen] =
     useState(false);
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [selectedPendingEmployee, setSelectedPendingEmployee] =
     useState<PendingEmployee | null>(null);
 
@@ -47,11 +49,22 @@ const PendingEmployees = () => {
           isReadOnly={true}
         />
       </Modal>
+      {/* Add Employee Modal */}
+      <Modal
+        open={isAddEmployeeModalOpen}
+        setOpen={setIsAddEmployeeModalOpen}
+        title={"Send Onboarding Form"}
+        className="sm:max-w-[calc(50%-4rem)] h-fit max-h-9/10 flex flex-col overflow-auto"
+        description="Send an onboarding form to the new employee with the email they have provided."
+      >
+        <AddEmployeeForm setOpen={setIsAddEmployeeModalOpen} />
+      </Modal>
 
       <div>
         <PendingEmployeeTable<PendingEmployee, any>
           columns={columns}
           data={pendingEmployees}
+          setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
         />
       </div>
     </>

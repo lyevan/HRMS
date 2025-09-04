@@ -1,0 +1,63 @@
+/* Enhanced Date Input Styles */
+
+/* Hide native date picker icons across all browsers */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 2.5rem;
+  height: 100%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+/* Firefox date input styling */
+input[type="date"]::-moz-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  width: 2.5rem;
+  height: 100%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+/* Remove spin buttons and clear buttons */
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/* Ensure consistent color scheme */
+input[type="date"] {
+  color-scheme: light;
+}
+
+/* Custom focus styles for better accessibility */
+/* .date-input-wrapper:focus-within .calendar-icon {
+  color: rgb(59 130 246);
+} */
+
+/* Animation for the calendar icon on hover */
+/* .date-input-wrapper:hover .calendar-icon {
+  transform: translateY(-50%) scale(1.05);
+  transition: transform 0.2s ease-in-out;
+} */
+
+/* Ensure the date input text is properly aligned */
+input[type="date"] {
+  font-family: inherit;
+  font-size: 0.875rem; /* text-sm equivalent */
+  line-height: 1.25rem;
+}
+
+/* Handle placeholder text in date inputs */
+input[type="date"]:invalid {
+  color: rgb(156 163 175); /* gray-400 equivalent */
+}
+
+input[type="date"]:focus:invalid {
+  color: inherit;
+}
