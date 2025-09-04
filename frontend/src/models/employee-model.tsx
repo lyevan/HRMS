@@ -14,7 +14,7 @@ export type Employee = {
   last_name: string;
   nickname?: string | null; // Can be null, API returns string
   suffix?: string | null; // Can be null, API returns string
-  gender: string | null; // Can be null, API returns string
+  sex: string | null; // Can be null, API returns string
   civil_status: string | null; // Can be null, API returns string
   religion?: string | null; // Can be null, API returns string
   citizenship?: string | null; // Can be null, API returns string
@@ -67,7 +67,9 @@ export const fetchAllEmployees = async (
   try {
     let response;
     bustCache
-      ? (response = await axios.get("/employees", { params: { t: Date.now() } }))
+      ? (response = await axios.get("/employees", {
+          params: { t: Date.now() },
+        }))
       : (response = await axios.get("/employees"));
     return response.data;
   } catch (error) {

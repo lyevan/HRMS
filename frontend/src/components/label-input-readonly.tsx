@@ -1,40 +1,66 @@
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { toast } from "sonner";
+import { useFormContext } from "react-hook-form";
 
 interface LabelAndInputProps {
   isReadOnly?: boolean;
-  id?: string;
+  name: string; // Changed from id to name for better form handling
   label?: string;
-  value?: string;
   type?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  required?: boolean;
+  excludeFromForm?: boolean; // Don't register this field with React Hook Form
 }
+
 const LabelAndInput = ({
-  isReadOnly,
-  id,
+  isReadOnly = false,
+  name,
   label,
-  value = "--",
   type = "text",
-  onChange = () => {
-    toast.warning("Field Editing implementing soon!");
-  },
+  placeholder,
+  required = false,
+  excludeFromForm = false,
 }: LabelAndInputProps) => {
+  const {
+    register,
+    formState: { errors },
+    getValues,
+  } = useFormContext();
+
+  // Get the error for this field
+  const error = errors[name];
+
+  // Get the current value for excluded fields
+  const currentValue = excludeFromForm ? getValues(name) : undefined;
+
   return (
     <div className="grid grid-cols-3 w-full max-w-sm items-center gap-2">
-      <Label htmlFor={id} className="col-span-1">
+      <Label htmlFor={name} className="col-span-1">
         {label}
-      </Label>
-      <Input
-        className="col-span-2"
-        id={id}
-        type={type}
-        value={value}
-        placeholder={label}
-        readOnly={isReadOnly}
-        disabled={isReadOnly}
-        onChange={onChange}
-      />
+        {required && !isReadOnly && (
+          <span className="text-red-500 ml-1">*</span>
+        )}
+      </Label>{" "}
+      <div className="col-span-2 space-y-1">
+        <Input
+          {...(excludeFromForm
+            ? {}
+            : register(name, {
+                required:
+                  required && !isReadOnly ? `${label} is required` : false,
+              }))}
+          className={`${error ? "border-red-500" : ""}`}
+          id={name}
+          type={type}
+          placeholder={placeholder || "--"}
+          value={excludeFromForm ? currentValue || "" : undefined}
+          readOnly={isReadOnly || excludeFromForm}
+          disabled={isReadOnly || excludeFromForm}
+        />
+        {error && (
+          <p className="text-sm text-red-500">{error.message as string}</p>
+        )}
+      </div>
     </div>
   );
 };

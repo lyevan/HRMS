@@ -15,7 +15,7 @@ import { useIsMobile } from "./hooks/use-mobile";
 import { ThemeProvider } from "@/components/theme-provider";
 import EmployeeDashboard from "./pages/admin/employees/dashboard";
 import EmployeeManagement from "./pages/admin/employees/management";
-
+import CompleteRegistrationForm from "./pages/public/complete-registration";
 
 function App() {
   // Validate environment variables and configure axios
@@ -100,6 +100,10 @@ function App() {
 
             <Route path="/auth" element={<LoginPage />} />
             <Route
+              path="/complete-registration/:token"
+              element={<CompleteRegistrationForm />}
+            />
+            <Route
               path="/unauthorized"
               element={<div>Unauthorized Access</div>}
             />
@@ -121,8 +125,14 @@ function App() {
                         path="emp"
                         element={<Navigate to="/emp/dashboard" />}
                       />
-                      <Route path="emp/dashboard" element={<EmployeeDashboard />} />
-                      <Route path="emp/management" element={<EmployeeManagement />} />
+                      <Route
+                        path="emp/dashboard"
+                        element={<EmployeeDashboard />}
+                      />
+                      <Route
+                        path="emp/management"
+                        element={<EmployeeManagement />}
+                      />
 
                       {/* Admin Timekeeping Group Routes */}
                       <Route path="timekeeping" element={<TimekeepingPage />} />

@@ -3,6 +3,7 @@ import { sendInvitationEmail } from "./emailController.js";
 import { generateInviteToken } from "../utils/tokenGeneration.js";
 import { createEmployee } from "./employeeController.js";
 import { sendOnboardingEmail } from "./emailController.js";
+import { supabase } from "../config/supabase.config.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -60,10 +61,9 @@ export const createPendingEmployee = async (req, res) => {
     );
 
     const contractId = contractResult.rows[0].contract_id;
-
     const inviteToken = generateInviteToken(ei.email);
-    await pool.query(
-      "INSERT INTO pending_employees (first_name, last_name, email, phone, contract_id, token, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    const insertResult = await pool.query(
+      "INSERT INTO pending_employees (first_name, last_name, email, phone, contract_id, token, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
       [
         ei.first_name,
         ei.last_name,
@@ -75,20 +75,25 @@ export const createPendingEmployee = async (req, res) => {
       ]
     );
 
+    const createdPendingEmployee = insertResult.rows[0];
+
     await sendInvitationEmail({
       to: ei.email,
       url: `${process.env.FRONTEND_URL}/complete-registration/${inviteToken}`,
     });
 
     return res.status(201).json({
+      success: true,
       employmentData: {
-        first_name: ei.first_name,
-        last_name: ei.last_name,
-        email: ei.email,
-        phone: ei.phone,
-        contract_id: ci.contract_id,
-        account_type,
-        status,
+        pending_employee_id: createdPendingEmployee.pending_employee_id,
+        first_name: createdPendingEmployee.first_name,
+        last_name: createdPendingEmployee.last_name,
+        email: createdPendingEmployee.email,
+        phone: createdPendingEmployee.phone,
+        contract_id: createdPendingEmployee.contract_id,
+        status: createdPendingEmployee.status,
+        created_at: createdPendingEmployee.created_at,
+        token: createdPendingEmployee.token,
       },
       message: "Pending employee created successfully",
     });
@@ -102,7 +107,10 @@ export const returnEmploymentData = async (req, res) => {
   const token = req.params.token;
   try {
     const result = await pool.query(
-      "SELECT * FROM pending_employees WHERE token = $1",
+      `SELECT pe.*, gn.sss_number, gn.hdmf_number, gn.philhealth_number, gn.tin_number
+       FROM pending_employees pe
+       LEFT JOIN government_id_numbers gn ON pe.government_id_numbers_id = gn.government_id_numbers_id
+       WHERE pe.token = $1`,
       [token]
     );
 
@@ -110,27 +118,39 @@ export const returnEmploymentData = async (req, res) => {
       return res.status(404).json({ error: "Pending employee not found" });
     }
 
-    const {
-      email,
-      phone,
-      department,
-      position,
-      hourly_rate,
-      hire_date,
-      account_type,
-      status,
-    } = result.rows[0];
+    const pendingEmployee = result.rows[0];
 
     return res.status(200).json({
       employmentData: {
-        email,
-        phone,
-        department,
-        position,
-        hourly_rate,
-        hire_date,
-        account_type,
-        status,
+        pending_employee_id: pendingEmployee.pending_employee_id,
+        first_name: pendingEmployee.first_name,
+        last_name: pendingEmployee.last_name,
+        middle_name: pendingEmployee.middle_name,
+        email: pendingEmployee.email,
+        phone: pendingEmployee.phone,
+        contract_id: pendingEmployee.contract_id,
+        status: pendingEmployee.status,
+        // Personal information
+        nickname: pendingEmployee.nickname,
+        suffix: pendingEmployee.suffix,
+        sex: pendingEmployee.sex,
+        date_of_birth: pendingEmployee.date_of_birth,
+        civil_status: pendingEmployee.civil_status,
+        religion: pendingEmployee.religion,
+        citizenship: pendingEmployee.citizenship,
+        current_address: pendingEmployee.current_address,
+        permanent_address: pendingEmployee.permanent_address,
+        telephone: pendingEmployee.telephone,
+        // Government ID numbers
+        sss_number: pendingEmployee.sss_number,
+        hdmf_number: pendingEmployee.hdmf_number,
+        philhealth_number: pendingEmployee.philhealth_number,
+        tin_number: pendingEmployee.tin_number,
+        // Other fields
+        government_id_numbers_id: pendingEmployee.government_id_numbers_id,
+        avatar_url: pendingEmployee.avatar_url,
+        created_at: pendingEmployee.created_at,
+        updated_at: pendingEmployee.updated_at,
       },
     });
   } catch (error) {
@@ -147,88 +167,166 @@ export const completeRegistration = async (req, res) => {
     lastName,
     suffix,
     nickname,
-    gender,
-    birthDate,
-    birthPlace,
+    sex,
+    dateOfBirth,
     civilStatus,
-    nationality,
+    citizenship,
     religion,
     email,
     phone,
-    alternatePhone,
-    presentAddress,
+    telephone,
+    currentAddress,
     permanentAddress,
+    // Government ID Numbers
     sssNumber,
-    pagibigNumber,
-    philhealthNumber,
+    hdmfNumber,
+    philHealthNumber,
     tinNumber,
-    highestEducation,
-    schoolName,
-    courseOrMajor,
-    graduationYear,
-    spouseName,
-    spouseOccupation,
-    fatherName,
-    motherName,
-    emergencyContactName,
-    emergencyContactRelationship,
-    emergencyContactPhone,
-    emergencyContactAddress,
-    department,
-    position,
-    hourlyRate,
-    hireDate,
     status = "for reviewing",
   } = req.body;
 
+  const avatar = req.file; // Avatar file from multer
+
   try {
+    // First, check if the pending employee exists
+    const pendingEmployeeResult = await pool.query(
+      "SELECT * FROM pending_employees WHERE token = $1",
+      [token]
+    );
+
+    if (pendingEmployeeResult.rows.length === 0) {
+      return res.status(404).json({ error: "Invalid or expired token" });
+    }
+
+    const pendingEmployee = pendingEmployeeResult.rows[0];
+    let avatar_url = pendingEmployee.avatar_url; // Keep existing avatar if no new one uploaded
+    let government_id_numbers_id = pendingEmployee.government_id_numbers_id;
+
+    // Handle avatar upload if provided
+    if (avatar) {
+      try {
+        // Get file extension from original filename
+        const fileExtension = avatar.originalname.split(".").pop();
+        const fileName = `pending_${pendingEmployee.pending_employee_id}.${fileExtension}`;
+
+        console.log("Avatar to be uploaded:", {
+          originalname: avatar.originalname,
+          mimetype: avatar.mimetype,
+          size: avatar.size,
+          fileName: fileName,
+        });
+
+        // Upload to Supabase
+        const { data, error: uploadError } = await supabase.storage
+          .from("hrms")
+          .upload(`pending-avatars/${fileName}`, avatar.buffer, {
+            cacheControl: "0",
+            upsert: true,
+            contentType: avatar.mimetype,
+          });
+
+        if (uploadError) {
+          console.error("Supabase upload error:", uploadError);
+          return res.status(500).json({ error: "Error uploading avatar" });
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("hrms")
+          .getPublicUrl(data.path);
+
+        avatar_url = urlData.publicUrl + "?t=" + Date.now(); // Cache busting
+
+        console.log("Generated avatar URL:", avatar_url);
+      } catch (uploadError) {
+        console.error("Error handling avatar upload:", uploadError);
+        // Continue without avatar if upload fails
+      }
+    }
+
+    // Handle government ID numbers if provided
+    if (sssNumber || hdmfNumber || philHealthNumber || tinNumber) {
+      if (government_id_numbers_id) {
+        // Update existing government ID record
+        await pool.query(
+          `UPDATE government_id_numbers SET 
+            sss_number = COALESCE($1, sss_number),
+            hdmf_number = COALESCE($2, hdmf_number),
+            philhealth_number = COALESCE($3, philhealth_number),
+            tin_number = COALESCE($4, tin_number)
+          WHERE government_id_numbers_id = $5`,
+          [
+            sssNumber,
+            hdmfNumber,
+            philHealthNumber,
+            tinNumber,
+            government_id_numbers_id,
+          ]
+        );
+      } else {
+        // Create new government ID record
+        const govIdResult = await pool.query(
+          `INSERT INTO government_id_numbers 
+            (sss_number, hdmf_number, philhealth_number, tin_number)
+          VALUES ($1, $2, $3, $4)
+          RETURNING government_id_numbers_id`,
+          [sssNumber, hdmfNumber, philHealthNumber, tinNumber]
+        );
+        government_id_numbers_id = govIdResult.rows[0].government_id_numbers_id;
+      }
+    }
+
+    // Update pending employee record
     await pool.query(
-      "UPDATE pending_employees SET first_name = $1, last_name = $2, middle_name = $3, suffix = $4, nickname = $5, gender = $6, birth_date = $7, birth_place = $8, civil_status = $9, nationality = $10, religion = $11, email = $12, phone = $13, alternate_phone = $14, present_address = $15, permanent_address = $16, sss_number = $17, pagibig_number = $18, philhealth_number = $19, tin_number = $20, highest_education = $21, school_name = $22, course_or_major = $23, graduation_year = $24, spouse_name = $25, spouse_occupation = $26, father_name = $27, mother_name = $28, emergency_contact_name = $29, emergency_contact_relationship = $30, emergency_contact_phone = $31, emergency_contact_address = $32, department = $33, position = $34, hourly_rate = $35, hire_date = $36, status = $37, token = null WHERE token = $38",
+      `UPDATE pending_employees SET 
+        first_name = $1, 
+        last_name = $2, 
+        middle_name = $3, 
+        suffix = $4, 
+        nickname = $5, 
+        sex = $6, 
+        date_of_birth = $7, 
+        civil_status = $8, 
+        citizenship = $9, 
+        religion = $10, 
+        email = $11, 
+        phone = $12, 
+        telephone = $13, 
+        current_address = $14, 
+        permanent_address = $15, 
+        avatar_url = $16,
+        government_id_numbers_id = $17,
+        status = $18, 
+        token = null,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE token = $19`,
       [
         firstName,
         lastName,
         middleName,
         suffix,
         nickname,
-        gender,
-        birthDate,
-        birthPlace,
+        sex,
+        dateOfBirth,
         civilStatus,
-        nationality,
+        citizenship,
         religion,
         email,
         phone,
-        alternatePhone,
-        presentAddress,
+        telephone,
+        currentAddress,
         permanentAddress,
-        sssNumber,
-        pagibigNumber,
-        philhealthNumber,
-        tinNumber,
-        highestEducation,
-        schoolName,
-        courseOrMajor,
-        graduationYear,
-        spouseName,
-        spouseOccupation,
-        fatherName,
-        motherName,
-        emergencyContactName,
-        emergencyContactRelationship,
-        emergencyContactPhone,
-        emergencyContactAddress,
-        department,
-        position,
-        hourlyRate,
-        hireDate,
+        avatar_url,
+        government_id_numbers_id,
         status,
         token,
       ]
     );
 
-    return res
-      .status(200)
-      .json({ message: "Registration completed successfully" });
+    return res.status(200).json({
+      message: "Registration completed successfully",
+      avatar_url: avatar_url,
+    });
   } catch (error) {
     console.error("Error completing registration:", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -237,7 +335,18 @@ export const completeRegistration = async (req, res) => {
 
 export const getAllPendingEmployees = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM pending_employees");
+    // Join Pending Employees with Contract ID
+    const result = await pool.query(`
+        SELECT 
+          pe.*,
+          c.*,
+          p.*,
+          d.name AS department_name,
+          p.title AS position_title
+        FROM pending_employees pe
+        JOIN contracts c ON pe.contract_id = c.contract_id
+        JOIN positions p ON c.position_id = p.position_id
+        JOIN departments d ON p.department_id = d.department_id`);
     return res.status(200).json({ result: result.rows });
   } catch (error) {
     console.error("Error fetching pending employees:", error);
@@ -256,7 +365,7 @@ export const reviewPendingEmployee = async (req, res) => {
   try {
     // Check if current status is 'for reviewing'
     const status = await pool.query(
-      "SELECT status FROM pending_employees WHERE id = $1",
+      "SELECT status FROM pending_employees WHERE pending_employee_id = $1",
       [id]
     );
     if (status.rows.length === 0 || status.rows[0].status == "for approval") {
@@ -267,10 +376,10 @@ export const reviewPendingEmployee = async (req, res) => {
     if (status.rows.length === 0 || status.rows[0].status !== "for reviewing") {
       return res
         .status(400)
-        .json({ error: "Please have the employee form completed first" });
+        .json({ error: "Please have the onboarding form completed first" });
     }
     const result = await pool.query(
-      "UPDATE pending_employees SET status = 'for approval' WHERE id = $1 RETURNING *",
+      "UPDATE pending_employees SET status = 'for approval' WHERE pending_employee_id = $1 RETURNING *",
       [id]
     );
 
@@ -333,80 +442,46 @@ export const approvePendingEmployee = async (req, res) => {
       return generateEmployeeId(counter);
     };
 
-    const employee_id = await getNextEmployeeId();
-
-    // Check first if status is 'for approval'
+    const employee_id = await getNextEmployeeId(); // Check first if status is 'for approval'
     const status = await pool.query(
-      "SELECT status FROM pending_employees WHERE id = $1",
-      [employee.id]
+      "SELECT status FROM pending_employees WHERE pending_employee_id = $1",
+      [employee.pending_employee_id]
     );
     if (status.rows.length === 0 || status.rows[0].status !== "for approval") {
       return res
         .status(400)
         .json({ error: "Please review the employee form first" });
-    }
-
-    // 1. Insert into employees table
+    }    // 1. Insert into employees table
     const insertEmployeeQuery = `
       INSERT INTO employees (
         employee_id, first_name, middle_name, last_name, suffix, nickname,
-        gender, birth_date, birth_place, civil_status, nationality, religion,
-        email, phone, alternate_phone, present_address, permanent_address,
-        sss_number, pagibig_number, philhealth_number, tin_number,
-        department, position, employment_type, emergency_contact_name,
-        emergency_contact_relationship, emergency_contact_phone, emergency_contact_address,
-        spouse_name, spouse_occupation, father_name, mother_name,
-        highest_education, school_name, course_or_major, graduation_year,
-        bank_name, bank_account_number, hourly_rate, hire_date, account_type, status
+        sex, date_of_birth, civil_status, citizenship, religion,
+        email, phone, telephone, current_address, permanent_address,
+        government_id_numbers_id, avatar_url, contract_id, status
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
-        $33, $34, $35, $36, $37, $38, $39, $40, $41, $42
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+        $17, $18, $19, $20
       ) RETURNING *
-    `;
-
-    const employeeValues = [
+    `;    const employeeValues = [
       employee_id,
       employee.first_name,
       employee.middle_name,
       employee.last_name,
       employee.suffix,
       employee.nickname,
-      employee.gender,
-      employee.birth_date,
-      employee.birth_place,
+      employee.sex,
+      employee.date_of_birth,
       employee.civil_status,
-      employee.nationality,
+      employee.citizenship,
       employee.religion,
       employee.email,
       employee.phone,
-      employee.alternate_phone,
-      employee.present_address,
+      employee.telephone,
+      employee.current_address,
       employee.permanent_address,
-      employee.sss_number,
-      employee.pagibig_number,
-      employee.philhealth_number,
-      employee.tin_number,
-      employee.department,
-      employee.position,
-      employee.employment_type,
-      employee.emergency_contact_name,
-      employee.emergency_contact_relationship,
-      employee.emergency_contact_phone,
-      employee.emergency_contact_address,
-      employee.spouse_name,
-      employee.spouse_occupation,
-      employee.father_name,
-      employee.mother_name,
-      employee.highest_education,
-      employee.school_name,
-      employee.course_or_major,
-      employee.graduation_year,
-      employee.bank_name,
-      employee.bank_account_number,
-      employee.hourly_rate,
-      employee.hire_date,
-      employee.account_type || "employee",
+      employee.government_id_numbers_id,
+      employee.avatar_url,
+      employee.contract_id,
       "active",
     ];
 
@@ -440,30 +515,24 @@ export const approvePendingEmployee = async (req, res) => {
       username,
     ];
 
-    await pool.query(insertUserQuery, userValues);
-
-    // 3. Send onboarding email
-
+    await pool.query(insertUserQuery, userValues);    // 3. Send onboarding email
     await sendOnboardingEmail({
       to: insertedEmployee.email,
       first_name: insertedEmployee.first_name,
       employee_id: insertedEmployee.employee_id,
       username,
-      position: insertedEmployee.position,
+      position: "Employee", // Default position since we don't have this info in the current schema
       company_name: process.env.COMPANY_NAME,
-    });
-
-    // 4. Remove from pending_employees table
-    await pool.query("DELETE FROM pending_employees WHERE id = $1", [
-      employee.id,
-    ]);
-
-    console.log(
-      `Employee with position -${employee.position}- approved and created successfully.\nEmployee ID: ${employee_id}`
+    });// 4. Remove from pending_employees table
+    await pool.query(
+      "DELETE FROM pending_employees WHERE pending_employee_id = $1",
+      [employee.pending_employee_id]
+    );    console.log(
+      `Employee approved and created successfully.\nEmployee ID: ${employee_id}`
     );
     console.log(
       `Employee account with role -${
-        employee.account_type || "employee"
+        role || "employee"
       }- created successfully.\nUsername: ${username}`
     );
 
@@ -482,4 +551,41 @@ export const approvePendingEmployee = async (req, res) => {
   }
 };
 
-export const rejectPendingEmployee = async (req, res) => {};
+export const rejectPendingEmployee = async (req, res) => {
+  const { id } = req.params;
+  console.log("Rejecting pending employee with ID:", id);
+
+  if (!id) {
+    return res.status(400).json({ error: "Employee ID is required" });
+  }
+
+  try {
+    // Check if pending employee exists
+    const checkResult = await pool.query(
+      "SELECT * FROM pending_employees WHERE pending_employee_id = $1",
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: "Pending employee not found" });
+    }
+
+    // Update status to rejected
+    const result = await pool.query(
+      "UPDATE pending_employees SET status = 'rejected', updated_at = NOW() WHERE pending_employee_id = $1 RETURNING *",
+      [id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Pending employee rejected successfully",
+      employee: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error rejecting pending employee:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+};

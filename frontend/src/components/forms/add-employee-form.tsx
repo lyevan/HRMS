@@ -185,10 +185,16 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
       setOpen(false);
     } catch (error) {
       setError(
-        (error as any).response?.data?.message || "Failed to add employee"
+        (error as any).response?.data?.message ||
+          (error as any).response?.data?.error ||
+          "Failed to add employee"
       );
       console.error("Error adding employee:", error);
-      toast.error("Failed to add employee");
+      toast.error(
+        (error as any).response?.data?.message ||
+          (error as any).response?.data?.error ||
+          "Failed to add employee"
+      );
     } finally {
       setIsLoading(false);
       setError("");
@@ -239,36 +245,38 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
       <div className="flex flex-col gap-4 w-full flex-1">
         <h3 className="font-semibold">Create Employee Contract</h3>
         <hr></hr>
-        {/* Contract Start Date */}
-        <div className="flex flex-col gap-2 w-full">
-          <Label htmlFor="contract_start_date">Contract Start Date *</Label>
-          <Input
-            id="contract_start_date"
-            type="date"
-            value={formContractData.contract_start_date}
-            required
-            onChange={(e) =>
-              setFormContractData({
-                ...formContractData,
-                contract_start_date: e.target.value,
-              })
-            }
-          />
-        </div>
-        {/* Contract End Date */}
-        <div className="flex flex-col gap-2 w-full">
-          <Label htmlFor="contract_end_date">Contract End Date</Label>
-          <Input
-            id="contract_end_date"
-            type="date"
-            value={formContractData.contract_end_date}
-            onChange={(e) =>
-              setFormContractData({
-                ...formContractData,
-                contract_end_date: e.target.value,
-              })
-            }
-          />
+        <div className="flex gap-2 w-full">
+          {/* Contract Start Date */}
+          <div className="flex flex-col gap-2 flex-1">
+            <Label htmlFor="contract_start_date">Contract Start Date *</Label>
+            <Input
+              id="contract_start_date"
+              type="date"
+              value={formContractData.contract_start_date}
+              required
+              onChange={(e) =>
+                setFormContractData({
+                  ...formContractData,
+                  contract_start_date: e.target.value,
+                })
+              }
+            />
+          </div>
+          {/* Contract End Date */}
+          <div className="flex flex-col gap-2 flex-1">
+            <Label htmlFor="contract_end_date">Contract End Date</Label>
+            <Input
+              id="contract_end_date"
+              type="date"
+              value={formContractData.contract_end_date}
+              onChange={(e) =>
+                setFormContractData({
+                  ...formContractData,
+                  contract_end_date: e.target.value,
+                })
+              }
+            />
+          </div>
         </div>
         {/* Rate and Rate Type */}
         <div className="flex gap-2 w-full">
@@ -315,9 +323,8 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
 
         {/* Department Selection */}
         <div className="flex flex-col gap-2 w-full">
-          <Label htmlFor="department">Department *</Label>
+          <Label>Department *</Label>
           <Select
-            id="department"
             value={selectedDepartment}
             onValueChange={(value: string) => setSelectedDepartment(value)}
             required
@@ -341,9 +348,8 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
 
         {/* Positions Selection */}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="position">Position *</Label>
+          <Label>Position *</Label>
           <Select
-            id="position"
             value={selectedPosition}
             onValueChange={(value: string) => setSelectedPosition(value)}
             required
@@ -363,16 +369,17 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
                   </SelectItem>
                 ))
               ) : (
-                <SelectItem disabled>Select a department first</SelectItem>
+                <SelectItem disabled value="Select a department first">
+                  Select a department first
+                </SelectItem>
               )}
             </SelectContent>
           </Select>
         </div>
         {/* Employment Type */}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="employment_type">Employment Type *</Label>
+          <Label>Employment Type *</Label>
           <Select
-            id="employment_type"
             value={selectedEmploymentType}
             onValueChange={(value: string) => setSelectedEmploymentType(value)}
             required

@@ -25,10 +25,6 @@ export const getAllEmployees = async (req, res) => {
         c.rate AS salary_rate,
         c.rate_type AS rate_type,
         et.name AS employment_type,
-        gn.sss_number,
-        gn.tin_number,
-        gn.philhealth_number,
-        gn.hdmf_number,
         -- Aggregate leave balances into JSON
         COALESCE(
           JSON_AGG(
@@ -47,13 +43,11 @@ export const getAllEmployees = async (req, res) => {
       LEFT JOIN employment_types et ON c.employment_type_id = et.employment_type_id
       LEFT JOIN leave_balance lb ON e.employee_id = lb.employee_id
       LEFT JOIN leave_types lt ON lb.leave_type_id = lt.leave_type_id
-      LEFT JOIN government_id_numbers gn ON e.government_id_numbers_id = gn.government_id_numbers_id
       GROUP BY 
         e.employee_id, e.system_id, e.first_name, e.last_name, e.email, 
         e.date_of_birth, e.status, e.created_at, e.updated_at, e.contract_id,
         d.name, d.department_id, p.title, p.position_id, p.department_id,
-        c.start_date, c.end_date, c.rate, c.rate_type, et.name,
-        gn.sss_number, gn.tin_number, gn.philhealth_number, gn.hdmf_number
+        c.start_date, c.end_date, c.rate, c.rate_type, et.name
       ORDER BY e.created_at DESC
     `);
 

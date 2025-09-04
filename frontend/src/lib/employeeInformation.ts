@@ -8,24 +8,25 @@ import {
   formatHDMFNumber,
   formatPhilhealthNumber,
   formatTINNumber,
+  toTitleCase,
 } from "./stringMethods";
 
 export const getPersonalInformation = (employee: Employee | null) => {
   const personalInformation = [
     {
-      id: "first-name",
+      id: "first_name",
       label: "First Name",
       value: capitalizeFirstLetter(employee?.first_name || "--"),
       type: "text",
     },
     {
-      id: "middle-name",
+      id: "middle_name",
       label: "Middle Name",
       value: capitalizeFirstLetter(employee?.middle_name || "--"),
       type: "text",
     },
     {
-      id: "last-name",
+      id: "last_name",
       label: "Last Name",
       value: capitalizeFirstLetter(employee?.last_name || "--"),
       type: "text",
@@ -49,21 +50,21 @@ export const getPersonalInformation = (employee: Employee | null) => {
       type: "text",
     },
     {
-      id: "birthdate",
+      id: "date_of_birth",
       label: "Birthdate",
       value: formatDate(employee?.date_of_birth || null) || "--",
       type: "text",
     },
     {
-      id: "gender",
-      label: "Gender",
-      value: capitalizeFirstLetter(employee?.gender || "--"),
+      id: "sex",
+      label: "Sex",
+      value: capitalizeFirstLetter(employee?.sex || "--"),
       type: "text",
     },
     {
-      id: "civil-status",
+      id: "civil_status",
       label: "Civil Status",
-      value: capitalizeFirstLetter(employee?.civil_status || "--"),
+      value: toTitleCase(employee?.civil_status || "--"),
       type: "text",
     },
     {
@@ -73,8 +74,8 @@ export const getPersonalInformation = (employee: Employee | null) => {
       type: "text",
     },
     {
-      id: "nationality",
-      label: "Nationality",
+      id: "citizenship",
+      label: "Citizenship",
       value: capitalizeFirstLetter(employee?.citizenship || "--"),
       type: "text",
     },
@@ -85,20 +86,20 @@ export const getPersonalInformation = (employee: Employee | null) => {
 export const getContactInformation = (employee: Employee | null) => {
   const contactInformation = [
     {
-      id: "current-address",
+      id: "current_address",
       label: "Current Address",
       value: employee?.current_address || "--",
       type: "text",
     },
     {
-      id: "permanent-address",
+      id: "permanent_address",
       label: "Permanent Address",
       value: employee?.permanent_address || "--",
       type: "text",
     },
     { id: "email", label: "Email", value: employee?.email, type: "email" },
     {
-      id: "mobile",
+      id: "phone",
       label: "Mobile",
       value: employee?.phone || "--",
       type: "tel",
@@ -117,19 +118,19 @@ export const getContactInformation = (employee: Employee | null) => {
 export const getEmployeeProfile = (employee: Employee | null) => {
   const employeeProfile = [
     {
-      id: "employee-id",
+      id: "employee_id",
       label: "Employee ID",
       value: employee?.employee_id,
       type: "text",
     },
     {
-      id: "department",
+      id: "department_name",
       label: "Department",
       value: employee?.department_name,
       type: "text",
     },
     {
-      id: "position",
+      id: "position_title",
       label: "Position",
       value: employee?.position_title,
       type: "text",
@@ -141,13 +142,13 @@ export const getEmployeeProfile = (employee: Employee | null) => {
 export const getEmploymentInformation = (employee: Employee | null) => {
   const employmentInformation = [
     {
-      id: "hire-date",
+      id: "contract_start_date",
       label: "Hire Date",
       value: formatDate(employee?.contract_start_date || null) || "--",
-      type: "text",
+      type: "date",
     },
     {
-      id: "end-date",
+      id: "contract_end_date",
       label: "End Date",
       value: formatDate(employee?.contract_end_date || null) || "--",
       type: "text",
@@ -159,11 +160,12 @@ export const getEmploymentInformation = (employee: Employee | null) => {
       type: "text",
     },
     {
-      id: "employment-type",
+      id: "employment_type",
       label: "Employment Type",
       value: capitalizeFirstLetter(employee?.employment_type || "--"),
       type: "text",
     },
+    // Drill thru leave balance object and render each existing
   ];
   return employmentInformation;
 };
@@ -171,13 +173,13 @@ export const getEmploymentInformation = (employee: Employee | null) => {
 export const getCompensationInformation = (employee: Employee | null) => {
   const compensationInformation = [
     {
-      id: "rate-type",
+      id: "rate_type",
       label: "Rate Type",
       value: capitalizeFirstLetter(employee?.rate_type || "--"),
       type: "text",
     },
     {
-      id: "salary-rate",
+      id: "salary_rate",
       label: "Salary Rate",
       value: formatMoney(employee?.salary_rate || null),
       type: "text",
@@ -189,26 +191,26 @@ export const getCompensationInformation = (employee: Employee | null) => {
 export const getIdentificationInformation = (employee: Employee | null) => {
   const identificationInformation = [
     {
-      id: "sss-number",
+      id: "sss_number",
       label: "SSS Number",
       value: formatSSSNumber(employee?.sss_number || null) || "--",
       type: "text",
     },
     {
-      id: "pagibig-number",
+      id: "hdmf_number",
       label: "Pag-IBIG Number",
       value: formatHDMFNumber(employee?.hdmf_number || null) || "--",
       type: "text",
     },
     {
-      id: "philhealth-number",
+      id: "philhealth_number",
       label: "PhilHealth Number",
       value:
         formatPhilhealthNumber(employee?.philhealth_number || null) || "--",
       type: "text",
     },
     {
-      id: "tin-number",
+      id: "tin_number",
       label: "TIN Number",
       value: formatTINNumber(employee?.tin_number || null) || "--",
       type: "text",

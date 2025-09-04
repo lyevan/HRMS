@@ -1,9 +1,9 @@
 import { type HeaderContext } from "@tanstack/react-table";
-import type { Employee } from "@/models/employee-model";
+import type { PendingEmployee } from "@/models/pending-employee-model";
 import { ArrowDownAZ, ArrowUpAZ, ArrowDown01, ArrowUp01 } from "lucide-react";
 
-interface EmployeeHeadersProps<T> {
-  info: HeaderContext<Employee, T>;
+interface PendingEmployeeHeadersProps<T> {
+  info: HeaderContext<PendingEmployee, T>;
   name: string;
   isNumber?: boolean;
 }
@@ -11,7 +11,7 @@ const PendingEmployeeHeaders = ({
   info,
   name,
   isNumber = false,
-}: EmployeeHeadersProps<any>) => {
+}: PendingEmployeeHeadersProps<any>) => {
   const sorted = info.column.getIsSorted();
   return (
     <div
