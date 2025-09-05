@@ -48,7 +48,6 @@ const LabelAndSelect = ({
         )}
       </Label>
       <div className="col-span-2 space-y-1">
-        {" "}
         <Controller
           name={name}
           control={control}
@@ -57,12 +56,8 @@ const LabelAndSelect = ({
           }}
           render={({ field }) => (
             <Select
-              value={field.value || "none"}
-              onValueChange={(value) => {
-                // Convert "none" to null/empty for form data
-                const formValue = value === "none" ? null : value;
-                field.onChange(formValue);
-              }}
+              value={field.value || ""}
+              onValueChange={field.onChange}
               disabled={isReadOnly}
             >
               <SelectTrigger

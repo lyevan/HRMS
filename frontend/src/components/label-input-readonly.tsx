@@ -77,11 +77,6 @@ const LabelAndInput = ({
                 required:
                   required && !isReadOnly ? `${label} is required` : false,
                 setValueAs: (value: string) => {
-                  console.log(`🔍 Date input ${name} setValueAs:`, {
-                    inputValue: value,
-                    returning: value,
-                    field: name,
-                  });
                   // When the date input changes, keep it as YYYY-MM-DD format
                   // Don't convert to ISO to avoid timezone issues
                   return value;

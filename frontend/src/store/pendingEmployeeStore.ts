@@ -250,9 +250,7 @@ export const usePendingEmployeeStore = create<PendingEmployeeStore>()(
           );
           throw error;
         }
-      },
-
-      // Reject pending employee
+      },      // Reject pending employee
       rejectPendingEmployee: async (id: number) => {
         try {
           set(
@@ -263,8 +261,18 @@ export const usePendingEmployeeStore = create<PendingEmployeeStore>()(
 
           const response = await rejectPendingEmployee(id);
 
-          // Remove the pending employee from the store since it's rejected
-          get().removePendingEmployee(id);
+          // Update the pending employee status to "rejected" instead of removing
+          const updatedEmployee = get().pendingEmployees.find(
+            (emp) => emp.pending_employee_id === id
+          );
+          
+          if (updatedEmployee) {
+            const rejectedEmployee = {
+              ...updatedEmployee,
+              status: "rejected"
+            };
+            get().updatePendingEmployee(rejectedEmployee);
+          }
 
           set({ loading: false }, false, "rejectPendingEmployee:success");
 

@@ -11,9 +11,9 @@ import PendingEmployeeDirectory from "../modal-contents/pending-employee-directo
 import AddEmployeeForm from "../forms/add-employee-form";
 
 const PendingEmployees = () => {
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [isViewPendingEmployeeModalOpen, setIsViewPendingEmployeeModalOpen] =
     useState(false);
-  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [selectedPendingEmployee, setSelectedPendingEmployee] =
     useState<PendingEmployee | null>(null);
 
@@ -49,6 +49,7 @@ const PendingEmployees = () => {
           isReadOnly={true}
         />
       </Modal>
+
       {/* Add Employee Modal */}
       <Modal
         open={isAddEmployeeModalOpen}
@@ -62,9 +63,9 @@ const PendingEmployees = () => {
 
       <div>
         <PendingEmployeeTable<PendingEmployee, any>
+          setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
           columns={columns}
           data={pendingEmployees}
-          setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
         />
       </div>
     </>

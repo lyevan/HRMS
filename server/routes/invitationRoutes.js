@@ -46,6 +46,6 @@ router.get("/pending", verifyToken, verifyStaff, getAllPendingEmployees);
 router.post("/review/:id", verifyToken, verifyStaff, reviewPendingEmployee);
 
 router.post("/approve", verifyToken, verifyAdmin, approvePendingEmployee);
-router.post("/reject", verifyToken, verifyStaff, rejectPendingEmployee);
+router.post("/reject/:id", verifyToken, verifyStaff, rejectPendingEmployee);
 
 export default router;

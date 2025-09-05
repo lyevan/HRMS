@@ -48,48 +48,39 @@ const EmployeeDirectory = ({
   const [isViewImageOpen, setViewImageOpen] = useState(false);
   // Use Zustand store
   const selectedEmployee = useSelectedEmployee();
-  const setSelectedEmployee = useSetSelectedEmployee();
-
-  // Helper function to safely convert date to YYYY-MM-DD format with timezone compensation
+  const setSelectedEmployee = useSetSelectedEmployee(); // Helper function to safely convert date to YYYY-MM-DD format
   const safeDateToYMD = (dateString: string | null): string | null => {
     if (!dateString) return null;
 
-    console.log("Original date string:", dateString);
+    // console.log("Original date string:", dateString);
 
     // If it's already in YYYY-MM-DD format, return as is
     if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      console.log("Already in YYYY-MM-DD format, returning:", dateString);
+      // console.log("Already in YYYY-MM-DD format, returning:", dateString);
       return dateString;
     }
 
-    // If it's an ISO string (contains T), extract the date part and apply timezone compensation
+    // If it's an ISO string (contains T), extract date part and apply timezone compensation
     if (dateString.includes("T")) {
       const datePart = dateString.split("T")[0];
-      console.log("Extracted from ISO string:", datePart);
-
-      // Add +1 day compensation for timezone issues in edit mode
-      const date = new Date(datePart + "T12:00:00"); // Use noon to avoid timezone edge cases
-      date.setDate(date.getDate() + 1);
-
-      const compensatedDate = date.toISOString().split("T")[0];
-      console.log("Applied +1 day compensation:", {
-        original: datePart,
-        compensated: compensatedDate,
-      });
-
-      return compensatedDate;
+      // Create date at noon to avoid timezone issues and add +1 day compensation
+      const date = new Date(datePart + "T12:00:00");
+      date.setDate(date.getDate() + 1); // +1 day compensation for timezone adjustment
+      const result = date.toISOString().split("T")[0];
+      // console.log("Processed ISO string with +1 day compensation:", result);
+      return result;
     }
 
     // For date strings that might be in various formats, try regex first
     const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (dateMatch) {
       const result = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
-      console.log("Matched simple date format:", result);
+      // console.log("Matched simple date format:", result);
       return result;
     }
 
     // If we can't parse it safely, return the original string
-    console.log("Could not parse date safely, returning original:", dateString);
+    // console.log("Could not parse date safely, returning original:", dateString);
     return dateString;
   };
   // Helper function to convert employee data for form initialization
@@ -100,11 +91,11 @@ const EmployeeDirectory = ({
     if (employee.date_of_birth) {
       const convertedDate =
         safeDateToYMD(employee.date_of_birth) || employee.date_of_birth;
-      console.log("🔍 Form initialization - date_of_birth:", {
-        original: employee.date_of_birth,
-        converted: convertedDate,
-        willBeUsedForFormInput: convertedDate,
-      });
+      // console.log("🔍 Form initialization - date_of_birth:", {
+      //   original: employee.date_of_birth,
+      //   converted: convertedDate,
+      //   willBeUsedForFormInput: convertedDate,
+      // });
       transformedData.date_of_birth = convertedDate;
     }
 
@@ -119,7 +110,7 @@ const EmployeeDirectory = ({
         safeDateToYMD(employee.contract_end_date) || employee.contract_end_date;
     }
 
-    console.log("🚀 Final transformed data for form:", transformedData);
+    // console.log("🚀 Final transformed data for form:", transformedData);
     return transformedData;
   };
 
@@ -152,7 +143,6 @@ const EmployeeDirectory = ({
     {
       id: "suffix",
       options: [
-        { value: "none", label: "--" },
         { value: "Jr.", label: "Jr." },
         { value: "Sr.", label: "Sr." },
         { value: "II", label: "II" },
@@ -176,43 +166,51 @@ const EmployeeDirectory = ({
     "department_name",
     "department_id",
     "position_id",
+    "employee_id",
+    "status",
+  ]; // Update form when employee changes
+
+  const idFields = [
     "sss_number",
     "hdmf_number",
     "philhealth_number",
     "tin_number",
-    "status",
-    "employee_id",
-  ]; // Update form when employee changes
+  ];
   useEffect(() => {
     if (employee) {
       const transformedEmployee = transformEmployeeDataForForm(employee);
       form.reset(transformedEmployee);
     }
   }, [employee, form]);
-
-  // Debug form values when switching between read-only and edit modes
-  useEffect(() => {
-    const currentValues = form.getValues();
-    console.log(`🔄 Mode changed to: ${isReadOnly ? "READ-ONLY" : "EDIT"}`, {
-      mode: isReadOnly ? "read-only" : "edit",
-      dateOfBirth: currentValues.date_of_birth,
-      contractStartDate: currentValues.contract_start_date,
-      allFormValues: currentValues,
-    });
-  }, [isReadOnly, form]);
-
   // Handle form submission
   const onSubmit = async (data: Employee) => {
     try {
       // Filter out excluded fields from submission data
       const filteredData = Object.fromEntries(
-        Object.entries(data).filter(([key]) => !excludedFields.includes(key))
+        Object.entries(data).filter(
+          ([key]) => !excludedFields.includes(key) && !idFields.includes(key)
+        )
       ) as Partial<Employee>;
 
-      console.log("Submitting form data: ", filteredData);
-      await axios.put(`/employees/${data.employee_id}`, filteredData);
-      console.log("Updating employee:", filteredData);
+      // Filter and accept only sss_number, hdmf_number, philhealth_number, tin_number
+      const idUpdates = Object.fromEntries(
+        Object.entries(data).filter(([key]) => idFields.includes(key))
+      );
+
+      console.log("Submitting form data: ", {
+        infoUpdates: filteredData,
+        idUpdates,
+      });
+      await axios.put(`/employees/${data.employee_id}`, {
+        infoUpdates: filteredData,
+        idUpdates,
+      });
+      console.log("Updating employee:", {
+        infoUpdates: filteredData,
+        idUpdates,
+      });
       toast.success("Employee updated successfully!", {
+        className: "z-999999",
         description: "Reload the page to see updated data.",
       });
       setIsReadOnly(true);
@@ -250,6 +248,7 @@ const EmployeeDirectory = ({
   const compensationInformation = getCompensationInformation(employee);
   // Identification Information array
   const identificationInformation = getIdentificationInformation(employee);
+  console.log("Rendering EmployeeDirectory for:", employee);
   return (
     <FormProvider {...form}>
       <Modal

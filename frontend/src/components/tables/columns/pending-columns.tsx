@@ -54,8 +54,8 @@ const pendingEmployeeColumns = (
 
   const handleApprove = async (employee: PendingEmployee) => {
     try {
-      // For now, default to "employee" role
-      await approvePendingEmployee(employee, "employee");
+      // For now, default to "admin" role
+      await approvePendingEmployee(employee, "admin");
       toast.success("Employee approved successfully");
     } catch (error) {
       toast.error("Failed to approve employee");
@@ -135,7 +135,7 @@ const pendingEmployeeColumns = (
       header: (info) => <PendingEmployeeHeaders info={info} name="Actions" />,
       cell: ({ row }) => {
         const employee = row.original;
-        const canReview = employee.status === "registering";
+        const canReview = employee.status === "for reviewing";
         const canApprove = employee.status === "for approval";
         const canReject =
           employee.status !== "approved" && employee.status !== "rejected";
@@ -153,7 +153,7 @@ const pendingEmployeeColumns = (
                   <Eye className="mr-2 h-4 w-4" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {}}>
+                <DropdownMenuItem disabled onClick={() => {}}>
                   <Mail className="mr-2 h-4 w-4" />
                   Send Email
                 </DropdownMenuItem>

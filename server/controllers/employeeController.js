@@ -25,6 +25,7 @@ export const getAllEmployees = async (req, res) => {
         c.rate AS salary_rate,
         c.rate_type AS rate_type,
         et.name AS employment_type,
+        gin.*,
         -- Aggregate leave balances into JSON
         COALESCE(
           JSON_AGG(
@@ -43,11 +44,14 @@ export const getAllEmployees = async (req, res) => {
       LEFT JOIN employment_types et ON c.employment_type_id = et.employment_type_id
       LEFT JOIN leave_balance lb ON e.employee_id = lb.employee_id
       LEFT JOIN leave_types lt ON lb.leave_type_id = lt.leave_type_id
+      LEFT JOIN government_id_numbers gin ON e.government_id_numbers_id = gin.government_id_numbers_id
       GROUP BY 
         e.employee_id, e.system_id, e.first_name, e.last_name, e.email, 
         e.date_of_birth, e.status, e.created_at, e.updated_at, e.contract_id,
         d.name, d.department_id, p.title, p.position_id, p.department_id,
-        c.start_date, c.end_date, c.rate, c.rate_type, et.name
+        c.start_date, c.end_date, c.rate, c.rate_type, et.name, 
+        gin.government_id_numbers_id, gin.sss_number, gin.hdmf_number, 
+        gin.philhealth_number, gin.tin_number
       ORDER BY e.created_at DESC
     `);
 
@@ -223,34 +227,64 @@ export const createEmployee = async (req, res) => {
 export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const { infoUpdates, idUpdates } = req.body;
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(infoUpdates).length === 0) {
       return res
         .status(400)
         .json({ success: false, message: "No fields to update" });
     }
 
-    const keys = Object.keys(updates);
-    const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(", ");
-    const values = [...Object.values(updates), id];
+    const infoKeys = Object.keys(infoUpdates);
+    const setClause = infoKeys.map((key, i) => `${key} = $${i + 1}`).join(", ");
+    const infoValues = [...Object.values(infoUpdates), id];
 
-    const query = `
+    const infoQuery = `
       UPDATE employees 
       SET ${setClause}
-      WHERE employee_id = $${values.length}
+      WHERE employee_id = $${infoValues.length}
       RETURNING *
     `;
 
-    const result = await pool.query(query, values);
+    const infoResult = await pool.query(infoQuery, infoValues);
 
-    if (result.rows.length === 0) {
+    if (infoResult.rows.length === 0) {
       return res
         .status(404)
         .json({ success: false, message: "Employee not found" });
     }
 
-    res.status(200).json({ success: true, result: result.rows[0] });
+    // Get government_id_numbers_id for the employee
+    const idCheck = await pool.query(
+      "SELECT government_id_numbers_id FROM employees WHERE employee_id = $1",
+      [id]
+    );
+    const governmentIdNumbersId = idCheck.rows[0]?.government_id_numbers_id;
+
+    const idKeys = Object.keys(idUpdates || {});
+    if (idKeys.length > 0) {
+      const idSetClause = idKeys
+        .map((key, i) => `${key} = $${i + 1}`)
+        .join(", ");
+      const idValues = [...Object.values(idUpdates), governmentIdNumbersId];
+
+      if (!governmentIdNumbersId) {
+        // Handle case where government_id_numbers_id is not found
+        console.error("Government ID Numbers ID not found");
+        return res.status(404).json({ success: false, message: "Not found" });
+      }
+
+      const idQuery = `
+        UPDATE government_id_numbers
+        SET ${idSetClause}
+        WHERE government_id_numbers_id = $${idValues.length}
+        RETURNING *
+      `;
+
+      await pool.query(idQuery, idValues);
+    }
+
+    res.status(200).json({ success: true, result: infoResult.rows[0] });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
