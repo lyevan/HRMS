@@ -11,9 +11,8 @@ import {
 
 import {
   Funnel,
-  UserPlus,
+  Plus,
   Download,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -42,29 +41,24 @@ import {
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-// import { type DateRange } from "react-day-picker";
-// import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { type Department } from "@/models/department-model";
 
-interface EmployeeTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[];
-  data: TData[];
-  setIsAddEmployeeModalOpen: (isOpen: boolean) => void;
+interface DepartmentTableProps {
+  columns: ColumnDef<Department>[];
+  data: Department[];
+  setIsAddDepartmentModalOpen: (isOpen: boolean) => void;
 }
 
-export function PendingEmployeeTable<TData, TValue>({
+export function DepartmentTable({
   columns,
   data,
-  setIsAddEmployeeModalOpen,
-}: EmployeeTableProps<TData, TValue>) {
+  setIsAddDepartmentModalOpen,
+}: DepartmentTableProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filterInput, setFilterInput] = useState("last_name");
+  const [filterInput, setFilterInput] = useState("name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const isMobile = useIsMobile();
-  //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-  //     from: new Date(2025, 8, 15),
-  //     to: new Date(2025, 9, 6),
-  //   });
 
   const table = useReactTable({
     data,
@@ -128,20 +122,12 @@ export function PendingEmployeeTable<TData, TValue>({
                 value={filterInput}
                 onValueChange={setFilterInput}
               >
-                <DropdownMenuRadioItem defaultChecked value="employee_id">
-                  Employee ID
+                <DropdownMenuRadioItem value="id">ID</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem defaultChecked value="name">
+                  Department Name
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="first_name">
-                  First Name
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="last_name">
-                  Last Name
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="email">
-                  Email
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="department_name">
-                  Department
+                <DropdownMenuRadioItem value="description">
+                  Description
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
@@ -151,31 +137,22 @@ export function PendingEmployeeTable<TData, TValue>({
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
-            onClick={() => setIsAddEmployeeModalOpen(true)}
+            onClick={() => setIsAddDepartmentModalOpen(true)}
           >
-            <UserPlus />
-            {!isMobile && "Onboard Employee"}
+            <Plus />
+            {!isMobile && "Add Department"}
           </Button>
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
             onClick={() =>
-              toast.warning("Export employee table implementation coming soon")
+              toast.warning(
+                "Export department table implementation coming soon"
+              )
             }
           >
             <Download />
             {!isMobile && "Export as"}
-          </Button>
-
-          <Button
-            variant="outline"
-            size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning("Hire date filter implementation coming soon")
-            }
-          >
-            <Calendar />
-            {!isMobile && "Date Range"}
           </Button>
         </div>
       </div>
@@ -223,7 +200,7 @@ export function PendingEmployeeTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  No departments found.
                 </TableCell>
               </TableRow>
             )}{" "}
@@ -234,7 +211,7 @@ export function PendingEmployeeTable<TData, TValue>({
       {/* Pagination Controls */}
       <div className="flex items-center justify-between px-2 py-4">
         <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Rows per page</p>
+          <p className="text-sm font-medium">Rows per page</p>{" "}
           <select
             value={pageSize}
             onChange={(e) => {

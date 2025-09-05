@@ -16,6 +16,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import EmployeeDashboard from "./pages/admin/employees/dashboard";
 import EmployeeManagement from "./pages/admin/employees/management";
 import CompleteRegistrationForm from "./pages/public/complete-registration";
+import Organization from "./pages/admin/employees/organization";
 
 function App() {
   // Validate environment variables and configure axios
@@ -132,6 +133,10 @@ function App() {
                       <Route
                         path="emp/management"
                         element={<EmployeeManagement />}
+                      />
+                      <Route
+                        path="emp/organization"
+                        element={<Organization />}
                       />
 
                       {/* Admin Timekeeping Group Routes */}

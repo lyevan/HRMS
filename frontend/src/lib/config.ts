@@ -1,7 +1,8 @@
 // Environment configuration utility
 export const config = {
   api: {
-    baseUrl: import.meta.env.VITE_API_BASE_URL || "http://192.168.0.109:3000/api",
+    baseUrl:
+      import.meta.env.VITE_API_BASE_URL || "http://192.168.254.103:3000/api",
   },
   app: {
     name: import.meta.env.VITE_APP_NAME || "HRMS",
