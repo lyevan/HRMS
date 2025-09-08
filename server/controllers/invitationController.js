@@ -451,7 +451,7 @@ export const approvePendingEmployee = async (req, res) => {
       return res
         .status(400)
         .json({ error: "Please review the employee form first" });
-    }    // 1. Insert into employees table
+    } // 1. Insert into employees table
     const insertEmployeeQuery = `
       INSERT INTO employees (
         employee_id, first_name, middle_name, last_name, suffix, nickname,
@@ -462,7 +462,8 @@ export const approvePendingEmployee = async (req, res) => {
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
         $17, $18, $19, $20
       ) RETURNING *
-    `;    const employeeValues = [
+    `;
+    const employeeValues = [
       employee_id,
       employee.first_name,
       employee.middle_name,
@@ -515,7 +516,7 @@ export const approvePendingEmployee = async (req, res) => {
       username,
     ];
 
-    await pool.query(insertUserQuery, userValues);    // 3. Send onboarding email
+    await pool.query(insertUserQuery, userValues); // 3. Send onboarding email
     await sendOnboardingEmail({
       to: insertedEmployee.email,
       first_name: insertedEmployee.first_name,
@@ -523,11 +524,12 @@ export const approvePendingEmployee = async (req, res) => {
       username,
       position: "Employee", // Default position since we don't have this info in the current schema
       company_name: process.env.COMPANY_NAME,
-    });// 4. Remove from pending_employees table
+    }); // 4. Remove from pending_employees table
     await pool.query(
       "DELETE FROM pending_employees WHERE pending_employee_id = $1",
       [employee.pending_employee_id]
-    );    console.log(
+    );
+    console.log(
       `Employee approved and created successfully.\nEmployee ID: ${employee_id}`
     );
     console.log(

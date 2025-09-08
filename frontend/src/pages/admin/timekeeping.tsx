@@ -1,6 +1,54 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDate } from "@/lib/stringMethods";
+import { LogIn, LogOut } from "lucide-react";
+import axios from "axios";
+import { useUserSessionStore } from "@/store/userSessionStore";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const TimekeepingPage = () => {
+  const { employee } = useUserSessionStore();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleClockIn = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post("/attendance/clock-in", {
+        employee_id: employee?.employee_id,
+      });
+      console.log("Clock-in successful:", response.data);
+      toast.success("Clock-in successful!");
+    } catch (error) {
+      console.error("Error clocking in:", error);
+      toast.error((error as any).response?.data?.message || "Clock-in failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post("/attendance/clock-out", {
+        employee_id: employee?.employee_id,
+      });
+      console.log("Clock-out successful:", response.data);
+      toast.success("Clock-out successful!");
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      toast.error(
+        (error as any).response?.data?.message || "Clock-out failed."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // function handleClockOut(): void {
+  //   throw new Error("Function not implemented.");
+  // }
+
   return (
     <div className="space-y-6">
       <div>
@@ -54,18 +102,31 @@ const TimekeepingPage = () => {
             <p className="text-xs text-muted-foreground">Today</p>
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Attendance Records</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Attendance tracking interface will be implemented here.
-          </p>
-        </CardContent>
-      </Card>
+        <Card className="col-span-2">
+          <CardHeader>
+            <CardTitle>
+              Your Attendance Status Today: {formatDate(Date.now() as any)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full flex justify-between">
+              <Button onClick={() => handleClockIn()} disabled={isLoading}>
+                <LogIn />
+                Clock-In
+              </Button>
+              <Button
+                variant={"destructive"}
+                onClick={() => handleClockOut()}
+                disabled={isLoading}
+              >
+                <LogOut />
+                Clock-Out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

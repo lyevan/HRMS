@@ -140,7 +140,14 @@ function App() {
                       />
 
                       {/* Admin Timekeeping Group Routes */}
-                      <Route path="timekeeping" element={<TimekeepingPage />} />
+                      <Route
+                        path="tk"
+                        element={<Navigate to="tk/dashboard" replace />}
+                      />
+                      <Route
+                        path="tk/dashboard"
+                        element={<TimekeepingPage />}
+                      />
 
                       {/* Admin Payroll Group Routes */}
                       <Route path="payroll" element={<div>Payroll Page</div>} />
