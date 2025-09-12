@@ -203,7 +203,7 @@ export function DepartmentTable({
                   No departments found.
                 </TableCell>
               </TableRow>
-            )}{" "}
+            )}
           </TableBody>
         </Table>
       </div>

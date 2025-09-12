@@ -13,6 +13,7 @@ import {
   ListTodo,
   FileSpreadsheet,
   Shredder,
+  CalendarClock,
 } from "lucide-react";
 
 import {
@@ -95,6 +96,11 @@ const items: MenuItemType[] = [
         title: "Dashboard",
         url: `${baseUrl}/tk/dashboard`,
         icon: LayoutDashboard,
+      },
+      {
+        title: "Shift Management",
+        url: `${baseUrl}/tk/shift-management`,
+        icon: CalendarClock,
       },
       {
         title: "Timesheet Management",

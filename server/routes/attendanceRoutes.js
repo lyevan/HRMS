@@ -3,8 +3,8 @@ import {
   getAllAttendance,
   clockIn,
   clockOut,
-  startBreak,
-  endBreak,
+  // startBreak,
+  // endBreak,
   getTodayAttendance,
   getEmployeeStatus,
   canTakeBreak,
@@ -28,7 +28,7 @@ router.post("/manual-update/:employee_id", verifyToken, verifyAdmin, manualUpdat
 // Employee attendance routes
 router.post("/clock-in", verifyToken, clockIn);
 router.post("/clock-out", verifyToken, clockOut);
-router.post("/break-start", verifyToken, startBreak);
-router.post("/break-end", verifyToken, endBreak);
+// router.post("/break-start", verifyToken, startBreak);
+// router.post("/break-end", verifyToken, endBreak);
 
 export default router;

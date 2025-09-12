@@ -11,9 +11,8 @@ import {
 
 import {
   Funnel,
-  UserPlus,
-  Download,
   Calendar,
+  Download,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -42,33 +41,90 @@ import {
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
-// import { type DateRange } from "react-day-picker";
-// import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
-interface EmployeeTableProps<TData, TValue> {
+import { type Employee } from "@/models/employee-model";
+
+interface SchedAssignTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  setIsAddEmployeeModalOpen: (isOpen: boolean) => void;
+  selectedEmployees?: Employee[];
+  onSelectionChange?: (employees: Employee[]) => void;
 }
 
-export function PendingEmployeeTable<TData, TValue>({
+export function SchedAssignTable<TData, TValue>({
   columns,
   data,
-  setIsAddEmployeeModalOpen,
-}: EmployeeTableProps<TData, TValue>) {
+  selectedEmployees = [],
+  onSelectionChange,
+}: SchedAssignTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("last_name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const isMobile = useIsMobile();
-  //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-  //     from: new Date(2025, 8, 15),
-  //     to: new Date(2025, 9, 6),
-  //   });
+
+  // Handle row selection for employees
+  const handleEmployeeSelection = (employee: Employee, isSelected: boolean) => {
+    if (!onSelectionChange) return;
+
+    if (isSelected) {
+      onSelectionChange([...selectedEmployees, employee]);
+    } else {
+      onSelectionChange(
+        selectedEmployees.filter(
+          (emp) => emp.employee_id !== employee.employee_id
+        )
+      );
+    }
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (!onSelectionChange) return;
+
+    if (isSelected) {
+      onSelectionChange(data as Employee[]);
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const isEmployeeSelected = (employee: Employee) => {
+    return selectedEmployees.some(
+      (emp) => emp.employee_id === employee.employee_id
+    );
+  };
+
+  // Create columns with checkbox
+  const columnsWithCheckbox = [
+    {
+      id: "select",
+      header: () => (
+        <input
+          type="checkbox"
+          checked={selectedEmployees.length === data.length && data.length > 0}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="rounded"
+        />
+      ),
+      cell: ({ row }: any) => (
+        <input
+          type="checkbox"
+          checked={isEmployeeSelected(row.original)}
+          onChange={(e) =>
+            handleEmployeeSelection(row.original, e.target.checked)
+          }
+          className="rounded"
+        />
+      ),
+      enableSorting: false,
+      enableColumnFilter: false,
+    },
+    ...columns,
+  ];
 
   const table = useReactTable({
     data,
-    columns,
+    columns: columnsWithCheckbox,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -128,20 +184,20 @@ export function PendingEmployeeTable<TData, TValue>({
                 value={filterInput}
                 onValueChange={setFilterInput}
               >
-                <DropdownMenuRadioItem defaultChecked value="employee_id">
+                <DropdownMenuRadioItem value="employee_id">
                   Employee ID
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="first_name">
                   First Name
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="last_name">
+                <DropdownMenuRadioItem defaultChecked value="last_name">
                   Last Name
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="email">
-                  Email
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="department_name">
                   Department
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="position_title">
+                  Position
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
@@ -151,35 +207,30 @@ export function PendingEmployeeTable<TData, TValue>({
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
-            onClick={() => setIsAddEmployeeModalOpen(true)}
+            onClick={() =>
+              toast.warning(
+                "Bulk schedule assignment implementation coming soon"
+              )
+            }
           >
-            <UserPlus />
-            {!isMobile && "Onboard Employee"}
+            <Calendar />
+            {!isMobile && "Bulk Assign"}
           </Button>
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}
             onClick={() =>
-              toast.warning("Export employee table implementation coming soon")
+              toast.warning(
+                "Export schedule assignments implementation coming soon"
+              )
             }
           >
             <Download />
             {!isMobile && "Export as"}
           </Button>
-
-          <Button
-            variant="outline"
-            size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning("Hire date filter implementation coming soon")
-            }
-          >
-            <Calendar />
-            {!isMobile && "Date Range"}
-          </Button>
         </div>
       </div>
-      <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Nunito]">
+      <div className="overflow-auto h-60 rounded-md border border-muted-foreground/30 font-[Nunito]">
         <Table>
           <TableHeader className="bg-primary text-primary-foreground border border-muted-foreground/30">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -220,7 +271,7 @@ export function PendingEmployeeTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columnsWithCheckbox.length}
                   className="h-24 text-center"
                 >
                   No results.

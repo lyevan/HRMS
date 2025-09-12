@@ -226,7 +226,7 @@ export function EmployeeTable<TData, TValue>({
                   No results.
                 </TableCell>
               </TableRow>
-            )}{" "}
+            )}
           </TableBody>
         </Table>
       </div>

@@ -203,7 +203,7 @@ export function PositionTable<TData, TValue>({
                   No positions found.
                 </TableCell>
               </TableRow>
-            )}{" "}
+            )}
           </TableBody>
         </Table>
       </div>

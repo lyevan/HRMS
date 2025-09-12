@@ -30,7 +30,7 @@ const EmployeeDashboard = () => {
 
   useEffect(() => {
     console.log("🔍 Dashboard: Fetching employees...");
-    fetchEmployees();
+    fetchEmployees(true);
   }, [fetchEmployees]);
 
   const [isViewEmployeeModalOpen, setIsViewEmployeeModalOpen] = useState(false);

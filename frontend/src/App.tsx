@@ -1,7 +1,7 @@
 import AdminLayout from "./pages/admin/layout";
 import LoginPage from "./pages/authentication";
 import Dashboard from "./pages/admin/dashboard";
-import TimekeepingPage from "./pages/admin/timekeeping";
+import TimekeepingPage from "./pages/admin/timekeeping/dashboard";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import axios from "axios";
 import ProtectedRoute from "./components/protected-route";
@@ -17,6 +17,7 @@ import EmployeeDashboard from "./pages/admin/employees/dashboard";
 import EmployeeManagement from "./pages/admin/employees/management";
 import CompleteRegistrationForm from "./pages/public/complete-registration";
 import Organization from "./pages/admin/employees/organization";
+import ShiftManagement from "./pages/admin/timekeeping/shift-management";
 
 function App() {
   // Validate environment variables and configure axios
@@ -147,6 +148,10 @@ function App() {
                       <Route
                         path="tk/dashboard"
                         element={<TimekeepingPage />}
+                      />
+                      <Route
+                        path="tk/shift-management"
+                        element={<ShiftManagement />}
                       />
 
                       {/* Admin Payroll Group Routes */}
