@@ -30,8 +30,8 @@ import {
   RotateCw,
   RefreshCw,
 } from "lucide-react";
-import Modal from "@/components/modal";
-import FileChangeShiftContent from "@/components/modal-contents/file-change-shift-content";
+// import Modal from "@/components/modal";
+// import FileChangeShiftContent from "@/components/modal-contents/file-change-shift-content";
 // import ChangeShiftDetailsContent from "@/components/modal-contents/change-shift-details-content";
 import type { BaseRequest, RequestWithDetails } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
@@ -43,13 +43,14 @@ const ChangeShift = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedRequest, setSelectedRequest] =
+  const [_selectedRequest, setSelectedRequest] =
     useState<RequestWithDetails | null>(null);
 
   // Modal states
-  const [isFileRequestOpen, setIsFileRequestOpen] = useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [detailsReadOnly, setDetailsReadOnly] = useState(false);
+  // _ is for unused variables to avoid linting errors
+  const [_isFileRequestOpen, setIsFileRequestOpen] = useState(false);
+  const [_isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [_detailsReadOnly, setDetailsReadOnly] = useState(false);
 
   useEffect(() => {
     fetchChangeShiftRequests();
@@ -159,13 +160,13 @@ const ChangeShift = () => {
     setIsDetailsOpen(true);
   };
 
-  const handleFileRequestSuccess = () => {
-    fetchChangeShiftRequests();
-  };
+  // const handleFileRequestSuccess = () => {
+  //   fetchChangeShiftRequests();
+  // };
 
-  const handleApprovalSuccess = () => {
-    fetchChangeShiftRequests();
-  };
+  // const handleApprovalSuccess = () => {
+  //   fetchChangeShiftRequests();
+  // };
 
   const getStats = () => {
     const total = requests.length;
@@ -415,7 +416,8 @@ const ChangeShift = () => {
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      {/* Modals - TODO: Create modal content components */}
+      {/* 
       <Modal
         open={isFileRequestOpen}
         setOpen={setIsFileRequestOpen}
@@ -428,7 +430,7 @@ const ChangeShift = () => {
         />
       </Modal>
 
-      {/* <Modal
+      <Modal
         open={isDetailsOpen}
         setOpen={setIsDetailsOpen}
         title={
@@ -444,7 +446,8 @@ const ChangeShift = () => {
           onSuccess={handleApprovalSuccess}
           onClose={() => setIsDetailsOpen(false)}
         />
-      </Modal> */}
+      </Modal>
+      */}
     </div>
   );
 };

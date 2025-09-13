@@ -30,8 +30,8 @@ import {
   MapPin,
   Calendar,
 } from "lucide-react";
-import Modal from "@/components/modal";
-import FileOutOfBusinessContent from "@/components/modal-contents/file-out-of-business-content";
+// import Modal from "@/components/modal";
+// import FileOutOfBusinessContent from "@/components/modal-contents/file-out-of-business-content";
 // import OutOfBusinessDetailsContent from "@/components/modal-contents/out-of-business-details-content";
 import type { BaseRequest, RequestWithDetails } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
@@ -43,13 +43,14 @@ const OutOfBusiness = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedRequest, setSelectedRequest] =
+  const [_selectedRequest, setSelectedRequest] =
     useState<RequestWithDetails | null>(null);
 
   // Modal states
-  const [isFileRequestOpen, setIsFileRequestOpen] = useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [detailsReadOnly, setDetailsReadOnly] = useState(false);
+  // _ is for unused variables to avoid linting errors
+  const [_isFileRequestOpen, _setIsFileRequestOpen] = useState(false);
+  const [_isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [_detailsReadOnly, setDetailsReadOnly] = useState(false);
 
   useEffect(() => {
     fetchOutOfBusinessRequests();
@@ -159,13 +160,13 @@ const OutOfBusiness = () => {
     setIsDetailsOpen(true);
   };
 
-  const handleFileRequestSuccess = () => {
-    fetchOutOfBusinessRequests();
-  };
+  // const handleFileRequestSuccess = () => {
+  //   fetchOutOfBusinessRequests();
+  // };
 
-  const handleApprovalSuccess = () => {
-    fetchOutOfBusinessRequests();
-  };
+  // const handleApprovalSuccess = () => {
+  //   fetchOutOfBusinessRequests();
+  // };
 
   const getStats = () => {
     const total = requests.length;
@@ -203,7 +204,7 @@ const OutOfBusiness = () => {
           </p>
         </div>
         <Button
-          onClick={() => setIsFileRequestOpen(true)}
+          onClick={() => alert("Modal components not yet implemented")}
           className="flex items-center space-x-2"
         >
           <Plus className="h-4 w-4" />
@@ -421,7 +422,8 @@ const OutOfBusiness = () => {
         </CardContent>
       </Card>
 
-      {/* Modals */}
+      {/* Modals - TODO: Create modal content components */}
+      {/* 
       <Modal
         open={isFileRequestOpen}
         setOpen={setIsFileRequestOpen}
@@ -434,7 +436,7 @@ const OutOfBusiness = () => {
         />
       </Modal>
 
-      {/* <Modal
+      <Modal
         open={isDetailsOpen}
         setOpen={setIsDetailsOpen}
         title={
@@ -450,7 +452,8 @@ const OutOfBusiness = () => {
           onSuccess={handleApprovalSuccess}
           onClose={() => setIsDetailsOpen(false)}
         />
-      </Modal> */}
+      </Modal>
+      */}
     </div>
   );
 };
