@@ -12,15 +12,11 @@ import {
   BanknoteArrowUp,
   Menu,
 } from "lucide-react";
-import { Pie, PieChart } from "recharts";
+import { Pie, PieChart, Cell, ResponsiveContainer } from "recharts";
 import { useEffect, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartTooltip } from "@/components/ui/chart";
 
 import AddEmployeeForm from "@/components/forms/add-employee-form";
 import Modal from "@/components/modal";
@@ -31,35 +27,12 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 
-import type { ChartConfig } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useFetchEmployees, useEmployees } from "../../store/employeeStore";
 import { useAttendanceStore } from "@/store/attendanceStore";
 
 export const description = "Attendance today";
-
-const chartConfig = {
-  count: {
-    label: "Attendance Counts",
-  },
-  present: {
-    label: "Present",
-    color: "var(--chart-1)",
-  },
-  late: {
-    label: "Late",
-    color: "var(--chart-4)",
-  },
-  absent: {
-    label: "Absent",
-    color: "var(--chart-2)",
-  },
-  leave: {
-    label: "On Leave",
-    color: "var(--chart-3)",
-  },
-} satisfies ChartConfig;
 
 const Dashboard = () => {
   const [open, setOpen] = useState(false);
@@ -90,26 +63,30 @@ const Dashboard = () => {
       count: todayAttendance.filter(
         (record) => record.is_present && !record.is_late
       ).length,
-      fill: "var(--chart-1)",
+      fill: "#22c55e",
+      label: "Present",
     },
     {
       status: "late",
       count: todayAttendance.filter(
         (record) => record.is_present && record.is_late
       ).length,
-      fill: "var(--chart-4)",
+      fill: "#f59e0b",
+      label: "Late",
     },
     {
       status: "absent",
       count: attendanceStats.absent,
-      fill: "var(--chart-2)",
+      fill: "#ef4444",
+      label: "Absent",
     },
     {
       status: "leave",
       count: attendanceStats.leave,
-      fill: "var(--chart-3)",
+      fill: "#3b82f6",
+      label: "On Leave",
     },
-  ];
+  ].filter((item) => item.count > 0); // Only show segments with data
 
   const quickActions = [
     {
@@ -350,36 +327,188 @@ const Dashboard = () => {
         </div>
 
         <Card className="flex flex-col h-full col-span-3 row-span-3 flex-3">
-          <CardHeader className="items-center pb-0">
-            <CardTitle>Attendance Today</CardTitle>
-            <CardDescription>{new Date().toLocaleDateString()}</CardDescription>
+          <CardHeader className="items-center pb-4">
+            <CardTitle className="text-xl font-semibold">
+              Today's Attendance Overview
+            </CardTitle>
+            <CardDescription className="text-center">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="pb-0">
+          <CardContent className="pb-4">
             {attendanceLoading ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <p className="text-muted-foreground">
-                  Loading attendance data...
-                </p>
+              <div className="flex items-center justify-center h-[350px]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">
+                    Loading attendance data...
+                  </p>
+                </div>
               </div>
             ) : attendanceError ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <p className="text-red-500">Error loading attendance data</p>
+              <div className="flex items-center justify-center h-[350px]">
+                <div className="text-center">
+                  <p className="text-red-500 text-lg font-medium mb-2">
+                    Error loading attendance data
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Please try refreshing the page
+                  </p>
+                </div>
+              </div>
+            ) : chartData.length === 0 ? (
+              <div className="flex items-center justify-center h-[350px]">
+                <div className="text-center">
+                  <p className="text-muted-foreground text-lg font-medium mb-2">
+                    No attendance data available
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Check back later for updates
+                  </p>
+                </div>
               </div>
             ) : (
-              <ChartContainer
-                config={chartConfig}
-                className="[&_.recharts-pie-label-text]:fill-foreground mx-auto aspect-square max-h-[300px] pb-0"
-              >
-                <PieChart>
-                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                  <Pie
-                    data={chartData}
-                    dataKey="count"
-                    label
-                    nameKey="status"
-                  />
-                </PieChart>
-              </ChartContainer>
+              <div className="space-y-6">
+                {/* Pie Chart */}
+                <div className="flex justify-center">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        dataKey="count"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        stroke="#ffffff"
+                        strokeWidth={2}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.fill}
+                            className="hover:opacity-80 transition-opacity cursor-pointer"
+                          />
+                        ))}
+                      </Pie>
+                      <ChartTooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-background border border-border rounded-lg shadow-lg p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: data.fill }}
+                                  />
+                                  <span className="font-medium">
+                                    {data.label}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  Count:{" "}
+                                  <span className="font-semibold text-foreground">
+                                    {data.count}
+                                  </span>
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Percentage:{" "}
+                                  <span className="font-semibold text-foreground">
+                                    {(
+                                      (data.count /
+                                        chartData.reduce(
+                                          (sum, item) => sum + item.count,
+                                          0
+                                        )) *
+                                      100
+                                    ).toFixed(1)}
+                                    %
+                                  </span>
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Custom Legend with Statistics */}
+                <div className="grid grid-cols-2 gap-4">
+                  {chartData.map((entry) => {
+                    const total = chartData.reduce(
+                      (sum, item) => sum + item.count,
+                      0
+                    );
+                    const percentage =
+                      total > 0
+                        ? ((entry.count / total) * 100).toFixed(1)
+                        : "0";
+
+                    return (
+                      <div
+                        key={entry.status}
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-4 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: entry.fill }}
+                          />
+                          <div>
+                            <p className="font-medium text-sm">{entry.label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {percentage}% of total
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">{entry.count}</p>
+                          <p className="text-xs text-muted-foreground">
+                            employees
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary Stats */}
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Total Employees:
+                    </span>
+                    <span className="font-semibold">{employees.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-muted-foreground">
+                      Tracked Today:
+                    </span>
+                    <span className="font-semibold">
+                      {chartData.reduce((sum, item) => sum + item.count, 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-muted-foreground">
+                      Attendance Rate:
+                    </span>
+                    <span className="font-semibold text-green-600">
+                      {Math.round(attendanceStats.attendanceRate)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

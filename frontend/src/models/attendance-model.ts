@@ -71,11 +71,7 @@ export interface ManualAttendanceRequest {
   date: string;
   time_in?: string;
   time_out?: string;
-  break_start?: string;
-  break_end?: string;
-  total_hours?: number;
-  overtime_hours?: number;
-  status?: string;
+  status?: "PRESENT" | "ABSENT" | "LATE" | "HALF_DAY" | "ON_LEAVE";
   notes?: string;
 }
 
@@ -114,7 +110,7 @@ export const fetchTodayAttendance = async (): Promise<
   TodayAttendanceRecord[]
 > => {
   try {
-    const response = await axios.get("/attendance/today");
+    const response = await axios.get("/attendance/today-all");
     return response.data.data || [];
   } catch (error) {
     console.error("Error fetching today's attendance:", error);
@@ -182,14 +178,27 @@ export const createManualAttendance = async (
   data: ManualAttendanceRequest
 ): Promise<AttendanceRecord> => {
   try {
-    const response = await axios.post("/attendance/manual", data);
-    return response.data.data;
+    const response = await axios.post("/attendance/manual-create", data);
+
+    if (response.data.success) {
+      return response.data.data;
+    } else {
+      throw new Error(
+        response.data.message || "Failed to create manual attendance"
+      );
+    }
   } catch (error) {
     console.error("Error creating manual attendance:", error);
+
+    if (axios.isAxiosError(error)) {
+      const errorMessage = error.response?.data?.message || error.message;
+      throw new Error(errorMessage);
+    }
+
     throw new Error(
       error instanceof Error
         ? error.message
-        : "Failed to create manual attendance"
+        : "Failed to create manual attendance record"
     );
   }
 };

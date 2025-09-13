@@ -46,6 +46,50 @@ export const getAllAttendance = async (req, res) => {
   }
 };
 
+export const getEmployeeAttendance = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+    const result = await pool.query(
+      `
+      SELECT 
+        a.*, e.first_name, e.last_name,
+        COALESCE(a.total_hours, 0) as calculated_total_hours,
+        COALESCE(a.overtime_hours, 0) as overtime_hours,
+        s.break_duration
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      WHERE a.employee_id = $1
+      ORDER BY a.date DESC, a.time_in DESC
+    `,
+      [employee_id]
+    );
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getTodayAllAttendance = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        a.*, e.first_name, e.last_name,
+        COALESCE(a.total_hours, 0) as calculated_total_hours,
+        COALESCE(a.overtime_hours, 0) as overtime_hours,
+        s.break_duration
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      WHERE a.date = CURRENT_DATE
+      ORDER BY a.time_in DESC
+    `);
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const clockIn = async (req, res) => {
   try {
     const { employee_id, rfid } = req.body;
@@ -429,64 +473,100 @@ export const createManualAttendance = async (req, res) => {
       date,
       time_in,
       time_out,
-      break_start,
-      break_end,
       notes,
-      status = "present",
+      status = "PRESENT",
     } = req.body;
 
+    // Validate required fields
+    if (!employee_id || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee ID and date are required",
+      });
+    }
+
+    // Check if attendance already exists for this employee and date
     const existing = await pool.query(
       "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2",
       [employee_id, date]
     );
-    if (existing.rows.length > 0)
+
+    if (existing.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: "Attendance already exists for this date",
       });
-
-    let totalHours = null,
-      overtimeHours = null;
-    if (time_in && time_out) {
-      const result = await pool.query(
-        `
-        SELECT ROUND(EXTRACT(EPOCH FROM ($1::time - $2::time)) / 3600 -
-        COALESCE(EXTRACT(EPOCH FROM ($3::time - $4::time)) / 3600, 0), 2) AS calculated_hours
-      `,
-        [time_out, time_in, break_end, break_start]
-      );
-
-      totalHours = result.rows[0].calculated_hours;
-      overtimeHours = Math.max(totalHours - 8, 0);
     }
 
+    // Calculate hours worked and overtime if both time_in and time_out are provided
+    let hoursWorked = null;
+    let overtime = null;
+
+    if (time_in && time_out) {
+      const timeInDate = new Date(`${date}T${time_in}`);
+      const timeOutDate = new Date(`${date}T${time_out}`);
+
+      // Handle next day time_out (for night shifts)
+      if (timeOutDate < timeInDate) {
+        timeOutDate.setDate(timeOutDate.getDate() + 1);
+      }
+
+      const diffMs = timeOutDate - timeInDate;
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      hoursWorked = Math.round(diffHours * 100) / 100; // Round to 2 decimal places
+
+      // Calculate overtime (hours over 8)
+      if (hoursWorked > 8) {
+        overtime = Math.round((hoursWorked - 8) * 100) / 100;
+      }
+    }
+
+    // Insert the manual attendance record
     const insert = await pool.query(
       `
-      INSERT INTO attendance (employee_id, date, time_in, time_out, break_start, break_end, total_hours, overtime_hours, status, notes)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      INSERT INTO attendance (employee_id, date, time_in, time_out, status, total_hours, overtime_hours, notes, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       RETURNING *
     `,
       [
         employee_id,
         date,
-        time_in,
-        time_out,
-        break_start,
-        break_end,
-        totalHours,
-        overtimeHours,
+        time_in ? `${date}T${time_in}` : null,
+        time_out ? `${date}T${time_out}` : null,
         status,
+        hoursWorked,
+        overtime,
         notes,
       ]
     );
 
+    // Fetch the complete record with employee details
+    const result = await pool.query(
+      `
+      SELECT 
+        a.*, 
+        e.first_name, 
+        e.last_name
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.employee_id
+      WHERE a.attendance_id = $1
+    `,
+      [insert.rows[0].attendance_id]
+    );
+
     res.status(201).json({
       success: true,
-      message: "Manual attendance record created",
-      data: insert.rows[0],
+      message: "Manual attendance record created successfully",
+      data: result.rows[0],
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error creating manual attendance:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create manual attendance record",
+      error: error.message,
+    });
   }
 };
 
