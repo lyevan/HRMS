@@ -33,8 +33,8 @@ router.get("/status/:employee_id", verifyToken, verifyStaff, getEmployeeStatus);
 router.get("/can-break/:employee_id", verifyToken, verifyStaff, canTakeBreak);
 
 // Only admin can manually update attendance
-router.post(
-  "/manual-update/:employee_id",
+router.put(
+  "/manual-update/:attendance_id",
   verifyToken,
   verifyAdmin,
   manualUpdate

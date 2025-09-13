@@ -522,11 +522,23 @@ export const createManualAttendance = async (req, res) => {
       }
     }
 
+    // Set boolean flags based on status
+    const is_present = status === "PRESENT";
+    const is_late = status === "LATE";
+    const is_absent = status === "ABSENT";
+    const on_leave = status === "ON_LEAVE";
+    const is_halfday = status === "HALF_DAY";
+    const is_undertime = false; // Default to false, can be calculated later
+
     // Insert the manual attendance record
     const insert = await pool.query(
       `
-      INSERT INTO attendance (employee_id, date, time_in, time_out, status, total_hours, overtime_hours, notes, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      INSERT INTO attendance (
+        employee_id, date, time_in, time_out, total_hours, overtime_hours, notes, 
+        created_at, updated_at, is_present, is_late, is_absent, on_leave, 
+        is_undertime, is_halfday
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8, $9, $10, $11, $12, $13)
       RETURNING *
     `,
       [
@@ -534,10 +546,15 @@ export const createManualAttendance = async (req, res) => {
         date,
         time_in ? `${date}T${time_in}` : null,
         time_out ? `${date}T${time_out}` : null,
-        status,
         hoursWorked,
-        overtime,
+        overtime || 0,
         notes,
+        is_present,
+        is_late,
+        is_absent,
+        on_leave,
+        is_undertime,
+        is_halfday,
       ]
     );
 
@@ -609,27 +626,101 @@ export const canTakeBreak = async (req, res) => {
 };
 
 export const manualUpdate = async (req, res) => {
-  const employee_id = req.params.employee_id;
-  const { date, time_in, time_out, notes, total_hours, overtime_hours } =
-    req.body;
-
   try {
+    const { attendance_id } = req.params;
+    const {
+      date,
+      time_in,
+      time_out,
+      notes,
+      total_hours,
+      overtime_hours,
+      status,
+    } = req.body;
+
+    // Validate required fields
+    if (!attendance_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Attendance ID is required",
+      });
+    }
+
+    // Set boolean flags based on status if provided
+    let updateFields = [];
+    let values = [];
+    let paramIndex = 1;
+
+    if (date !== undefined) {
+      updateFields.push(`date = $${paramIndex++}`);
+      values.push(date);
+    }
+    if (time_in !== undefined) {
+      updateFields.push(`time_in = $${paramIndex++}`);
+      values.push(time_in);
+    }
+    if (time_out !== undefined) {
+      updateFields.push(`time_out = $${paramIndex++}`);
+      values.push(time_out);
+    }
+    if (notes !== undefined) {
+      updateFields.push(`notes = $${paramIndex++}`);
+      values.push(notes);
+    }
+    if (total_hours !== undefined) {
+      updateFields.push(`total_hours = $${paramIndex++}`);
+      values.push(total_hours);
+    }
+    if (overtime_hours !== undefined) {
+      updateFields.push(`overtime_hours = $${paramIndex++}`);
+      values.push(overtime_hours);
+    }
+
+    // Handle status boolean flags if status is provided
+    if (status !== undefined) {
+      const is_present = status === "PRESENT";
+      const is_late = status === "LATE";
+      const is_absent = status === "ABSENT";
+      const on_leave = status === "ON_LEAVE";
+      const is_halfday = status === "HALF_DAY";
+      const is_undertime = false; // Default to false
+
+      updateFields.push(`is_present = $${paramIndex++}`);
+      values.push(is_present);
+      updateFields.push(`is_late = $${paramIndex++}`);
+      values.push(is_late);
+      updateFields.push(`is_absent = $${paramIndex++}`);
+      values.push(is_absent);
+      updateFields.push(`on_leave = $${paramIndex++}`);
+      values.push(on_leave);
+      updateFields.push(`is_halfday = $${paramIndex++}`);
+      values.push(is_halfday);
+      updateFields.push(`is_undertime = $${paramIndex++}`);
+      values.push(is_undertime);
+    }
+
+    // Always update the updated_at timestamp
+    updateFields.push(`updated_at = NOW()`);
+
+    if (updateFields.length === 1) {
+      // Only updated_at
+      return res.status(400).json({
+        success: false,
+        message: "No fields to update",
+      });
+    }
+
+    // Add attendance_id as the last parameter
+    values.push(attendance_id);
+
     const result = await pool.query(
       `
       UPDATE attendance
-      SET date = $1, time_in = $2, time_out = $3, notes = $4, total_hours = $5, overtime_hours = $6, updated_at = NOW()
-      WHERE employee_id = $7
+      SET ${updateFields.join(", ")}
+      WHERE attendance_id = $${paramIndex}
       RETURNING *
     `,
-      [
-        date,
-        time_in,
-        time_out,
-        notes,
-        total_hours,
-        overtime_hours || 0,
-        employee_id,
-      ]
+      values
     );
 
     if (result.rows.length === 0) {
@@ -645,6 +736,11 @@ export const manualUpdate = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error updating attendance:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update attendance record",
+      error: error.message,
+    });
   }
 };

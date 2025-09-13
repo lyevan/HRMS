@@ -682,6 +682,72 @@ export const approveRequest = async (req, res) => {
       }
     }
 
+    // Handle overtime request approval
+    if (request.request_type === "overtime") {
+      // Get the overtime request details
+      const overtimeResult = await client.query(
+        "SELECT * FROM overtime_requests WHERE request_id = $1",
+        [request_id]
+      );
+
+      if (overtimeResult.rows.length > 0) {
+        const overtimeRequest = overtimeResult.rows[0];
+
+        // Get the current attendance record to check existing overtime
+        const attendanceResult = await client.query(
+          "SELECT * FROM attendance WHERE attendance_id = $1",
+          [overtimeRequest.attendance_id]
+        );
+
+        if (attendanceResult.rows.length > 0) {
+          const attendance = attendanceResult.rows[0];
+          const currentOvertimeHours =
+            parseFloat(attendance.overtime_hours) || 0;
+          const requestedOvertimeHours = parseFloat(
+            overtimeRequest.requested_overtime_hours
+          );
+
+          // Add the requested overtime hours to existing overtime
+          const newOvertimeHours =
+            currentOvertimeHours + requestedOvertimeHours;
+
+          // Update the attendance record with the new overtime hours
+          await client.query(
+            `
+            UPDATE attendance 
+            SET 
+              overtime_hours = $1,
+              updated_at = NOW()
+            WHERE attendance_id = $2
+          `,
+            [newOvertimeHours, overtimeRequest.attendance_id]
+          );
+
+          console.log(
+            `Overtime approved: Added ${requestedOvertimeHours}h to attendance ${overtimeRequest.attendance_id}. Previous: ${currentOvertimeHours}h, New: ${newOvertimeHours}h`
+          );
+        } else {
+          console.error(
+            `Attendance record not found for attendance_id: ${overtimeRequest.attendance_id}`
+          );
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            success: false,
+            message: "Associated attendance record not found",
+          });
+        }
+      } else {
+        console.error(
+          `Overtime request details not found for request_id: ${request_id}`
+        );
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "Overtime request details not found",
+        });
+      }
+    }
+
     await client.query("COMMIT");
 
     res.status(200).json({

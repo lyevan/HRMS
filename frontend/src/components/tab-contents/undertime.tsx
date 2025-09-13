@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock3 } from "lucide-react";
+import { toast } from "sonner";
 
 const Undertime = () => {
   return (
@@ -13,7 +14,10 @@ const Undertime = () => {
             Manage undertime requests and approvals
           </p>
         </div>
-        <Button className="flex items-center space-x-2">
+        <Button
+          className="flex items-center space-x-2"
+          onClick={() => toast("Modal components not yet implemented")}
+        >
           <Plus className="h-4 w-4" />
           <span>File Undertime Request</span>
         </Button>

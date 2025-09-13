@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 const ChangeDayOff = () => {
   return (
@@ -13,7 +14,10 @@ const ChangeDayOff = () => {
             Manage day-off change requests and approvals
           </p>
         </div>
-        <Button className="flex items-center space-x-2">
+        <Button
+          className="flex items-center space-x-2"
+          onClick={() => toast("Modal components not yet implemented")}
+        >
           <Plus className="h-4 w-4" />
           <span>File Change Day-off Request</span>
         </Button>

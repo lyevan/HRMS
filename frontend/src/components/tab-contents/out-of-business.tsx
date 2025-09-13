@@ -35,6 +35,7 @@ import {
 // import OutOfBusinessDetailsContent from "@/components/modal-contents/out-of-business-details-content";
 import type { BaseRequest, RequestWithDetails } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
+import { toast } from "sonner";
 
 const OutOfBusiness = () => {
   const [requests, setRequests] = useState<BaseRequest[]>([]);
@@ -204,7 +205,7 @@ const OutOfBusiness = () => {
           </p>
         </div>
         <Button
-          onClick={() => alert("Modal components not yet implemented")}
+          onClick={() => toast("Modal components not yet implemented")}
           className="flex items-center space-x-2"
         >
           <Plus className="h-4 w-4" />

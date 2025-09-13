@@ -35,6 +35,7 @@ import {
 // import ChangeShiftDetailsContent from "@/components/modal-contents/change-shift-details-content";
 import type { BaseRequest, RequestWithDetails } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
+import { toast } from "sonner";
 
 const ChangeShift = () => {
   const [requests, setRequests] = useState<BaseRequest[]>([]);
@@ -202,7 +203,10 @@ const ChangeShift = () => {
           </p>
         </div>
         <Button
-          onClick={() => setIsFileRequestOpen(true)}
+          onClick={() => {
+            setIsFileRequestOpen(true);
+            toast("Modal components not yet implemented");
+          }}
           className="flex items-center space-x-2"
         >
           <Plus className="h-4 w-4" />

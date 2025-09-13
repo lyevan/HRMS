@@ -369,7 +369,10 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
               <TableRow key={headerGroup.id} className="hover:bg-primary">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead
+                      key={header.id}
+                      className="text-primary-foreground font-bold"
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(

@@ -419,7 +419,7 @@ const ManualLog = () => {
         <FileManualAttendanceContent
           onSuccess={handleFileManualLogSuccess}
           onClose={() => setIsFileManualLogOpen(false)}
-          isAdminFiling={false}
+          isAdminFiling={true}
         />
       </Modal>
 
