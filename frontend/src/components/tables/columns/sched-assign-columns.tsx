@@ -8,28 +8,48 @@ const schedAssignColumns: ColumnDef<Employee, any>[] = [
     header: "Employee ID",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor("first_name", {
-    header: "First Name",
+  columnHelper.accessor((row) => `${row.first_name} ${row.last_name}`, {
+    id: "full_name",
+    header: "Name",
     cell: (info) => info.getValue(),
+    sortingFn: (rowA, rowB) => {
+      const nameA = `${rowA.original.first_name} ${rowA.original.last_name}`;
+      const nameB = `${rowB.original.first_name} ${rowB.original.last_name}`;
+      return nameA.localeCompare(nameB);
+    },
+    filterFn: (row, _columnId, filterValue) => {
+      const fullName = `${row.original.first_name} ${row.original.last_name}`;
+      return fullName.toLowerCase().includes(filterValue.toLowerCase());
+    },
   }),
-  columnHelper.accessor("last_name", {
-    header: "Last Name",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("department_name", {
-    header: "Department",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor("position_title", {
-    header: "Position",
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.display({
-    id: "current_schedule",
+  columnHelper.accessor(
+    (row) => `${row.department_name} - ${row.position_title}`,
+    {
+      id: "department_position",
+      header: "Department & Position",
+      cell: (info) => (
+        <div className="flex flex-col">
+          <p className="font-medium">{info.row.original.department_name}</p>
+          <p className="text-sm text-muted-foreground">
+            {info.row.original.position_title}
+          </p>
+        </div>
+      ),
+      sortingFn: (rowA, rowB) => {
+        const deptA = rowA.original.department_name;
+        const deptB = rowB.original.department_name;
+        return deptA.localeCompare(deptB);
+      },
+      filterFn: (row, _columnId, filterValue) => {
+        const combined = `${row.original.department_name} ${row.original.position_title}`;
+        return combined.toLowerCase().includes(filterValue.toLowerCase());
+      },
+    }
+  ),
+  columnHelper.accessor("schedule_name", {
     header: "Current Schedule",
-    cell: () => "N/A",
-    enableSorting: false,
-    enableColumnFilter: false,
+    cell: (info) =>
+      info.getValue() || <p className="text-muted-foreground">Unassigned</p>,
   }),
 ];
 

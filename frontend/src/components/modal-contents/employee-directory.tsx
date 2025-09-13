@@ -197,18 +197,19 @@ const EmployeeDirectory = ({
         Object.entries(data).filter(([key]) => idFields.includes(key))
       );
 
-      console.log("Submitting form data: ", {
-        infoUpdates: filteredData,
-        idUpdates,
-      });
+      // "Submitting form data: ",
+      //   {
+      //     infoUpdates: filteredData,
+      //     idUpdates,
+      //   };
       await axios.put(`/employees/${data.employee_id}`, {
         infoUpdates: filteredData,
         idUpdates,
       });
-      console.log("Updating employee:", {
-        infoUpdates: filteredData,
-        idUpdates,
-      });
+      // console.log("Updating employee:", {
+      //   infoUpdates: filteredData,
+      //   idUpdates,
+      // });
       toast.success("Employee updated successfully!", {
         className: "z-999999",
         description: "Reload the page to see updated data.",
@@ -248,7 +249,7 @@ const EmployeeDirectory = ({
   const compensationInformation = getCompensationInformation(employee);
   // Identification Information array
   const identificationInformation = getIdentificationInformation(employee);
-  console.log("Rendering EmployeeDirectory for:", employee);
+  // console.log("Rendering EmployeeDirectory for:", employee);
   return (
     <FormProvider {...form}>
       <Modal

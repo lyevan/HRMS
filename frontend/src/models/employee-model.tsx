@@ -47,6 +47,12 @@ export type Employee = {
   philhealth_number?: string | null; // Can be null, API returns string
   hdmf_number?: string | null; // Can be null, API returns string
   tin_number?: string | null; // Can be null, API returns string
+  schedule_id?: number | null;
+  schedule_name?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  break_duration?: number | null;
+  days_of_week?: string[] | null;
 };
 
 export type EmployeeResponse = {
@@ -60,7 +66,7 @@ export const fetchAllEmployees = async (
   bustCache = false
 ): Promise<EmployeeResponse> => {
   if (bustCache) {
-    console.log("Fetching employees with cache busting");
+    // console.log("Fetching employees with cache busting");
   }
   // If bust cache is true, add a timestamp to the query param to avoid cached responses
   // If not true just fetch normally, and dont use query param

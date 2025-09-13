@@ -53,7 +53,7 @@ export const formatDateShort = (dateString: string | null) => {
 };
 
 export const formatMoney = (amount: number | null) => {
-  console.log("Formatting amount:", amount);
+  // console.log("Formatting amount:", amount);
   if (amount === null || amount === undefined) return "--";
   // Convert amount to string
   const amountStr = amount.toString();

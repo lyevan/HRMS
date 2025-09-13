@@ -73,7 +73,7 @@ export const fetchAllPendingEmployees = async (
   bustCache = true
 ): Promise<PendingEmployeeResponse> => {
   if (bustCache) {
-    console.log("Fetching pending employees with cache busting");
+    // console.log("Fetching pending employees with cache busting");
   }
 
   try {
@@ -83,7 +83,7 @@ export const fetchAllPendingEmployees = async (
           params: { t: Date.now() },
         }))
       : (response = await axios.get("/invite/pending"));
-    console.log("Fetched pending employees:", response.data.result);
+    // console.log("Fetched pending employees:", response.data.result);
     return {
       success: true,
       result: response.data.result || [],

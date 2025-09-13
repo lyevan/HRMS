@@ -1,5 +1,27 @@
 import { pool } from "../config/db.js";
-import { getPhilippineTime } from "../utils/getPH_Time.js";
+import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone.js";
+import utc from "dayjs/plugin/utc.js";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// Payroll-friendly hour rounding function
+const roundToPayrollIncrement = (hours) => {
+  const wholeHours = Math.floor(hours);
+  const minutes = (hours - wholeHours) * 60;
+
+  if (minutes <= 15) {
+    // 0-15 minutes: round down
+    return wholeHours;
+  } else if (minutes <= 45) {
+    // 16-45 minutes: round to 30 minutes (0.5 hours)
+    return wholeHours + 0.5;
+  } else {
+    // 46-59 minutes: round up to next hour
+    return wholeHours + 1;
+  }
+};
 
 //     CASE WHEN a.total_hours IS NOT NULL THEN a.total_hours * e.hourly_rate ELSE NULL END AS daily_pay,
 //     CASE WHEN a.overtime_hours IS NOT NULL THEN a.overtime_hours * e.hourly_rate * 1.5 ELSE NULL END AS overtime_pay
@@ -10,15 +32,12 @@ export const getAllAttendance = async (req, res) => {
     const result = await pool.query(`
       SELECT 
         a.*, e.first_name, e.last_name,
-        CASE 
-          WHEN a.time_in IS NOT NULL AND a.time_out IS NOT NULL THEN
-            EXTRACT(EPOCH FROM (a.time_out - a.time_in)) / 3600 -
-            COALESCE(EXTRACT(EPOCH FROM (a.break_end - a.break_start)) / 3600, 0)
-          ELSE a.total_hours
-        END AS calculated_total_hours,
-        a.overtime_hours,
+        COALESCE(a.total_hours, 0) as calculated_total_hours,
+        COALESCE(a.overtime_hours, 0) as overtime_hours,
+        s.break_duration
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       ORDER BY a.date DESC, a.time_in DESC
     `);
     res.status(200).json({ success: true, data: result.rows });
@@ -30,19 +49,29 @@ export const getAllAttendance = async (req, res) => {
 export const clockIn = async (req, res) => {
   try {
     const { employee_id, rfid } = req.body;
-    const { date: today, time: currentTime } = getPhilippineTime();
-    const currentTimestamp = `${today} ${currentTime}`;
+
+    // Get current Philippine time
+    const now = dayjs().tz("Asia/Manila");
+    const today = now.format("YYYY-MM-DD");
+    const currentTime = now.format("YYYY-MM-DD HH:mm:ss");
+    const currentDayOfWeek = now.format("dddd").toLowerCase(); // monday, tuesday, etc.
 
     // Find employee by either employee_id or RFID
     let employee;
     if (employee_id) {
       employee = await pool.query(
-        "SELECT * FROM employees WHERE employee_id = $1 AND status = 'active'",
+        `SELECT e.*, s.start_time, s.end_time, s.days_of_week, s.schedule_name 
+         FROM employees e 
+         LEFT JOIN schedules s ON e.schedule_id = s.schedule_id 
+         WHERE e.employee_id = $1 AND e.status = 'active'`,
         [employee_id]
       );
     } else if (rfid) {
       employee = await pool.query(
-        "SELECT * FROM employees WHERE rfid = $1 AND status = 'active'",
+        `SELECT e.*, s.start_time, s.end_time, s.days_of_week, s.schedule_name 
+         FROM employees e 
+         LEFT JOIN schedules s ON e.schedule_id = s.schedule_id 
+         WHERE e.rfid = $1 AND e.status = 'active'`,
         [rfid]
       );
     } else {
@@ -62,6 +91,46 @@ export const clockIn = async (req, res) => {
     const foundEmployee = employee.rows[0];
     const actualEmployeeId = foundEmployee.employee_id;
 
+    // Check if employee has an assigned schedule
+    if (!foundEmployee.schedule_id) {
+      return res.status(400).json({
+        success: false,
+        message: "You do not have an assigned schedule",
+        info: "Please contact HR for schedule assignment.",
+      });
+    }
+
+    // Check if today is a working day according to schedule
+    const workingDays = foundEmployee.days_of_week || [];
+    if (!workingDays.includes(currentDayOfWeek)) {
+      return res.status(400).json({
+        success: false,
+        message: "Today is not a working day according to your schedule",
+        info: `Working days: ${workingDays.join(", ")}`,
+      });
+    }
+
+    // Check if employee has approved leave for today
+    const leaveCheck = await pool.query(
+      `SELECT lr.*, lt.name as leave_type_name 
+       FROM leave_requests lr 
+       JOIN leave_types lt ON lr.leave_type_id = lt.leave_type_id
+       WHERE lr.employee_id = $1 
+       AND lr.status = 'approved' 
+       AND $2 BETWEEN lr.start_date AND lr.end_date`,
+      [actualEmployeeId, today]
+    );
+
+    if (leaveCheck.rows.length > 0) {
+      const leave = leaveCheck.rows[0];
+      return res.status(400).json({
+        success: false,
+        message: "Cannot clock in - You have approved leave for today",
+        info: `Leave Type: ${leave.leave_type_name} (${leave.start_date} to ${leave.end_date})`,
+        leave_details: leave,
+      });
+    }
+
     // Check if already clocked in today
     const existingRecord = await pool.query(
       "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2",
@@ -75,17 +144,29 @@ export const clockIn = async (req, res) => {
       });
     }
 
+    // Determine if employee is late
+    const scheduleStartTime = foundEmployee.start_time;
+    const currentTimeOnly = now.format("HH:mm:ss");
+    const isLate = currentTimeOnly > scheduleStartTime;
+
+    // Insert attendance record with boolean flags
     const result = await pool.query(
-      "INSERT INTO attendance (employee_id, date, time_in, status) VALUES ($1, $2, $3, 'present') RETURNING *",
-      [actualEmployeeId, today, currentTimestamp]
+      `INSERT INTO attendance (employee_id, date, time_in, is_present, is_late, is_absent) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [actualEmployeeId, today, currentTime, true, isLate, false]
     );
 
     res.status(201).json({
       success: true,
-      message: `Clocked in successfully - ${foundEmployee.first_name} ${foundEmployee.last_name}`,
+      message: `Clocked in successfully - ${foundEmployee.first_name} ${
+        foundEmployee.last_name
+      }${isLate ? " (Late)" : ""}`,
       data: {
         ...result.rows[0],
         employee_name: `${foundEmployee.first_name} ${foundEmployee.last_name}`,
+        schedule_name: foundEmployee.schedule_name,
+        scheduled_start_time: scheduleStartTime,
+        is_late: isLate,
         method: rfid ? "RFID" : "Manual",
       },
     });
@@ -97,14 +178,19 @@ export const clockIn = async (req, res) => {
 export const clockOut = async (req, res) => {
   try {
     const { employee_id, rfid, notes } = req.body;
-    const { date: today, time: currentTime } = getPhilippineTime();
-    const currentTimestamp = `${today} ${currentTime}`;
+
+    // Get current Philippine time
+    const now = dayjs().tz("Asia/Manila");
+    const today = now.format("YYYY-MM-DD");
+    const currentTime = now.format("YYYY-MM-DD HH:mm:ss");
 
     // Find employee by either employee_id or RFID
     let actualEmployeeId = employee_id;
+    let employeeName = "";
+
     if (!employee_id && rfid) {
       const employee = await pool.query(
-        "SELECT employee_id FROM employees WHERE rfid = $1 AND status = 'active'",
+        "SELECT employee_id, first_name, last_name FROM employees WHERE rfid = $1 AND status = 'active'",
         [rfid]
       );
       if (employee.rows.length === 0) {
@@ -114,6 +200,15 @@ export const clockOut = async (req, res) => {
         });
       }
       actualEmployeeId = employee.rows[0].employee_id;
+      employeeName = `${employee.rows[0].first_name} ${employee.rows[0].last_name}`;
+    } else if (employee_id) {
+      const employee = await pool.query(
+        "SELECT first_name, last_name FROM employees WHERE employee_id = $1 AND status = 'active'",
+        [employee_id]
+      );
+      if (employee.rows.length > 0) {
+        employeeName = `${employee.rows[0].first_name} ${employee.rows[0].last_name}`;
+      }
     }
 
     if (!actualEmployeeId) {
@@ -123,51 +218,106 @@ export const clockOut = async (req, res) => {
       });
     }
 
+    // Get attendance record for today
     const attendanceRecord = await pool.query(
       "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2",
       [actualEmployeeId, today]
     );
-    if (attendanceRecord.rows.length === 0)
+
+    if (attendanceRecord.rows.length === 0) {
       return res.status(400).json({
         success: false,
         message: "No clock-in record found for today",
       });
-    if (attendanceRecord.rows[0].time_out)
+    }
+
+    const record = attendanceRecord.rows[0];
+
+    if (record.time_out) {
       return res.status(400).json({
         success: false,
         message: "Employee already clocked out today",
-      }); // Calculate hours worked
-    const record = attendanceRecord.rows[0];
-
-    // Parse timestamps to calculate hours
-    const timeIn = new Date(record.time_in);
-    const timeOut = new Date(currentTimestamp);
-
-    // Calculate break duration in milliseconds
-    let breakDuration = 0;
-    if (record.break_start && record.break_end) {
-      const breakStart = new Date(record.break_start);
-      const breakEnd = new Date(record.break_end);
-      breakDuration = breakEnd - breakStart;
-    }
-    // if both break starts and break end default to 1 hour
-    else if (record.break_start && !record.break_end) {
-      breakDuration = 60 * 60 * 1000; // Default to 1 hour
+      });
     }
 
-    // Calculate total hours worked (excluding break time)
-    const totalMs = timeOut - timeIn - breakDuration;
-    const totalHrs = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
-    const overtimeHrs = Math.max(totalHrs - 8, 0);
+    // Calculate total hours worked
+    const timeIn = dayjs(record.time_in);
+    const timeOut = dayjs(currentTime);
 
+    // Get employee schedule to calculate break duration
+    const scheduleQuery = await pool.query(
+      `SELECT s.break_duration, s.start_time, s.end_time
+       FROM employees e 
+       JOIN schedules s ON e.schedule_id = s.schedule_id 
+       WHERE e.employee_id = $1`,
+      [actualEmployeeId]
+    );
+
+    // Calculate raw hours worked
+    const rawHours = timeOut.diff(timeIn, "hour", true);
+
+    // Calculate break duration in hours (from schedule)
+    let breakDurationHours = 0;
+    if (scheduleQuery.rows.length > 0 && scheduleQuery.rows[0].break_duration) {
+      // Convert break_duration from minutes to hours
+      breakDurationHours = scheduleQuery.rows[0].break_duration / 60;
+    }
+
+    // Only deduct break time if the employee worked long enough to take a break
+    // Typically breaks are taken if working more than 4-6 hours
+    // For shorter periods, don't deduct break time
+    let totalHours = rawHours;
+    if (rawHours >= 4) {
+      totalHours = rawHours - breakDurationHours;
+    }
+
+    // Ensure total hours is never negative
+    if (totalHours < 0) {
+      totalHours = 0;
+    }
+
+    // Apply payroll-friendly rounding
+    // 0-15 minutes: round down, 16-45 minutes: round to 0.5, 46-59 minutes: round up
+    const payrollRoundedHours = roundToPayrollIncrement(totalHours);
+    const roundedTotalHours = Math.round(payrollRoundedHours * 100) / 100;
+
+    // Calculate scheduled work hours for undertime/halfday flags
+    let isUndertime = false;
+    let isHalfday = false;
+
+    if (scheduleQuery.rows.length > 0) {
+      const scheduledStartTime = scheduleQuery.rows[0].start_time;
+      const scheduledEndTime = scheduleQuery.rows[0].end_time;
+
+      // Calculate scheduled hours (raw schedule time minus break)
+      const scheduledRawHours = dayjs(`1970-01-01 ${scheduledEndTime}`).diff(
+        dayjs(`1970-01-01 ${scheduledStartTime}`),
+        "hour",
+        true
+      );
+      const scheduledWorkHours = scheduledRawHours - breakDurationHours;
+
+      // Calculate flags independently
+      isHalfday = roundedTotalHours < scheduledWorkHours / 2;
+      isUndertime = roundedTotalHours < scheduledWorkHours - 1;
+    }
+
+    // Note: overtime_hours will only be populated when overtime requests are approved
+    // Do not auto-calculate overtime here
+
+    // Update attendance record with new flags
     const result = await pool.query(
-      `UPDATE attendance SET time_out = $1, status = 'completed', total_hours = $2, overtime_hours = $3, notes = $4 
-       WHERE employee_id = $5 AND date = $6 RETURNING *`,
+      `UPDATE attendance 
+       SET time_out = $1, total_hours = $2, notes = $3, updated_at = $4, is_undertime = $5, is_halfday = $6
+       WHERE employee_id = $7 AND date = $8 
+       RETURNING *`,
       [
-        currentTimestamp,
-        totalHrs,
-        overtimeHrs,
+        currentTime,
+        roundedTotalHours,
         notes || null,
+        currentTime,
+        isUndertime,
+        isHalfday,
         actualEmployeeId,
         today,
       ]
@@ -175,9 +325,16 @@ export const clockOut = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Clocked out successfully",
+      message: `Clocked out successfully - ${employeeName}${
+        isUndertime ? " (Undertime)" : ""
+      }${isHalfday ? " (Half-day)" : ""}`,
       data: {
         ...result.rows[0],
+        employee_name: employeeName,
+        hours_worked: roundedTotalHours,
+        break_duration_hours: breakDurationHours,
+        is_undertime: isUndertime,
+        is_halfday: isHalfday,
         method: rfid ? "RFID" : "Manual",
       },
     });
@@ -187,123 +344,21 @@ export const clockOut = async (req, res) => {
 };
 
 export const startBreak = async (req, res) => {
-  try {
-    const { employee_id, rfid } = req.body;
-    const { date: today, time: currentTime } = getPhilippineTime();
-
-    // Find employee by either employee_id or RFID
-    let actualEmployeeId = employee_id;
-    if (!employee_id && rfid) {
-      const employee = await pool.query(
-        "SELECT id FROM employees WHERE rfid = $1 AND status = 'active'",
-        [rfid]
-      );
-      if (employee.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Active employee not found",
-        });
-      }
-      actualEmployeeId = employee.rows[0].id;
-    }
-
-    if (!actualEmployeeId) {
-      return res.status(400).json({
-        success: false,
-        message: "Either employee_id or rfid is required",
-      });
-    }
-
-    const breakHistory = await pool.query(
-      "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND break_start IS NOT NULL",
-      [actualEmployeeId, today]
-    );
-    if (breakHistory.rows.length > 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "Break already taken today." });
-
-    const activeRecord = await pool.query(
-      "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND time_in IS NOT NULL AND time_out IS NULL",
-      [actualEmployeeId, today]
-    );
-    if (activeRecord.rows.length === 0)
-      return res.status(400).json({
-        success: false,
-        message: "No active attendance record or already clocked out",
-      });
-
-    const result = await pool.query(
-      "UPDATE attendance SET break_start = $1::time, status = 'on_break' WHERE employee_id = $2 AND date = $3 RETURNING *",
-      [currentTime, actualEmployeeId, today]
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Break started",
-      data: {
-        ...result.rows[0],
-        method: rfid ? "RFID" : "Manual",
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  res.status(410).json({
+    success: false,
+    message: "Break system is now automatic based on employee schedule",
+    note: "Break duration is calculated from assigned schedule break_duration field during clock-out",
+    deprecated: true,
+  });
 };
 
 export const endBreak = async (req, res) => {
-  try {
-    const { employee_id, rfid } = req.body;
-    const { date: today, time: currentTime } = getPhilippineTime();
-
-    // Find employee by either employee_id or RFID
-    let actualEmployeeId = employee_id;
-    if (!employee_id && rfid) {
-      const employee = await pool.query(
-        "SELECT id FROM employees WHERE rfid = $1 AND status = 'active'",
-        [rfid]
-      );
-      if (employee.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Active employee not found",
-        });
-      }
-      actualEmployeeId = employee.rows[0].id;
-    }
-
-    if (!actualEmployeeId) {
-      return res.status(400).json({
-        success: false,
-        message: "Either employee_id or rfid is required",
-      });
-    }
-
-    const activeBreak = await pool.query(
-      "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND break_start IS NOT NULL AND break_end IS NULL",
-      [actualEmployeeId, today]
-    );
-    if (activeBreak.rows.length === 0)
-      return res
-        .status(400)
-        .json({ success: false, message: "No active break found to end" });
-
-    const result = await pool.query(
-      "UPDATE attendance SET break_end = $1::time, status = 'present' WHERE employee_id = $2 AND date = $3 RETURNING *",
-      [currentTime, actualEmployeeId, today]
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Break ended",
-      data: {
-        ...result.rows[0],
-        method: rfid ? "RFID" : "Manual",
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  res.status(410).json({
+    success: false,
+    message: "Break system is now automatic based on employee schedule",
+    note: "Break duration is calculated from assigned schedule break_duration field during clock-out",
+    deprecated: true,
+  });
 };
 
 export const getTodayAttendance = async (req, res) => {
@@ -442,21 +497,16 @@ export const getEmployeeStatus = async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT a.*, e.first_name, e.last_name, e.hourly_rate,
+      SELECT a.*, e.first_name, e.last_name,
         CASE 
-          WHEN a.time_in IS NOT NULL AND a.time_out IS NOT NULL AND a.break_start IS NOT NULL AND a.break_end IS NOT NULL THEN 'completed'
-          WHEN a.time_in IS NOT NULL AND a.time_out IS NOT NULL AND a.break_start IS NOT NULL AND a.break_end IS NULL THEN 'on_break'
+          WHEN a.time_in IS NOT NULL AND a.time_out IS NOT NULL THEN 'completed'
           WHEN a.time_in IS NOT NULL AND a.time_out IS NULL THEN 'clocked_in'
           ELSE 'not_started'
         END AS current_status,
-        CASE WHEN a.break_start IS NOT NULL THEN true ELSE false END AS break_taken,
-        CASE 
-          WHEN a.break_start IS NOT NULL AND a.break_end IS NOT NULL THEN EXTRACT(EPOCH FROM (a.break_end - a.break_start)) / 60
-          WHEN a.break_start IS NOT NULL AND a.break_end IS NULL THEN EXTRACT(EPOCH FROM (CURRENT_TIME - a.break_start)) / 60
-          ELSE 0
-        END AS break_duration_minutes
+        s.break_duration
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       WHERE a.employee_id = $1 AND a.date = $2
     `,
       [employee_id, today]
@@ -469,69 +519,35 @@ export const getEmployeeStatus = async (req, res) => {
 };
 
 export const canTakeBreak = async (req, res) => {
-  try {
-    const { employee_id } = req.params;
-    const { date: today } = getPhilippineTime();
-
-    const result = await pool.query(
-      `
-      SELECT 
-        CASE 
-          WHEN break_start IS NOT NULL THEN false
-          WHEN time_in IS NULL THEN false
-          WHEN time_out IS NOT NULL THEN false
-          ELSE true
-        END AS can_take_break,
-        CASE 
-          WHEN break_start IS NOT NULL THEN 'Break already taken today'
-          WHEN time_in IS NULL THEN 'Employee not clocked in'
-          WHEN time_out IS NOT NULL THEN 'Employee already clocked out'
-          ELSE 'Break available'
-        END AS message
-      FROM attendance WHERE employee_id = $1 AND date = $2
-    `,
-      [employee_id, today]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(200).json({
-        success: true,
-        can_take_break: false,
-        message: "No attendance record found for today",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      can_take_break: result.rows[0].can_take_break,
-      message: result.rows[0].message,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  res.status(200).json({
+    success: true,
+    can_take_break: false,
+    message: "Break system is now automatic based on employee schedule",
+    note: "Break duration is calculated from assigned schedule break_duration field during clock-out",
+    deprecated: true,
+  });
 };
 
 export const manualUpdate = async (req, res) => {
   const employee_id = req.params.employee_id;
-  const { date, time_in, time_out, break_start, break_end, notes, status } =
+  const { date, time_in, time_out, notes, total_hours, overtime_hours } =
     req.body;
 
   try {
     const result = await pool.query(
       `
       UPDATE attendance
-      SET date = $1, time_in = $2, time_out = $3, break_start = $4, break_end = $5, notes = $6, status = $7
-      WHERE employee_id = $8
+      SET date = $1, time_in = $2, time_out = $3, notes = $4, total_hours = $5, overtime_hours = $6, updated_at = NOW()
+      WHERE employee_id = $7
       RETURNING *
     `,
       [
         date,
         time_in,
         time_out,
-        break_start,
-        break_end,
         notes,
-        status,
+        total_hours,
+        overtime_hours || 0,
         employee_id,
       ]
     );

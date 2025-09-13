@@ -57,7 +57,7 @@ export function EmployeeTable<TData, TValue>({
   setIsAddEmployeeModalOpen,
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filterInput, setFilterInput] = useState("last_name");
+  const [filterInput, setFilterInput] = useState("full_name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const isMobile = useIsMobile();
@@ -128,20 +128,20 @@ export function EmployeeTable<TData, TValue>({
                 value={filterInput}
                 onValueChange={setFilterInput}
               >
-                <DropdownMenuRadioItem defaultChecked value="employee_id">
+                <DropdownMenuRadioItem value="employee_id">
                   Employee ID
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="first_name">
-                  First Name
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="last_name">
-                  Last Name
+                <DropdownMenuRadioItem defaultChecked value="full_name">
+                  Full Name
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="email">
                   Email
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="department_name">
-                  Department
+                <DropdownMenuRadioItem value="department_position">
+                  Department & Position
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="status">
+                  Status
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>

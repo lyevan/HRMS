@@ -72,30 +72,54 @@ const pendingEmployeeColumns = (
   };
 
   return [
-    columnHelper.accessor("first_name", {
-      header: (info) => (
-        <PendingEmployeeHeaders info={info} name="First Name" />
-      ),
+    columnHelper.accessor((row) => `${row.first_name} ${row.last_name}`, {
+      id: "full_name",
+      header: (info) => <PendingEmployeeHeaders info={info} name="Full Name" />,
       cell: (info) => info.getValue(),
-    }),
-    columnHelper.accessor("last_name", {
-      header: (info) => <PendingEmployeeHeaders info={info} name="Last Name" />,
-      cell: (info) => info.getValue(),
+      sortingFn: (rowA, rowB) => {
+        const nameA = `${rowA.original.first_name} ${rowA.original.last_name}`;
+        const nameB = `${rowB.original.first_name} ${rowB.original.last_name}`;
+        return nameA.localeCompare(nameB);
+      },
+      filterFn: (row, _columnId, filterValue) => {
+        const fullName = `${row.original.first_name} ${row.original.last_name}`;
+        return fullName.toLowerCase().includes(filterValue.toLowerCase());
+      },
     }),
     columnHelper.accessor("email", {
       header: (info) => <PendingEmployeeHeaders info={info} name="Email" />,
       cell: (info) => info.getValue(),
     }),
-    columnHelper.accessor("department_name", {
-      header: (info) => (
-        <PendingEmployeeHeaders info={info} name="Department" />
-      ),
-      cell: (info) => info.getValue() || "--",
-    }),
-    columnHelper.accessor("position_title", {
-      header: (info) => <PendingEmployeeHeaders info={info} name="Position" />,
-      cell: (info) => info.getValue() || "--",
-    }),
+    columnHelper.accessor(
+      (row) => `${row.department_name || ""} - ${row.position_title || ""}`,
+      {
+        id: "department_position",
+        header: (info) => (
+          <PendingEmployeeHeaders info={info} name="Department & Position" />
+        ),
+        cell: (info) => (
+          <div className="flex flex-col">
+            <p className="font-medium">
+              {info.row.original.department_name || "--"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {info.row.original.position_title || "--"}
+            </p>
+          </div>
+        ),
+        sortingFn: (rowA, rowB) => {
+          const deptA = rowA.original.department_name || "";
+          const deptB = rowB.original.department_name || "";
+          return deptA.localeCompare(deptB);
+        },
+        filterFn: (row, _columnId, filterValue) => {
+          const combined = `${row.original.department_name || ""} ${
+            row.original.position_title || ""
+          }`;
+          return combined.toLowerCase().includes(filterValue.toLowerCase());
+        },
+      }
+    ),
     columnHelper.accessor("status", {
       header: (info) => <PendingEmployeeHeaders info={info} name="Status" />,
       cell: (info) => {

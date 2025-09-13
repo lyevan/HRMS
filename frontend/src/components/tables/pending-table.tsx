@@ -57,17 +57,23 @@ export function PendingEmployeeTable<TData, TValue>({
   setIsAddEmployeeModalOpen,
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filterInput, setFilterInput] = useState("last_name");
+  const [filterInput, setFilterInput] = useState("full_name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
+  const [showRejected, setShowRejected] = useState(false);
   const isMobile = useIsMobile();
   //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
   //     from: new Date(2025, 8, 15),
   //     to: new Date(2025, 9, 6),
   //   });
 
+  // Filter data based on showRejected state
+  const filteredData = showRejected
+    ? data
+    : data.filter((item: any) => item.status !== "rejected");
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -100,7 +106,7 @@ export function PendingEmployeeTable<TData, TValue>({
   return (
     <div>
       <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
-        <div className="flex items-center gap-2 w-xs">
+        <div className="flex items-center gap-2 w-full">
           <Input
             placeholder={
               !isMobile
@@ -128,24 +134,36 @@ export function PendingEmployeeTable<TData, TValue>({
                 value={filterInput}
                 onValueChange={setFilterInput}
               >
-                <DropdownMenuRadioItem defaultChecked value="employee_id">
-                  Employee ID
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="first_name">
-                  First Name
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="last_name">
-                  Last Name
+                <DropdownMenuRadioItem defaultChecked value="full_name">
+                  Full Name
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="email">
                   Email
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="department_name">
-                  Department
+                <DropdownMenuRadioItem value="department_position">
+                  Department & Position
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="status">
+                  Status
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          <div className="flex items-center space-x-2 w-full">
+            <input
+              type="checkbox"
+              id="show-rejected"
+              checked={showRejected}
+              onChange={(e) => setShowRejected(e.target.checked)}
+              className="rounded"
+            />
+            <label
+              htmlFor="show-rejected"
+              className="text-sm font-medium cursor-pointer"
+            >
+              Show Rejected
+            </label>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button

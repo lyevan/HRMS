@@ -7,12 +7,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/stringMethods";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, Clock, User, Calendar, TrendingUp } from "lucide-react";
 import axios from "axios";
 import { useUserSessionStore } from "@/store/userSessionStore";
+import { useAttendanceStore } from "@/store/attendanceStore";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   type ChartConfig,
   ChartContainer,
@@ -21,34 +23,137 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { TrendingUp } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import {
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  subDays,
+  subWeeks,
+  subMonths,
+  format,
+  eachDayOfInterval,
+  eachWeekOfInterval,
+  eachMonthOfInterval,
+} from "date-fns";
 
-export const description = "An area chart with a legend";
-
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-];
+export const description = "An area chart showing attendance trends";
 
 const chartConfig = {
-  desktop: {
-    label: "Desktop",
+  present: {
+    label: "Present",
     color: "var(--chart-1)",
   },
-  mobile: {
-    label: "Mobile",
+  absent: {
+    label: "Absent",
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
 
 const TimekeepingPage = () => {
   const { employee } = useUserSessionStore();
+  const { attendanceRecords, attendanceStats, fetchAttendanceRecords } =
+    useAttendanceStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [chartView, setChartView] = useState<"daily" | "weekly" | "monthly">(
+    "monthly"
+  );
+
+  useEffect(() => {
+    fetchAttendanceRecords();
+  }, [fetchAttendanceRecords]);
+
+  // Generate chart data from attendance records based on view type
+  const chartData = useMemo(() => {
+    const currentDate = new Date();
+
+    if (chartView === "daily") {
+      // Last 7 days
+      const last7Days = eachDayOfInterval({
+        start: subDays(currentDate, 6),
+        end: currentDate,
+      });
+
+      return last7Days.map((date) => {
+        const dayRecords = attendanceRecords.filter((record) => {
+          const recordDate = new Date(record.date);
+          return (
+            format(recordDate, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
+          );
+        });
+
+        const presentCount = dayRecords.filter(
+          (r) => r.time_in !== null
+        ).length;
+        const absentCount = dayRecords.filter((r) => r.time_in === null).length;
+
+        return {
+          period: format(date, "EEE d"),
+          present: presentCount,
+          absent: absentCount,
+        };
+      });
+    }
+
+    if (chartView === "weekly") {
+      // Last 8 weeks
+      const last8Weeks = eachWeekOfInterval({
+        start: subWeeks(currentDate, 7),
+        end: currentDate,
+      });
+
+      return last8Weeks.map((weekStart, index) => {
+        const weekEnd = endOfWeek(weekStart);
+        const weekRecords = attendanceRecords.filter((record) => {
+          const recordDate = new Date(record.date);
+          return recordDate >= startOfWeek(weekStart) && recordDate <= weekEnd;
+        });
+
+        const presentCount = weekRecords.filter(
+          (r) => r.time_in !== null
+        ).length;
+        const absentCount = weekRecords.filter(
+          (r) => r.time_in === null
+        ).length;
+
+        return {
+          period: `Week ${index + 1}`,
+          present: presentCount,
+          absent: absentCount,
+        };
+      });
+    }
+
+    // Monthly view (default) - Last 6 months
+    const last6Months = eachMonthOfInterval({
+      start: subMonths(currentDate, 5),
+      end: currentDate,
+    });
+
+    return last6Months.map((date) => {
+      const monthRecords = attendanceRecords.filter((record) => {
+        const recordDate = new Date(record.date);
+        return (
+          recordDate.getMonth() === date.getMonth() &&
+          recordDate.getFullYear() === date.getFullYear()
+        );
+      });
+
+      const presentCount = monthRecords.filter(
+        (r) => r.time_in !== null
+      ).length;
+      const absentCount = monthRecords.filter((r) => r.time_in === null).length;
+
+      return {
+        period: format(date, "MMM"),
+        present: presentCount,
+        absent: absentCount,
+      };
+    });
+  }, [attendanceRecords, chartView]);
 
   const handleClockIn = async () => {
     try {
@@ -60,7 +165,12 @@ const TimekeepingPage = () => {
       toast.success("Clock-in successful!");
     } catch (error) {
       console.error("Error clocking in:", error);
-      toast.error((error as any).response?.data?.message || "Clock-in failed.");
+      toast.error(
+        (error as any).response?.data?.message || "Clock-in failed.",
+        {
+          description: (error as any).response?.data?.info || null,
+        }
+      );
     } finally {
       setIsLoading(false);
     }
@@ -73,11 +183,14 @@ const TimekeepingPage = () => {
         employee_id: employee?.employee_id,
       });
       console.log("Clock-out successful:", response.data);
-      toast.success("Clock-out successful!");
+      toast.success(response.data.message || "Clock-out successful!");
     } catch (error) {
       console.error("Error clocking out:", error);
       toast.error(
-        (error as any).response?.data?.message || "Clock-out failed."
+        (error as any).response?.data?.message || "Clock-out failed.",
+        {
+          description: (error as any).response?.data?.info || null,
+        }
       );
     } finally {
       setIsLoading(false);
@@ -102,54 +215,93 @@ const TimekeepingPage = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Hours for a Week
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">142</div>
-            <p className="text-xs text-muted-foreground">Hours</p>
+            <div className="text-2xl font-bold">{attendanceStats.total}</div>
+            <p className="text-xs text-muted-foreground">All time entries</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Present Days</CardTitle>
+            <User className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {attendanceStats.present}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceStats.total > 0
+                ? `${Math.round(
+                    (attendanceStats.present / attendanceStats.total) * 100
+                  )}% attendance rate`
+                : "No data"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+            <Clock className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {Math.round(attendanceStats.totalHours)}h
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceStats.averageHours.toFixed(1)}h avg per record
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Active Employees
+              Attendance Rate
             </CardTitle>
+            <TrendingUp className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">7</div>
-            <p className="text-xs text-muted-foreground">Currently</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Absentee</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">Currently</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Median Hours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">10</div>
-            <p className="text-xs text-muted-foreground">Weekly</p>
+            <div className="text-2xl font-bold text-purple-600">
+              {Math.round(attendanceStats.attendanceRate)}%
+            </div>
+            <p className="text-xs text-muted-foreground">Overall performance</p>
           </CardContent>
         </Card>
 
         <Card className="col-span-2">
           <CardHeader>
-            <CardTitle>Area Chart - Legend</CardTitle>
-            <CardDescription>
-              Showing total visitors for the last 6 months
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <CardTitle>Attendance Trends</CardTitle>
+                <CardDescription>
+                  {chartView === "daily" &&
+                    "Showing attendance patterns for the last 7 days"}
+                  {chartView === "weekly" &&
+                    "Showing attendance patterns for the last 8 weeks"}
+                  {chartView === "monthly" &&
+                    "Showing attendance patterns for the last 6 months"}
+                </CardDescription>
+              </div>
+
+              {/* Chart View Selector */}
+              <Tabs
+                value={chartView}
+                onValueChange={(value) =>
+                  setChartView(value as "daily" | "weekly" | "monthly")
+                }
+              >
+                <TabsList>
+                  <TabsTrigger value="daily">Daily</TabsTrigger>
+                  <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                  <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig}>
@@ -163,30 +315,30 @@ const TimekeepingPage = () => {
               >
                 <CartesianGrid vertical={false} />
                 <XAxis
-                  dataKey="month"
+                  dataKey="period"
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
-                  tickFormatter={(value) => value.slice(0, 3)}
+                  tickFormatter={(value) => value}
                 />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent indicator="line" />}
                 />
                 <Area
-                  dataKey="mobile"
+                  dataKey="absent"
                   type="natural"
-                  fill="var(--color-mobile)"
+                  fill="var(--color-absent)"
                   fillOpacity={0.4}
-                  stroke="var(--color-mobile)"
+                  stroke="var(--color-absent)"
                   stackId="a"
                 />
                 <Area
-                  dataKey="desktop"
+                  dataKey="present"
                   type="natural"
-                  fill="var(--color-desktop)"
+                  fill="var(--color-present)"
                   fillOpacity={0.4}
-                  stroke="var(--color-desktop)"
+                  stroke="var(--color-present)"
                   stackId="a"
                 />
                 <ChartLegend content={<ChartLegendContent />} />
@@ -197,11 +349,13 @@ const TimekeepingPage = () => {
             <div className="flex w-full items-start gap-2 text-sm">
               <div className="grid gap-2">
                 <div className="flex items-center gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
+                  Attendance tracking overview{" "}
                   <TrendingUp className="h-4 w-4" />
                 </div>
                 <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                  January - June 2024
+                  {chartView === "daily" && "Last 7 days data"}
+                  {chartView === "weekly" && "Last 8 weeks data"}
+                  {chartView === "monthly" && "Last 6 months data"}
                 </div>
               </div>
             </div>

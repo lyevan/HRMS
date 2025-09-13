@@ -150,7 +150,7 @@ export function ManageSchedulesContent() {
     <div>
       <div className="space-y-6">
         {/* Header with Add Button */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-end">
           <Button
             onClick={handleStartCreate}
             disabled={isCreating || editingId !== null}
@@ -340,15 +340,15 @@ export function ManageSchedulesContent() {
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         onClick={() => handleStartEdit(schedule)}
                         disabled={isCreating || editingId !== null}
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="destructive"
+                        size="icon"
                         onClick={() => handleDelete(schedule)}
                         disabled={isCreating || editingId !== null}
                       >

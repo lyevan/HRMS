@@ -22,15 +22,14 @@ import {
 import AddEmployeeForm from "@/components/forms/add-employee-form";
 
 const EmployeeDashboard = () => {
-  // const { employees, loading, error } = useEmployees();
   const employees = useEmployees();
   const loading = useEmployeeLoading();
   const error = useEmployeeError();
   const fetchEmployees = useFetchEmployees();
 
   useEffect(() => {
-    console.log("🔍 Dashboard: Fetching employees...");
-    fetchEmployees(true);
+    // console.log("🔍 Dashboard: Fetching employees...");
+    fetchEmployees();
   }, [fetchEmployees]);
 
   const [isViewEmployeeModalOpen, setIsViewEmployeeModalOpen] = useState(false);

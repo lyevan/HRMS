@@ -18,6 +18,8 @@ import EmployeeManagement from "./pages/admin/employees/management";
 import CompleteRegistrationForm from "./pages/public/complete-registration";
 import Organization from "./pages/admin/employees/organization";
 import ShiftManagement from "./pages/admin/timekeeping/shift-management";
+import FilingAndApproval from "./pages/admin/timekeeping/timesheet-management/filing-and-approval";
+import RawTimesheet from "./pages/admin/timekeeping/timesheet-management/raw-timesheet";
 
 function App() {
   // Validate environment variables and configure axios
@@ -152,6 +154,28 @@ function App() {
                       <Route
                         path="tk/shift-management"
                         element={<ShiftManagement />}
+                      />
+
+                      {/* Timekeeping Timesheet Management Group */}
+                      <Route
+                        path="tk/tm"
+                        element={<Navigate to="/tk/tm/raw-timesheet" />}
+                      />
+                      <Route
+                        path="tk/tm/raw-timesheet"
+                        element={<RawTimesheet />}
+                      />
+                      <Route
+                        path="tk/tm/filing-and-approval"
+                        element={<FilingAndApproval />}
+                      />
+                      <Route
+                        path="tk/tm/processing-timesheet"
+                        element={<div>Processing Timesheet Page</div>}
+                      />
+                      <Route
+                        path="tk/tm/deleted-logs"
+                        element={<div>Deleted Logs Page</div>}
                       />
 
                       {/* Admin Payroll Group Routes */}

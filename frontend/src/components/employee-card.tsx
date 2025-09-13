@@ -45,10 +45,12 @@ const EmployeeCard = ({
 }: EmployeeCardProps) => {
   const { copyToClipboard, isCopying } = useCopyToClipboard();
   const employees = useEmployees(); // Get employees from store
-  
+
   // Find the current employee from store to get latest data (including avatar updates)
-  const employee = employees.find(emp => emp.employee_id === propEmployee.employee_id) || propEmployee;
-  
+  const employee =
+    employees.find((emp) => emp.employee_id === propEmployee.employee_id) ||
+    propEmployee;
+
   const placeholderNumber = "09991234567";
   const formatPhoneNumber = (number: string) => {
     return number.replace(/(\d{4})(\d{3})(\d{4})/, "$1-$2-$3");
@@ -62,8 +64,10 @@ const EmployeeCard = ({
             {employee.avatar_url ? (
               <img
                 src={`${employee.avatar_url}?v=${Date.now()}`} // Add cache busting
-                alt={`${employee.first_name} ${employee.last_name}`}
-                className="w-10 h-10 rounded-full mr-2 object-cover object-center"
+                alt={`${employee.first_name.charAt(
+                  0
+                )}${employee.last_name.charAt(0)}`}
+                className="w-10 h-10 flex justify-center items-center rounded-full border border-muted mr-2 object-cover object-center"
               />
             ) : (
               <UserCircle2 className="w-10 h-10 mr-2" />

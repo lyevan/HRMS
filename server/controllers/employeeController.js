@@ -25,6 +25,12 @@ export const getAllEmployees = async (req, res) => {
         c.rate AS salary_rate,
         c.rate_type AS rate_type,
         et.name AS employment_type,
+        s.schedule_id,
+        s.schedule_name,
+        s.start_time,
+        s.end_time,
+        s.break_duration,
+        s.days_of_week,
         gin.*,
         -- Aggregate leave balances into JSON
         COALESCE(
@@ -45,13 +51,15 @@ export const getAllEmployees = async (req, res) => {
       LEFT JOIN leave_balance lb ON e.employee_id = lb.employee_id
       LEFT JOIN leave_types lt ON lb.leave_type_id = lt.leave_type_id
       LEFT JOIN government_id_numbers gin ON e.government_id_numbers_id = gin.government_id_numbers_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       GROUP BY 
         e.employee_id, e.system_id, e.first_name, e.last_name, e.email, 
         e.date_of_birth, e.status, e.created_at, e.updated_at, e.contract_id,
         d.name, d.department_id, p.title, p.position_id, p.department_id,
         c.start_date, c.end_date, c.rate, c.rate_type, et.name, 
         gin.government_id_numbers_id, gin.sss_number, gin.hdmf_number, 
-        gin.philhealth_number, gin.tin_number
+        gin.philhealth_number, gin.tin_number, s.schedule_id, s.schedule_name, 
+        s.start_time, s.end_time, s.break_duration, s.days_of_week
       ORDER BY e.created_at DESC
     `);
 
@@ -268,11 +276,11 @@ export const updateEmployee = async (req, res) => {
         .join(", ");
       const idValues = [...Object.values(idUpdates), governmentIdNumbersId];
 
-      if (!governmentIdNumbersId) {
-        // Handle case where government_id_numbers_id is not found
-        console.error("Government ID Numbers ID not found");
-        return res.status(404).json({ success: false, message: "Not found" });
-      }
+      // if (!governmentIdNumbersId) {
+      //   // Handle case where government_id_numbers_id is not found
+      //   console.error("Government ID Numbers ID not found");
+      //   return res.status(404).json({ success: false, message: "Not found" });
+      // }
 
       const idQuery = `
         UPDATE government_id_numbers

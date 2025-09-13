@@ -11,7 +11,6 @@ import {
 
 import {
   Funnel,
-  Calendar,
   Download,
   ChevronLeft,
   ChevronRight,
@@ -58,7 +57,7 @@ export function SchedAssignTable<TData, TValue>({
   onSelectionChange,
 }: SchedAssignTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [filterInput, setFilterInput] = useState("last_name");
+  const [filterInput, setFilterInput] = useState("full_name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const isMobile = useIsMobile();
@@ -187,35 +186,20 @@ export function SchedAssignTable<TData, TValue>({
                 <DropdownMenuRadioItem value="employee_id">
                   Employee ID
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="first_name">
-                  First Name
+                <DropdownMenuRadioItem defaultChecked value="full_name">
+                  Full Name
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem defaultChecked value="last_name">
-                  Last Name
+                <DropdownMenuRadioItem value="department_position">
+                  Department & Position
                 </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="department_name">
-                  Department
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="position_title">
-                  Position
+                <DropdownMenuRadioItem value="schedule_name">
+                  Current Schedule
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning(
-                "Bulk schedule assignment implementation coming soon"
-              )
-            }
-          >
-            <Calendar />
-            {!isMobile && "Bulk Assign"}
-          </Button>
           <Button
             variant="outline"
             size={isMobile ? "icon" : "default"}

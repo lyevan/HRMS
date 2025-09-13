@@ -1,6 +1,23 @@
 import { pool } from "../config/db.js";
 import { getPhilippineTime } from "../utils/getPH_Time.js";
 
+// Payroll-friendly hour rounding function
+const roundToPayrollIncrement = (hours) => {
+  const wholeHours = Math.floor(hours);
+  const minutes = (hours - wholeHours) * 60;
+
+  if (minutes <= 15) {
+    // 0-15 minutes: round down
+    return wholeHours;
+  } else if (minutes <= 45) {
+    // 16-45 minutes: round to 30 minutes (0.5 hours)
+    return wholeHours + 0.5;
+  } else {
+    // 46-59 minutes: round up to next hour
+    return wholeHours + 1;
+  }
+};
+
 let pendingUser = null;
 const enrollDuration = 30_000;
 
@@ -59,18 +76,14 @@ const employeeHasExistingAttendance = async (employee_id, mode, today) => {
         break;
 
       case "break-start":
-        // Check if employee already has break record for today or is not clocked in
-        query = `SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND 
-                 (break_start IS NOT NULL OR time_in IS NULL OR time_out IS NOT NULL)`;
-        queryParams = [employee_id, today];
-        break;
-
       case "break-end":
-        // Check if employee has active break (break_start but no break_end)
-        query =
-          "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND break_start IS NOT NULL AND break_end IS NULL";
-        queryParams = [employee_id, today];
-        break;
+        // Break system is now automatic - return deprecation info
+        return {
+          hasExisting: false,
+          message: "Break system is now automatic based on employee schedule",
+          deprecated: true,
+          data: null,
+        };
 
       default:
         throw new Error(`Unhandled mode: ${mode}`);
@@ -101,21 +114,12 @@ const employeeHasExistingAttendance = async (employee_id, mode, today) => {
         };
 
       case "break-start":
-        const canStartBreak = result.rows.length === 0;
-        return {
-          hasExisting: !canStartBreak,
-          message: canStartBreak
-            ? "Can start break"
-            : "Break already taken, not clocked in, or already clocked out",
-          data: result.rows[0] || null,
-        };
-
       case "break-end":
         return {
-          hasExisting: result.rows.length > 0,
-          message:
-            result.rows.length > 0 ? "Can end break" : "No active break found",
-          data: result.rows[0] || null,
+          hasExisting: false,
+          message: "Break system is now automatic based on employee schedule",
+          deprecated: true,
+          data: null,
         };
 
       default:
@@ -316,7 +320,7 @@ export const handleClocking = async (req, res) => {
     if (!clockInCheck.hasExisting) {
       // No clock-in record today, proceed with clock-in
       const result = await pool.query(
-        "INSERT INTO attendance (employee_id, date, time_in, status) VALUES ($1, $2, $3, 'present') RETURNING *",
+        "INSERT INTO attendance (employee_id, date, time_in, is_present) VALUES ($1, $2, $3, true) RETURNING *",
         [employee_id, today, currentTime]
       );
 
@@ -339,8 +343,27 @@ export const handleClocking = async (req, res) => {
       );
 
       if (clockOutCheck.hasExisting) {
-        // Can clock out - calculate hours and update record
+        // Can clock out - calculate hours using schedule break duration
         const record = clockOutCheck.data;
+
+        // Get employee schedule for break calculation
+        const scheduleQuery = await pool.query(
+          `SELECT s.break_duration, s.start_time, s.end_time
+           FROM employees e 
+           JOIN schedules s ON e.schedule_id = s.schedule_id 
+           WHERE e.employee_id = $1`,
+          [employee_id]
+        );
+
+        let breakDurationHours = 0;
+        if (
+          scheduleQuery.rows.length > 0 &&
+          scheduleQuery.rows[0].break_duration
+        ) {
+          // Convert break_duration from minutes to hours
+          breakDurationHours = scheduleQuery.rows[0].break_duration / 60;
+        }
+
         const toMinutes = (t) =>
           t
             .split(":")
@@ -348,27 +371,65 @@ export const handleClocking = async (req, res) => {
 
         const timeInM = toMinutes(record.time_in);
         const timeOutM = toMinutes(currentTime);
-        const breakM =
-          record.break_start && record.break_end
-            ? toMinutes(record.break_end) - toMinutes(record.break_start)
-            : 0;
-        const totalHrs =
-          Math.round(((timeOutM - timeInM - breakM) / 60) * 100) / 100;
-        const overtimeHrs = Math.max(totalHrs - 8, 0);
+
+        // Calculate raw hours worked
+        const rawHours = (timeOutM - timeInM) / 60;
+
+        // Only deduct break time if the employee worked long enough to take a break
+        // Typically breaks are taken if working more than 4 hours
+        let totalHours = rawHours;
+        if (rawHours >= 4) {
+          totalHours = rawHours - breakDurationHours;
+        }
+
+        // Ensure total hours is never negative
+        if (totalHours < 0) {
+          totalHours = 0;
+        }
+
+        // Apply payroll-friendly rounding
+        // 0-15 minutes: round down, 16-45 minutes: round to 0.5, 46-59 minutes: round up
+        const payrollRoundedHours = roundToPayrollIncrement(totalHours);
+        const totalHrs = Math.round(payrollRoundedHours * 100) / 100;
+
+        // Calculate scheduled work hours for undertime/halfday flags
+        let isUndertime = false;
+        let isHalfday = false;
+
+        if (scheduleQuery.rows.length > 0) {
+          const scheduledStartTime = scheduleQuery.rows[0].start_time;
+          const scheduledEndTime = scheduleQuery.rows[0].end_time;
+
+          // Calculate scheduled hours (raw schedule time minus break)
+          const scheduledRawHours =
+            (toMinutes(scheduledEndTime) - toMinutes(scheduledStartTime)) / 60;
+          const scheduledWorkHours = scheduledRawHours - breakDurationHours;
+
+          // Calculate flags independently
+          isHalfday = totalHrs < scheduledWorkHours / 2;
+          isUndertime = totalHrs < scheduledWorkHours - 1;
+        }
 
         const result = await pool.query(
-          `UPDATE attendance SET time_out = $1::time, status = 'completed', total_hours = $2, overtime_hours = $3 
-           WHERE employee_id = $4 AND date = $5 RETURNING *`,
-          [currentTime, totalHrs, overtimeHrs, employee_id, today]
+          `UPDATE attendance SET time_out = $1::time, total_hours = $2, is_undertime = $3, is_halfday = $4, updated_at = NOW()
+           WHERE employee_id = $5 AND date = $6 RETURNING *`,
+          [currentTime, totalHrs, isUndertime, isHalfday, employee_id, today]
         );
 
         return res.status(200).json({
           success: true,
-          message: `Clocked out successfully - ${employee.first_name} ${employee.last_name}`,
+          message: `Clocked out successfully - ${employee.first_name} ${
+            employee.last_name
+          }${isUndertime ? " (Undertime)" : ""}${
+            isHalfday ? " (Half-day)" : ""
+          }`,
           action: "clock-out",
           data: {
             ...result.rows[0],
             employee_name: `${employee.first_name} ${employee.last_name}`,
+            hours_worked: totalHrs,
+            is_undertime: isUndertime,
+            is_halfday: isHalfday,
             method: "RFID",
           },
         });
@@ -391,92 +452,11 @@ export const handleClocking = async (req, res) => {
 };
 
 export const handleBreak = async (req, res) => {
-  const { tag } = req.body;
-  const { date: today, time: currentTime } = getPhilippineTime();
-
-  if (!tag) {
-    return res
-      .status(400)
-      .send({ success: false, message: "No tag were scanned." });
-  }
-
-  try {
-    // Find the employee by RFID
-    const employee = await getEmployeeByRFID(tag);
-
-    // Handle error if no employees were found
-    if (!employee) {
-      return res.status(404).send({
-        success: false,
-        message: "Employee not found or inactive",
-      });
-    }
-
-    const employee_id = employee.employee_id;
-
-    // Check if employee can start break
-    const breakStartCheck = await employeeHasExistingAttendance(
-      employee_id,
-      "break-start",
-      today
-    );
-
-    if (!breakStartCheck.hasExisting) {
-      // Can start break
-      const result = await pool.query(
-        "UPDATE attendance SET break_start = $1::time, status = 'on_break' WHERE employee_id = $2 AND date = $3 RETURNING *",
-        [currentTime, employee_id, today]
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: `Break started - ${employee.first_name} ${employee.last_name}`,
-        action: "break-start",
-        data: {
-          ...result.rows[0],
-          employee_name: `${employee.first_name} ${employee.last_name}`,
-          method: "RFID",
-        },
-      });
-    } else {
-      // Check if can end break
-      const breakEndCheck = await employeeHasExistingAttendance(
-        employee_id,
-        "break-end",
-        today
-      );
-
-      if (breakEndCheck.hasExisting) {
-        // Can end break
-        const result = await pool.query(
-          "UPDATE attendance SET break_end = $1::time, status = 'present' WHERE employee_id = $2 AND date = $3 RETURNING *",
-          [currentTime, employee_id, today]
-        );
-
-        return res.status(200).json({
-          success: true,
-          message: `Break ended - ${employee.first_name} ${employee.last_name}`,
-          action: "break-end",
-          data: {
-            ...result.rows[0],
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            method: "RFID",
-          },
-        });
-      } else {
-        // Cannot perform break action
-        return res.status(400).json({
-          success: false,
-          message: breakStartCheck.message,
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error in handleBreak:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: "Internal Server Error",
-    });
-  }
+  res.status(410).json({
+    success: false,
+    message: "Break system is now automatic based on employee schedule",
+    note: "Break duration is calculated from assigned schedule break_duration field during clock-out",
+    deprecated: true,
+    action: "break-deprecated",
+  });
 };

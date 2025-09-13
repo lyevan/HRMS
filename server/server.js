@@ -12,6 +12,8 @@ import departmentRoutes from "./routes/departmentRoutes.js";
 import positionRoutes from "./routes/positionRoutes.js";
 import schedulesRoutes from "./routes/schedulesRoutes.js";
 import rfidRoutes from "./routes/rfidRoutes.js";
+import leaveRoutes from "./routes/leaveRoutes.js";
+import payrollRoutes from "./routes/payrollRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
 import { pool } from "./config/db.js";
@@ -90,6 +92,8 @@ app.use("/api/invite", invitationRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/positions", positionRoutes);
 app.use("/api/schedules", schedulesRoutes);
+app.use("/api/leave", leaveRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 app.get("/test-db", async (req, res) => {
   try {

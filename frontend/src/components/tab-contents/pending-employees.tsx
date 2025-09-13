@@ -30,7 +30,7 @@ const PendingEmployees = () => {
   );
 
   useEffect(() => {
-    console.log("🔍 PendingEmployees: Fetching pending employees...");
+    // console.log("🔍 PendingEmployees: Fetching pending employees...");
     fetchPendingEmployees();
   }, [fetchPendingEmployees]);
 

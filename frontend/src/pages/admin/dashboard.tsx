@@ -34,14 +34,11 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useFetchEmployees, useEmployeeError, useEmployeeLoading, useEmployees } from "../../store/employeeStore";
+import { useFetchEmployees, useEmployees } from "../../store/employeeStore";
+import { useAttendanceStore } from "@/store/attendanceStore";
 
 export const description = "Attendance today";
-const chartData = [
-  { status: "present", count: 275, fill: "var(--chart-1)" },
-  { status: "absent", count: 200, fill: "var(--chart-2)" },
-  { status: "leave", count: 187, fill: "var(--chart-3)" },
-];
+
 const chartConfig = {
   count: {
     label: "Attendance Counts",
@@ -49,6 +46,10 @@ const chartConfig = {
   present: {
     label: "Present",
     color: "var(--chart-1)",
+  },
+  late: {
+    label: "Late",
+    color: "var(--chart-4)",
   },
   absent: {
     label: "Absent",
@@ -64,24 +65,51 @@ const Dashboard = () => {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const employees = useEmployees();
-  const loading = useEmployeeLoading();
-  const error = useEmployeeError();
   const fetchEmployees = useFetchEmployees();
 
-  useEffect(() => {
-    console.log("🔍 Dashboard: Fetching employees...");
-    fetchEmployees();
-  }, [fetchEmployees]);
+  // Attendance store
+  const {
+    todayAttendance,
+    attendanceStats,
+    loading: attendanceLoading,
+    error: attendanceError,
+    fetchTodayAttendanceRecords,
+    fetchAttendanceRecords,
+  } = useAttendanceStore();
 
-  // Debug logging
   useEffect(() => {
-    console.log("📊 Dashboard state:", {
-      employeeCount: employees.length,
-      loading,
-      error,
-      employees: employees.slice(0, 2), // Show first 2 employees for debugging
-    });
-  }, [employees, loading, error]);
+    fetchEmployees();
+    fetchTodayAttendanceRecords();
+    fetchAttendanceRecords();
+  }, [fetchEmployees, fetchTodayAttendanceRecords, fetchAttendanceRecords]);
+
+  // Calculate dynamic chart data from real attendance data
+  const chartData = [
+    {
+      status: "present",
+      count: todayAttendance.filter(
+        (record) => record.is_present && !record.is_late
+      ).length,
+      fill: "var(--chart-1)",
+    },
+    {
+      status: "late",
+      count: todayAttendance.filter(
+        (record) => record.is_present && record.is_late
+      ).length,
+      fill: "var(--chart-4)",
+    },
+    {
+      status: "absent",
+      count: attendanceStats.absent,
+      fill: "var(--chart-2)",
+    },
+    {
+      status: "leave",
+      count: attendanceStats.leave,
+      fill: "var(--chart-3)",
+    },
+  ];
 
   const quickActions = [
     {
@@ -154,44 +182,74 @@ const Dashboard = () => {
             <CardTitle className="text-sm font-medium">Present Today</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">189</div>
-            <p className="text-xs text-muted-foreground">+2% from yesterday</p>
+            <div className="text-2xl font-bold">
+              {attendanceLoading
+                ? "..."
+                : todayAttendance.filter((r) => r.is_present).length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceLoading
+                ? "Loading..."
+                : `${
+                    todayAttendance.filter((r) => r.is_late).length
+                  } late arrivals`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col row-span-1 col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {attendanceLoading ? "..." : attendanceStats.absent}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceLoading
+                ? "Loading..."
+                : `${attendanceStats.leave} on leave`}
+            </p>
           </CardContent>
         </Card>
 
         <Card className="flex flex-col row-span-1 col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Pending Applications
+              Total Hours Today
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">-5% from last week</p>
+            <div className="text-2xl font-bold">
+              {attendanceLoading
+                ? "..."
+                : Math.round(attendanceStats.totalHours)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceLoading
+                ? "Loading..."
+                : `${Math.round(
+                    attendanceStats.averageHours
+                  )}h avg per employee`}
+            </p>
           </CardContent>
         </Card>
 
         <Card className="flex flex-col row-span-1 col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Active Departments
+              Attendance Rate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">No change</p>
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col row-span-1 col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Active Departments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">No change</p>
+            <div className="text-2xl font-bold">
+              {attendanceLoading
+                ? "..."
+                : `${Math.round(attendanceStats.attendanceRate)}%`}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {attendanceLoading ? "Loading..." : "Today's rate"}
+            </p>
           </CardContent>
         </Card>
 
@@ -297,15 +355,32 @@ const Dashboard = () => {
             <CardDescription>{new Date().toLocaleDateString()}</CardDescription>
           </CardHeader>
           <CardContent className="pb-0">
-            <ChartContainer
-              config={chartConfig}
-              className="[&_.recharts-pie-label-text]:fill-foreground mx-auto aspect-square max-h-[300px] pb-0"
-            >
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                <Pie data={chartData} dataKey="count" label nameKey="status" />
-              </PieChart>
-            </ChartContainer>
+            {attendanceLoading ? (
+              <div className="flex items-center justify-center h-[300px]">
+                <p className="text-muted-foreground">
+                  Loading attendance data...
+                </p>
+              </div>
+            ) : attendanceError ? (
+              <div className="flex items-center justify-center h-[300px]">
+                <p className="text-red-500">Error loading attendance data</p>
+              </div>
+            ) : (
+              <ChartContainer
+                config={chartConfig}
+                className="[&_.recharts-pie-label-text]:fill-foreground mx-auto aspect-square max-h-[300px] pb-0"
+              >
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                  <Pie
+                    data={chartData}
+                    dataKey="count"
+                    label
+                    nameKey="status"
+                  />
+                </PieChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
       </div>

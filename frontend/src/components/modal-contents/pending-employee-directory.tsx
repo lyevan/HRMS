@@ -55,14 +55,14 @@ const PendingEmployeeDirectory = ({
   }, [employee, form]);
 
   // Handle form submission
-  const onSubmit = async (data: PendingEmployee) => {
+  const onSubmit = async (_data: PendingEmployee) => {
     try {
       // TODO: Implement API call to update pending employee
-      console.log("Updating pending employee:", data);
+      // console.log("Updating pending employee:", data);
       toast.success("Pending employee updated successfully!");
       setIsReadOnly(true);
     } catch (error) {
-      console.error("Error updating pending employee:", error);
+      // console.error("Error updating pending employee:", error);
       toast.error("Failed to update pending employee");
     }
   };

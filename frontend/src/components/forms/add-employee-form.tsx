@@ -143,27 +143,27 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
   };
 
   const getPositions = async (departmentId: number) => {
-    console.log("Fetching positions for department:", departmentId);
+    // console.log("Fetching positions for department:", departmentId);
     try {
       const response = await axios.get(`positions/department/${departmentId}`);
-      console.log("Fetched positions:", response.data.result);
+      // console.log("Fetched positions:", response.data.result);
       return response.data.result;
     } catch (error) {
-      console.error("Error fetching positions:", error);
+      // console.error("Error fetching positions:", error);
       toast.error("Failed to fetch positions");
       return [];
     }
   };
 
   const handleSubmit = async () => {
-    console.log("Submitting form with data:", {
-      employee_information: formContactData,
-      contract_information: formContractData,
-      selectedPosition,
-      selectedEmploymentType,
-      "position_id (parsed)": parseInt(selectedPosition),
-      "employment_type_id (parsed)": parseInt(selectedEmploymentType),
-    });
+    // console.log("Submitting form with data:", {
+    //   employee_information: formContactData,
+    //   contract_information: formContractData,
+    //   selectedPosition,
+    //   selectedEmploymentType,
+    //   "position_id (parsed)": parseInt(selectedPosition),
+    //   "employment_type_id (parsed)": parseInt(selectedEmploymentType),
+    // });
     try {
       setIsLoading(true);
       const response = await axios.post("/invite/pending", {

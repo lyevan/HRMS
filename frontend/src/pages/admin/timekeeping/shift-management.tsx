@@ -35,7 +35,6 @@ const ShiftManagement = () => {
     useState(false);
 
   useEffect(() => {
-    console.log("🔍 Shift Management: Fetching employees...");
     fetchEmployees();
   }, []); // Empty dependency array - only run once on mount
 
@@ -107,10 +106,10 @@ const ShiftManagement = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6h-fit">
       <div className="grid grid-cols-12 gap-6">
         {/* Left side - Employee Table */}
-        <div className="col-span-7 row-span-1 lg:h-3/4 2xl:h-8/10">
+        <div className="col-span-7 row-span-1 h-[calc(70vh-4.5rem)]">
           <div className="bg-card rounded-lg border p-4 h-full">
             <h2 className="text-lg font-semibold mb-4">Select Employees</h2>
             <SchedAssignTable
@@ -123,7 +122,7 @@ const ShiftManagement = () => {
         </div>
 
         {/* Middle - Bulk Assign Button */}
-        <div className="col-span-2 row-span-1 lg:h-3/4 2xl:h-8/10 flex items-center justify-center">
+        <div className="col-span-2 row-span-1 h-[calc(70vh-4.5rem)] flex items-center justify-center">
           <div className="text-center space-y-4">
             <Button
               onClick={handleBulkAssign}
@@ -142,7 +141,7 @@ const ShiftManagement = () => {
         </div>
 
         {/* Right side - Schedules List */}
-        <div className="col-span-3 row-span-1 lg:h-3/4 2xl:h-8/10">
+        <div className="col-span-3 row-span-1 h-[calc(70vh-4.5rem)]">
           <div className="bg-card rounded-lg border p-4 h-full overflow-auto">
             <h2 className="text-lg font-semibold mb-4">Select Schedule</h2>
             <SchedulesList
