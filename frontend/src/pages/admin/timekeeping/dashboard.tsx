@@ -25,12 +25,8 @@ import {
 } from "@/components/ui/chart";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import {
-  startOfDay,
-  endOfDay,
   startOfWeek,
   endOfWeek,
-  startOfMonth,
-  endOfMonth,
   subDays,
   subWeeks,
   subMonths,
