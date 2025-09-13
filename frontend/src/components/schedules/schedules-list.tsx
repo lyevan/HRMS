@@ -9,6 +9,7 @@ import {
 } from "@/store/schedulesStore";
 import type { Schedule } from "@/models/schedules-model";
 import { Badge } from "../ui/badge";
+import { getAllDaysWithScheduleStatus } from "@/lib/stringMethods";
 
 interface SchedulesListProps {
   selectedSchedule: Schedule | null;
@@ -90,13 +91,18 @@ export function SchedulesList({
                   {schedule.days_of_week &&
                     schedule.days_of_week.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-2">
-                        {schedule.days_of_week.map((day: string) => (
+                        {getAllDaysWithScheduleStatus(
+                          schedule.days_of_week
+                        ).map(({ day, isScheduled }) => (
                           <Badge
                             key={day}
                             variant="outline"
-                            className="text-xs px-2 py-1"
+                            className={`text-xs px-2 py-1 ${
+                              isScheduled
+                                ? "border-primary/50 text-primary bg-primary/5"
+                                : "border-destructive/50 text-destructive bg-destructive/5"
+                            }`}
                           >
-                            {/* Only display three letters */}
                             {day.charAt(0).toUpperCase() + day.slice(1, 3)}
                           </Badge>
                         ))}

@@ -52,6 +52,66 @@ export const formatDateShort = (dateString: string | null) => {
   return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
+export const formatMilitaryTimeToAMPM = (militaryTime: string | null) => {
+  if (!militaryTime) return "--";
+
+  // Handle different input formats: "HH:mm:ss", "HH:mm", or "HHmm"
+  let timeString = militaryTime.toString().trim();
+
+  // Remove seconds if present (e.g., "14:30:00" -> "14:30")
+  if (timeString.includes(":") && timeString.split(":").length === 3) {
+    timeString = timeString.substring(0, 5); // Take only "HH:mm"
+  }
+
+  // Add colon if missing (e.g., "1430" -> "14:30")
+  if (!timeString.includes(":") && timeString.length === 4) {
+    timeString = timeString.substring(0, 2) + ":" + timeString.substring(2);
+  }
+
+  // Parse hours and minutes
+  const [hoursStr, minutesStr] = timeString.split(":");
+  const hours = parseInt(hoursStr, 10);
+  const minutes = parseInt(minutesStr, 10);
+
+  // Validate input
+  if (
+    isNaN(hours) ||
+    isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return militaryTime; // Return original if invalid
+  }
+
+  // Convert to 12-hour format
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  const displayMinutes = minutes.toString().padStart(2, "0");
+
+  return `${displayHours}:${displayMinutes} ${period}`;
+};
+
+export const getAllDaysWithScheduleStatus = (scheduledDays: string[]) => {
+  const allDays = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ];
+
+  return allDays.map((day) => ({
+    day,
+    isScheduled: scheduledDays
+      .map((d) => d.toLowerCase())
+      .includes(day.toLowerCase()),
+  }));
+};
+
 export const formatMoney = (amount: number | null) => {
   // console.log("Formatting amount:", amount);
   if (amount === null || amount === undefined) return "--";

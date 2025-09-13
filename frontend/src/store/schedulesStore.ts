@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import {
   fetchAllSchedules,
+  getScheduleById,
   createSchedule,
   updateSchedule,
   deleteSchedule,
@@ -11,11 +12,13 @@ import type { Schedule, BulkAssignRequest } from "../models/schedules-model";
 
 interface SchedulesState {
   schedules: Schedule[];
+  schedule: Schedule | null;
   loading: boolean;
   error: string | null;
 
   // Actions
   fetchSchedules: (bustCache?: boolean) => Promise<void>;
+  getScheduleById: (id: string) => Promise<void>;
   addSchedule: (
     scheduleData: Omit<Schedule, "schedule_id" | "created_at" | "updated_at">
   ) => Promise<void>;
@@ -60,6 +63,27 @@ export const useSchedulesStore = create<SchedulesState>()(
               error instanceof Error
                 ? error.message
                 : "Failed to fetch schedules",
+          });
+        }
+      },
+
+      getScheduleById: async (id) => {
+        set({ loading: true, error: null });
+        try {
+          const schedule = await getScheduleById(id);
+          set({
+            schedule: schedule,
+            loading: false,
+            error: null,
+          });
+        } catch (error) {
+          set({
+            schedule: null,
+            loading: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch schedule by ID",
           });
         }
       },
@@ -184,6 +208,7 @@ export const useAssignScheduleBulk = () =>
 export const useSchedulesActions = () =>
   useSchedulesStore((state) => ({
     fetchSchedules: state.fetchSchedules,
+    getScheduleById: state.getScheduleById,
     addSchedule: state.addSchedule,
     editSchedule: state.editSchedule,
     removeSchedule: state.removeSchedule,

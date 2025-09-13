@@ -222,7 +222,7 @@ const RawTimesheet = () => {
 
       {/* View Details Modal */}
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl pr-10">
           {selectedRecord && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">

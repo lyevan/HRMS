@@ -8,8 +8,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate } from "@/lib/stringMethods";
-import { LogIn, LogOut, Clock, User, Calendar, TrendingUp } from "lucide-react";
+import {
+  formatDate,
+  formatMilitaryTimeToAMPM,
+  getAllDaysWithScheduleStatus,
+} from "@/lib/stringMethods";
+import {
+  LogIn,
+  LogOut,
+  Clock,
+  User,
+  Calendar,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
 import axios from "axios";
 import { useUserSessionStore } from "@/store/userSessionStore";
 import { useAttendanceStore } from "@/store/attendanceStore";
@@ -35,6 +47,7 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
 } from "date-fns";
+import { useSchedulesStore } from "@/store/schedulesStore";
 
 export const description = "An area chart showing attendance trends";
 
@@ -57,9 +70,11 @@ const TimekeepingPage = () => {
   const [chartView, setChartView] = useState<"daily" | "weekly" | "monthly">(
     "monthly"
   );
+  const { schedule, getScheduleById } = useSchedulesStore();
 
   useEffect(() => {
     fetchAttendanceRecords();
+    getScheduleById(employee?.employee_id || "0");
   }, [fetchAttendanceRecords]);
 
   // Generate chart data from attendance records based on view type
@@ -360,24 +375,128 @@ const TimekeepingPage = () => {
         <div className="col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>
-                Your Attendance Status Today: {formatDate(Date.now() as any)}
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Your Attendance Status Today
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  {formatDate(Date.now() as any)}
+                </span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="w-full flex justify-between">
-                <Button onClick={() => handleClockIn()} disabled={isLoading}>
-                  <LogIn />
-                  Clock-In
-                </Button>
-                <Button
-                  variant={"destructive"}
-                  onClick={() => handleClockOut()}
-                  disabled={isLoading}
-                >
-                  <LogOut />
-                  Clock-Out
-                </Button>
+            <CardContent className="space-y-6">
+              {/* Schedule Information */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Your Schedule Today
+                </h3>
+                {schedule ? (
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Schedule:
+                        </span>
+                        <span className="text-sm font-medium">
+                          {schedule.schedule_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Start Time:
+                        </span>
+                        <span className="text-sm font-medium">
+                          {formatMilitaryTimeToAMPM(schedule.start_time)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          End Time:
+                        </span>
+                        <span className="text-sm font-medium">
+                          {formatMilitaryTimeToAMPM(schedule.end_time)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Break Duration:
+                        </span>
+                        <span className="text-sm font-medium">
+                          {schedule.break_duration} min
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm text-muted-foreground">
+                          Work Days:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {getAllDaysWithScheduleStatus(
+                            schedule.days_of_week
+                          ).map(({ day, isScheduled }) => (
+                            <span
+                              key={day}
+                              className={`px-2 py-1 text-xs font-medium rounded-md capitalize ${
+                                isScheduled
+                                  ? "bg-primary/10 text-primary"
+                                  : "bg-destructive/10 text-destructive"
+                              }`}
+                            >
+                              {day.slice(0, 3)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        No schedule assigned!
+                      </span>
+                    </div>
+                    <p className="text-sm text-destructive/80 mt-1">
+                      Contact HR for schedule assignment.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Clock In/Out Buttons */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Quick Actions</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={() => handleClockIn()}
+                    disabled={isLoading || schedule == null}
+                    className="h-12 flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Clock In
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleClockOut()}
+                    disabled={isLoading || schedule == null}
+                    className="h-12 flex items-center justify-center gap-2"
+                    size="lg"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Clock Out
+                  </Button>
+                </div>
+
+                {(isLoading || schedule == null) && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    {isLoading
+                      ? "Processing..."
+                      : "Schedule required for attendance actions"}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

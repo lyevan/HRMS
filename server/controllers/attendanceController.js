@@ -6,6 +6,38 @@ import utc from "dayjs/plugin/utc.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+// Helper function to check if a date is a holiday
+const checkHolidayStatus = async (date) => {
+  try {
+    // Check if holidays table exists and query it
+    const holidayResult = await pool.query(
+      `SELECT holiday_type FROM holidays 
+       WHERE date = $1 AND is_active = true`,
+      [date]
+    );
+
+    if (holidayResult.rows.length > 0) {
+      const holidayType = holidayResult.rows[0].holiday_type;
+      return {
+        isRegularHoliday: holidayType === "regular",
+        isSpecialHoliday: holidayType === "special",
+      };
+    }
+
+    return {
+      isRegularHoliday: false,
+      isSpecialHoliday: false,
+    };
+  } catch (error) {
+    // If holidays table doesn't exist, return false for all
+    console.log("Holiday check skipped - holidays table may not exist");
+    return {
+      isRegularHoliday: false,
+      isSpecialHoliday: false,
+    };
+  }
+};
+
 // Payroll-friendly hour rounding function
 const roundToPayrollIncrement = (hours) => {
   const wholeHours = Math.floor(hours);
@@ -146,13 +178,10 @@ export const clockIn = async (req, res) => {
 
     // Check if today is a working day according to schedule
     const workingDays = foundEmployee.days_of_week || [];
-    if (!workingDays.includes(currentDayOfWeek)) {
-      return res.status(400).json({
-        success: false,
-        message: "Today is not a working day according to your schedule",
-        info: `Working days: ${workingDays.join(", ")}`,
-      });
-    }
+    const isScheduledDayOff = !workingDays.includes(currentDayOfWeek);
+
+    // Note: We allow clocking in on day off (for approved overtime/emergency work)
+    // This will be flagged as is_dayoff=true for proper payroll processing
 
     // Check if employee has approved leave for today
     const leaveCheck = await pool.query(
@@ -193,25 +222,52 @@ export const clockIn = async (req, res) => {
     const currentTimeOnly = now.format("HH:mm:ss");
     const isLate = currentTimeOnly > scheduleStartTime;
 
-    // Insert attendance record with boolean flags
+    // Check holiday status
+    const holidayStatus = await checkHolidayStatus(today);
+
+    // Insert attendance record with boolean flags including payroll flags
     const result = await pool.query(
-      `INSERT INTO attendance (employee_id, date, time_in, is_present, is_late, is_absent) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [actualEmployeeId, today, currentTime, true, isLate, false]
+      `INSERT INTO attendance (
+        employee_id, date, time_in, is_present, is_late, is_absent, 
+        is_dayoff, is_regular_holiday, is_special_holiday
+      ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [
+        actualEmployeeId,
+        today,
+        currentTime,
+        true,
+        isLate,
+        false,
+        isScheduledDayOff, // Flag if working on day off
+        holidayStatus.isRegularHoliday,
+        holidayStatus.isSpecialHoliday,
+      ]
     );
 
     res.status(201).json({
       success: true,
       message: `Clocked in successfully - ${foundEmployee.first_name} ${
         foundEmployee.last_name
-      }${isLate ? " (Late)" : ""}`,
+      }${isLate ? " (Late)" : ""}${isScheduledDayOff ? " (Day Off Work)" : ""}${
+        holidayStatus.isRegularHoliday ? " (Regular Holiday)" : ""
+      }${holidayStatus.isSpecialHoliday ? " (Special Holiday)" : ""}`,
       data: {
         ...result.rows[0],
         employee_name: `${foundEmployee.first_name} ${foundEmployee.last_name}`,
         schedule_name: foundEmployee.schedule_name,
         scheduled_start_time: scheduleStartTime,
         is_late: isLate,
+        is_dayoff: isScheduledDayOff,
+        is_regular_holiday: holidayStatus.isRegularHoliday,
+        is_special_holiday: holidayStatus.isSpecialHoliday,
         method: rfid ? "RFID" : "Manual",
+        payroll_note:
+          isScheduledDayOff ||
+          holidayStatus.isRegularHoliday ||
+          holidayStatus.isSpecialHoliday
+            ? "Special pay rate applies"
+            : "Regular pay rate applies",
       },
     });
   } catch (error) {
@@ -475,6 +531,9 @@ export const createManualAttendance = async (req, res) => {
       time_out,
       notes,
       status = "PRESENT",
+      is_dayoff = false,
+      is_regular_holiday = false,
+      is_special_holiday = false,
     } = req.body;
 
     // Validate required fields
@@ -496,6 +555,16 @@ export const createManualAttendance = async (req, res) => {
         success: false,
         message: "Attendance already exists for this date",
       });
+    }
+
+    // Auto-detect holiday status if not manually specified
+    let finalIsRegularHoliday = is_regular_holiday;
+    let finalIsSpecialHoliday = is_special_holiday;
+
+    if (!is_regular_holiday && !is_special_holiday) {
+      const holidayStatus = await checkHolidayStatus(date);
+      finalIsRegularHoliday = holidayStatus.isRegularHoliday;
+      finalIsSpecialHoliday = holidayStatus.isSpecialHoliday;
     }
 
     // Calculate hours worked and overtime if both time_in and time_out are provided
@@ -536,9 +605,9 @@ export const createManualAttendance = async (req, res) => {
       INSERT INTO attendance (
         employee_id, date, time_in, time_out, total_hours, overtime_hours, notes, 
         created_at, updated_at, is_present, is_late, is_absent, on_leave, 
-        is_undertime, is_halfday
+        is_undertime, is_halfday, is_dayoff, is_regular_holiday, is_special_holiday
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `,
       [
@@ -555,6 +624,9 @@ export const createManualAttendance = async (req, res) => {
         on_leave,
         is_undertime,
         is_halfday,
+        is_dayoff,
+        finalIsRegularHoliday,
+        finalIsSpecialHoliday,
       ]
     );
 
@@ -636,6 +708,9 @@ export const manualUpdate = async (req, res) => {
       total_hours,
       overtime_hours,
       status,
+      is_dayoff,
+      is_regular_holiday,
+      is_special_holiday,
     } = req.body;
 
     // Validate required fields
@@ -674,6 +749,20 @@ export const manualUpdate = async (req, res) => {
     if (overtime_hours !== undefined) {
       updateFields.push(`overtime_hours = $${paramIndex++}`);
       values.push(overtime_hours);
+    }
+
+    // Handle payroll flags
+    if (is_dayoff !== undefined) {
+      updateFields.push(`is_dayoff = $${paramIndex++}`);
+      values.push(is_dayoff);
+    }
+    if (is_regular_holiday !== undefined) {
+      updateFields.push(`is_regular_holiday = $${paramIndex++}`);
+      values.push(is_regular_holiday);
+    }
+    if (is_special_holiday !== undefined) {
+      updateFields.push(`is_special_holiday = $${paramIndex++}`);
+      values.push(is_special_holiday);
     }
 
     // Handle status boolean flags if status is provided

@@ -49,6 +49,17 @@ export const fetchAllSchedules = async (
   }
 };
 
+// Get a single schedule by ID
+export const getScheduleById = async (id: string): Promise<Schedule | null> => {
+  try {
+    const response = await axios.get(`/schedules/${id}`);
+    return response.data.results || null;
+  } catch (error) {
+    console.error("Error fetching schedule by ID:", error);
+    throw error;
+  }
+};
+
 // Get schedule data
 export const getScheduleData = async (): Promise<Schedule[]> => {
   try {

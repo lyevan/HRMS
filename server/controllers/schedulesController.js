@@ -1,6 +1,35 @@
 import { pool } from "../config/db.js";
 
 export const getAllSchedules = async (req, res) => {
+  const { id } = req.params;
+  if (id) {
+    // Fetch a single schedule by ID
+    try {
+      const result = await pool.query(
+        `
+        SELECT 
+          s.*
+        FROM schedules s
+        JOIN employees e ON s.schedule_id = e.schedule_id
+        WHERE e.employee_id = $1
+      `,
+        [id]
+      );
+      if (result.rows.length === 0) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Schedule not found" });
+      }
+      return res.status(200).json({ success: true, results: result.rows[0] });
+    } catch (error) {
+      console.error("Error fetching schedule:", error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
+    }
+  }
+
+  // Fetch all schedules
   try {
     const result = await pool.query(`
       SELECT 

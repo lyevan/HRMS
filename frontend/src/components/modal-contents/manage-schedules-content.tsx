@@ -16,6 +16,7 @@ import {
   useRemoveSchedule,
 } from "@/store/schedulesStore";
 import { type Schedule } from "@/models/schedules-model";
+import { getAllDaysWithScheduleStatus } from "@/lib/stringMethods";
 
 interface ScheduleFormData {
   schedule_name: string;
@@ -322,14 +323,22 @@ export function ManageSchedulesContent() {
                               Working days:
                             </span>
                             <div className="flex gap-1">
-                              {schedule.days_of_week.map((day) => (
+                              {getAllDaysWithScheduleStatus(
+                                schedule.days_of_week
+                              ).map(({ day, isScheduled }) => (
                                 <Badge
                                   key={day}
                                   variant="secondary"
-                                  className="text-xs"
+                                  className={`text-xs ${
+                                    isScheduled
+                                      ? "bg-primary/10 text-primary border-primary/20"
+                                      : "bg-destructive/10 text-destructive border-destructive/20"
+                                  }`}
                                 >
                                   {DAYS_OF_WEEK.find((d) => d.value === day)
-                                    ?.label || day}
+                                    ?.label ||
+                                    day.charAt(0).toUpperCase() +
+                                      day.slice(1, 3)}
                                 </Badge>
                               ))}
                             </div>
