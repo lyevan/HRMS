@@ -18,6 +18,9 @@ export interface AttendanceRecord {
   on_leave: boolean;
   leave_type_id: number | null;
   leave_request_id: number | null;
+  is_dayoff: boolean;
+  is_regular_holiday: boolean;
+  is_special_holiday: boolean;
   status: string | null;
   notes: string | null;
   created_at: string;
@@ -264,8 +267,16 @@ export const calculateAttendanceStats = (records: AttendanceRecord[]) => {
 };
 
 export const getAttendanceStatusText = (record: AttendanceRecord): string => {
+  // Priority order: Leave > Absent > Day Off > Holidays > Present states
   if (record.on_leave) return "On Leave";
   if (record.is_absent) return "Absent";
+  if (record.is_dayoff && !record.is_present) return "Day Off";
+  if (record.is_regular_holiday && record.is_present)
+    return "Present (Regular Holiday)";
+  if (record.is_special_holiday && record.is_present)
+    return "Present (Special Holiday)";
+  if (record.is_regular_holiday) return "Regular Holiday";
+  if (record.is_special_holiday) return "Special Holiday";
   if (record.is_halfday) return "Half Day";
   if (record.is_undertime) return "Undertime";
   if (record.is_late) return "Late";
@@ -276,9 +287,89 @@ export const getAttendanceStatusText = (record: AttendanceRecord): string => {
 export const getAttendanceStatusColor = (record: AttendanceRecord): string => {
   if (record.on_leave) return "bg-blue-100 text-blue-800";
   if (record.is_absent) return "bg-red-100 text-red-800";
+  if (record.is_dayoff && !record.is_present)
+    return "bg-gray-100 text-gray-800";
+  if (record.is_regular_holiday) return "bg-purple-100 text-purple-800";
+  if (record.is_special_holiday) return "bg-pink-100 text-pink-800";
   if (record.is_halfday) return "bg-orange-100 text-orange-800";
   if (record.is_undertime) return "bg-yellow-100 text-yellow-800";
   if (record.is_late) return "bg-amber-100 text-amber-800";
   if (record.is_present) return "bg-green-100 text-green-800";
   return "bg-gray-100 text-gray-800";
+};
+
+// Enhanced multi-badge status function
+export const getAttendanceStatusBadges = (record: AttendanceRecord) => {
+  const badges = [];
+
+  // Primary status badges
+  if (record.is_present) {
+    badges.push({
+      key: "present",
+      text: "Present",
+      className: "bg-green-100 text-green-800 border-green-300",
+    });
+  }
+  if (record.is_absent) {
+    badges.push({
+      key: "absent",
+      text: "Absent",
+      className: "bg-red-100 text-red-800 border-red-300",
+    });
+  }
+  if (record.on_leave) {
+    badges.push({
+      key: "leave",
+      text: "On Leave",
+      className: "bg-blue-100 text-blue-800 border-blue-300",
+    });
+  }
+
+  // Secondary status badges
+  if (record.is_late) {
+    badges.push({
+      key: "late",
+      text: "Late",
+      className: "bg-orange-100 text-orange-800 border-orange-300",
+    });
+  }
+  if (record.is_undertime) {
+    badges.push({
+      key: "undertime",
+      text: "Undertime",
+      className: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    });
+  }
+  if (record.is_halfday) {
+    badges.push({
+      key: "halfday",
+      text: "Half Day",
+      className: "bg-indigo-100 text-indigo-800 border-indigo-300",
+    });
+  }
+
+  // Special day badges
+  if (record.is_dayoff) {
+    badges.push({
+      key: "dayoff",
+      text: "Day Off",
+      className: "bg-gray-100 text-gray-800 border-gray-300",
+    });
+  }
+  if (record.is_regular_holiday) {
+    badges.push({
+      key: "regular-holiday",
+      text: "Regular Holiday",
+      className: "bg-purple-100 text-purple-800 border-purple-300",
+    });
+  }
+  if (record.is_special_holiday) {
+    badges.push({
+      key: "special-holiday",
+      text: "Special Holiday",
+      className: "bg-pink-100 text-pink-800 border-pink-300",
+    });
+  }
+
+  return badges;
 };

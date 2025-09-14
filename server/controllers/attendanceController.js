@@ -707,10 +707,19 @@ export const manualUpdate = async (req, res) => {
       notes,
       total_hours,
       overtime_hours,
-      status,
+      // Boolean flags
+      is_present,
+      is_absent,
+      is_late,
+      on_leave,
+      is_undertime,
+      is_halfday,
       is_dayoff,
       is_regular_holiday,
       is_special_holiday,
+      // Leave information
+      leave_type_id,
+      leave_request_id,
     } = req.body;
 
     // Validate required fields
@@ -721,11 +730,12 @@ export const manualUpdate = async (req, res) => {
       });
     }
 
-    // Set boolean flags based on status if provided
+    // Build dynamic update query
     let updateFields = [];
     let values = [];
     let paramIndex = 1;
 
+    // Basic fields
     if (date !== undefined) {
       updateFields.push(`date = $${paramIndex++}`);
       values.push(date);
@@ -751,7 +761,33 @@ export const manualUpdate = async (req, res) => {
       values.push(overtime_hours);
     }
 
-    // Handle payroll flags
+    // Boolean attendance flags
+    if (is_present !== undefined) {
+      updateFields.push(`is_present = $${paramIndex++}`);
+      values.push(is_present);
+    }
+    if (is_absent !== undefined) {
+      updateFields.push(`is_absent = $${paramIndex++}`);
+      values.push(is_absent);
+    }
+    if (is_late !== undefined) {
+      updateFields.push(`is_late = $${paramIndex++}`);
+      values.push(is_late);
+    }
+    if (on_leave !== undefined) {
+      updateFields.push(`on_leave = $${paramIndex++}`);
+      values.push(on_leave);
+    }
+    if (is_undertime !== undefined) {
+      updateFields.push(`is_undertime = $${paramIndex++}`);
+      values.push(is_undertime);
+    }
+    if (is_halfday !== undefined) {
+      updateFields.push(`is_halfday = $${paramIndex++}`);
+      values.push(is_halfday);
+    }
+
+    // Special day flags
     if (is_dayoff !== undefined) {
       updateFields.push(`is_dayoff = $${paramIndex++}`);
       values.push(is_dayoff);
@@ -765,27 +801,14 @@ export const manualUpdate = async (req, res) => {
       values.push(is_special_holiday);
     }
 
-    // Handle status boolean flags if status is provided
-    if (status !== undefined) {
-      const is_present = status === "PRESENT";
-      const is_late = status === "LATE";
-      const is_absent = status === "ABSENT";
-      const on_leave = status === "ON_LEAVE";
-      const is_halfday = status === "HALF_DAY";
-      const is_undertime = false; // Default to false
-
-      updateFields.push(`is_present = $${paramIndex++}`);
-      values.push(is_present);
-      updateFields.push(`is_late = $${paramIndex++}`);
-      values.push(is_late);
-      updateFields.push(`is_absent = $${paramIndex++}`);
-      values.push(is_absent);
-      updateFields.push(`on_leave = $${paramIndex++}`);
-      values.push(on_leave);
-      updateFields.push(`is_halfday = $${paramIndex++}`);
-      values.push(is_halfday);
-      updateFields.push(`is_undertime = $${paramIndex++}`);
-      values.push(is_undertime);
+    // Leave information
+    if (leave_type_id !== undefined) {
+      updateFields.push(`leave_type_id = $${paramIndex++}`);
+      values.push(leave_type_id);
+    }
+    if (leave_request_id !== undefined) {
+      updateFields.push(`leave_request_id = $${paramIndex++}`);
+      values.push(leave_request_id);
     }
 
     // Always update the updated_at timestamp
@@ -819,10 +842,26 @@ export const manualUpdate = async (req, res) => {
       });
     }
 
+    // Get the updated record with employee information
+    const detailedResult = await pool.query(
+      `
+      SELECT 
+        a.*, e.first_name, e.last_name,
+        COALESCE(a.total_hours, 0) as calculated_total_hours,
+        COALESCE(a.overtime_hours, 0) as overtime_hours,
+        s.break_duration
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      WHERE a.attendance_id = $1
+    `,
+      [attendance_id]
+    );
+
     res.status(200).json({
       success: true,
-      message: "Attendance record updated",
-      data: result.rows[0],
+      message: "Attendance record updated successfully",
+      data: detailedResult.rows[0],
     });
   } catch (error) {
     console.error("Error updating attendance:", error);

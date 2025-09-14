@@ -15,6 +15,7 @@ import rfidRoutes from "./routes/rfidRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import payrollRoutes from "./routes/payrollRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
+import bulkUploadRoutes from "./routes/bulkUploadRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
 import { pool } from "./config/db.js";
@@ -96,6 +97,7 @@ app.use("/api/schedules", schedulesRoutes);
 app.use("/api/leave", leaveRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/bulk-upload", bulkUploadRoutes);
 
 app.get("/test-db", async (req, res) => {
   try {

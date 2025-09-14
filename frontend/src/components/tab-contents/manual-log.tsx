@@ -14,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,12 +29,18 @@ import {
   Filter,
   FileText,
   Calendar,
+  Upload,
+  Download,
 } from "lucide-react";
 import Modal from "@/components/modal";
 import FileManualAttendanceContent from "@/components/modal-contents/file-manual-attendance-content";
 import ManualLogDetailsContent from "@/components/modal-contents/manual-log-details-content";
+import BulkUploadModal from "@/components/modals/bulk-upload-modal";
 import type { BaseRequest } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
+import { Separator } from "@radix-ui/react-separator";
+import axios from "axios";
+import { toast } from "sonner";
 
 const ManualLog = () => {
   const [requests, setRequests] = useState<BaseRequest[]>([]);
@@ -50,6 +57,7 @@ const ManualLog = () => {
     null
   );
   const [isDetailsReadOnly, setIsDetailsReadOnly] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
   useEffect(() => {
     fetchManualLogRequests();
@@ -58,6 +66,61 @@ const ManualLog = () => {
   useEffect(() => {
     filterRequests();
   }, [requests, searchTerm, statusFilter]);
+
+  // Template download handlers
+  const handleDownloadExcelTemplate = async () => {
+    try {
+      const response = await axios.get("/bulk-upload/template/excel", {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "attendance-upload-template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Excel template downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading Excel template:", error);
+      toast.error("Failed to download Excel template");
+    }
+  };
+
+  const handleDownloadCSVTemplate = async () => {
+    try {
+      const response = await axios.get("/bulk-upload/template/csv", {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "attendance-upload-template.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("CSV template downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading CSV template:", error);
+      toast.error("Failed to download CSV template");
+    }
+  };
+
+  const handleBulkUploadSuccess = () => {
+    fetchManualLogRequests();
+    // setIsBulkUploadOpen(false);
+  };
 
   const fetchManualLogRequests = async () => {
     try {
@@ -201,23 +264,52 @@ const ManualLog = () => {
             Manage manual attendance log requests and approvals
           </p>
         </div>
-        <Button
-          onClick={() => setIsFileManualLogOpen(true)}
-          className="flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>File Manual Log Request</span>
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                <span>Import from file</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                <span>Upload CSV</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                <span>Upload Excel</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleDownloadCSVTemplate}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>CSV Template</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadExcelTemplate}>
+                <Download className="h-4 w-4 mr-2" />
+                <span>Excel Template</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            onClick={() => setIsFileManualLogOpen(true)}
+            className="flex items-center space-x-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span>File Manual Log Request</span>
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Total Requests
             </CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -226,45 +318,28 @@ const ManualLog = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
+            <Clock className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {stats.pending}
-            </div>
+            <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
+            <CheckCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {stats.approved}
-            </div>
+            <div className="text-2xl font-bold">{stats.approved}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
+            <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {stats.rejected}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
-            <XCircle className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">
-              {stats.cancelled}
-            </div>
+            <div className="text-2xl font-bold">{stats.rejected}</div>
           </CardContent>
         </Card>
       </div>
@@ -441,6 +516,13 @@ const ManualLog = () => {
           onClose={() => setIsDetailsOpen(false)}
         />
       </Modal>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        onSuccess={handleBulkUploadSuccess}
+      />
     </div>
   );
 };

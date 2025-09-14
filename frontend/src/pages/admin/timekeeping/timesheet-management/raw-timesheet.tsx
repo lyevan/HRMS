@@ -1,23 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAttendanceStore } from "@/store/attendanceStore";
 import { AttendanceTable } from "@/components/tables/attendance-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Eye, Edit, MoreHorizontal } from "lucide-react";
-import type { ColumnDef } from "@tanstack/react-table";
 import type { AttendanceRecord } from "@/models/attendance-model";
-import {
-  getAttendanceStatusText,
-  getAttendanceStatusColor,
-} from "@/models/attendance-model";
+import { viewModalContent } from "@/components/modal-contents/view-attendance-modal";
+import { editModalContent } from "@/components/modal-contents/edit-attendance-modal";
+import { createAttendanceColumns } from "@/components/tables/columns/attendance-columns";
+import { getStatusBadges } from "@/lib/badge-config";
+import axios from "axios";
+import Modal from "@/components/modal";
 
 const RawTimesheet = () => {
   const { attendanceRecords, loading, error, fetchAttendanceRecords } =
@@ -29,6 +22,28 @@ const RawTimesheet = () => {
   );
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Form state for editing
+  const [editForm, setEditForm] = useState({
+    date: "",
+    time_in: "",
+    time_out: "",
+    total_hours: "",
+    overtime_hours: "",
+    notes: "",
+    is_present: false,
+    is_absent: false,
+    is_late: false,
+    on_leave: false,
+    is_undertime: false,
+    is_halfday: false,
+    is_dayoff: false,
+    is_regular_holiday: false,
+    is_special_holiday: false,
+    leave_type_id: "",
+    leave_request_id: "",
+  });
 
   useEffect(() => {
     fetchAttendanceRecords();
@@ -41,6 +56,38 @@ const RawTimesheet = () => {
 
   const handleEditRecord = (record: AttendanceRecord) => {
     setSelectedRecord(record);
+
+    // Populate form with existing data
+    const formatDateTime = (dateTime: string | null) => {
+      if (!dateTime) return "";
+      return new Date(dateTime).toISOString().slice(0, 16);
+    };
+
+    const formatDate = (date: string | null) => {
+      if (!date) return "";
+      return new Date(date).toISOString().slice(0, 10);
+    };
+
+    setEditForm({
+      date: formatDate(record.date),
+      time_in: formatDateTime(record.time_in),
+      time_out: formatDateTime(record.time_out),
+      total_hours: record.total_hours?.toString() || "",
+      overtime_hours: record.overtime_hours?.toString() || "",
+      notes: record.notes || "",
+      is_present: record.is_present,
+      is_absent: record.is_absent,
+      is_late: record.is_late,
+      on_leave: record.on_leave,
+      is_undertime: record.is_undertime,
+      is_halfday: record.is_halfday,
+      is_dayoff: record.is_dayoff,
+      is_regular_holiday: record.is_regular_holiday,
+      is_special_holiday: record.is_special_holiday,
+      leave_type_id: record.leave_type_id?.toString() || "",
+      leave_request_id: record.leave_request_id?.toString() || "",
+    });
+
     setEditModalOpen(true);
   };
 
@@ -48,147 +95,87 @@ const RawTimesheet = () => {
     setViewModalOpen(false);
     setEditModalOpen(false);
     setSelectedRecord(null);
+    // Reset form
+    setEditForm({
+      date: "",
+      time_in: "",
+      time_out: "",
+      total_hours: "",
+      overtime_hours: "",
+      notes: "",
+      is_present: false,
+      is_absent: false,
+      is_late: false,
+      on_leave: false,
+      is_undertime: false,
+      is_halfday: false,
+      is_dayoff: false,
+      is_regular_holiday: false,
+      is_special_holiday: false,
+      leave_type_id: "",
+      leave_request_id: "",
+    });
   };
 
-  const handleUpdateSuccess = () => {
-    fetchAttendanceRecords(); // Refresh data
-    handleCloseModals();
+  const handleUpdateAttendance = async () => {
+    if (!selectedRecord) return;
+
+    setIsUpdating(true);
+    try {
+      const updateData = {
+        date: editForm.date || undefined,
+        time_in: editForm.time_in || undefined,
+        time_out: editForm.time_out || undefined,
+        total_hours: editForm.total_hours
+          ? parseFloat(editForm.total_hours)
+          : undefined,
+        overtime_hours: editForm.overtime_hours
+          ? parseFloat(editForm.overtime_hours)
+          : undefined,
+        notes: editForm.notes || undefined,
+        is_present: editForm.is_present,
+        is_absent: editForm.is_absent,
+        is_late: editForm.is_late,
+        on_leave: editForm.on_leave,
+        is_undertime: editForm.is_undertime,
+        is_halfday: editForm.is_halfday,
+        is_dayoff: editForm.is_dayoff,
+        is_regular_holiday: editForm.is_regular_holiday,
+        is_special_holiday: editForm.is_special_holiday,
+        leave_type_id: editForm.leave_type_id
+          ? parseInt(editForm.leave_type_id)
+          : undefined,
+        leave_request_id: editForm.leave_request_id
+          ? parseInt(editForm.leave_request_id)
+          : undefined,
+      };
+
+      const response = await axios.put(
+        `/attendance/manual-update/${selectedRecord.attendance_id}`,
+        updateData
+      );
+
+      if (response.data.success) {
+        toast.success("Attendance record updated successfully");
+        fetchAttendanceRecords(); // Refresh data
+        handleCloseModals();
+      }
+    } catch (error: any) {
+      console.error("Error updating attendance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update attendance record"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  // Define columns for the attendance table
-  const columns: ColumnDef<AttendanceRecord>[] = useMemo(
-    () => [
-      {
-        accessorKey: "date",
-        header: "Date",
-        cell: ({ row }) => {
-          const date = new Date(row.getValue("date"));
-          return date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          });
-        },
-      },
-      {
-        accessorKey: "employee_id",
-        header: "Employee ID",
-      },
-      {
-        accessorFn: (row) => `${row.first_name} ${row.last_name}`,
-        id: "employee_name",
-        header: "Employee Name",
-        cell: ({ row }) => (
-          <div>
-            <div className="font-medium">
-              {row.original.first_name} {row.original.last_name}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {row.original.employee_id}
-            </div>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "time_in",
-        header: "Time In",
-        cell: ({ row }) => {
-          const timeIn = row.getValue("time_in") as string | null;
-          if (!timeIn) return <span className="text-muted-foreground">--</span>;
-          return new Date(timeIn).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        },
-      },
-      {
-        accessorKey: "time_out",
-        header: "Time Out",
-        cell: ({ row }) => {
-          const timeOut = row.getValue("time_out") as string | null;
-          if (!timeOut)
-            return <span className="text-muted-foreground">--</span>;
-          return new Date(timeOut).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        },
-      },
-      {
-        accessorKey: "total_hours",
-        header: "Hours Worked",
-        cell: ({ row }) => {
-          const hours = row.getValue("total_hours") as number | null;
-          if (hours === null || hours === undefined) {
-            return <span className="text-muted-foreground">--</span>;
-          }
-          return `${hours}h`;
-        },
-      },
-      {
-        id: "status",
-        header: "Status",
-        cell: ({ row }) => {
-          const record = row.original;
-          const statusText = getAttendanceStatusText(record);
-          const statusColor = getAttendanceStatusColor(record);
-
-          return (
-            <Badge variant="outline" className={statusColor}>
-              {statusText}
-            </Badge>
-          );
-        },
-      },
-      {
-        accessorKey: "notes",
-        header: "Notes",
-        cell: ({ row }) => {
-          const notes = row.getValue("notes") as string | null;
-          if (!notes) return <span className="text-muted-foreground">--</span>;
-          return (
-            <div className="max-w-[200px] truncate" title={notes}>
-              {notes}
-            </div>
-          );
-        },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => {
-          const record = row.original;
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => handleViewRecord(record)}
-                  className="cursor-pointer"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Details
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleEditRecord(record)}
-                  className="cursor-pointer"
-                >
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Record
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        },
-      },
-    ],
-    []
-  );
+  // Define columns for the attendance table using the extracted function
+  const columns = createAttendanceColumns({
+    getStatusBadges,
+    handleViewRecord,
+    handleEditRecord,
+  });
 
   return (
     <div className="space-y-6">
@@ -220,143 +207,31 @@ const RawTimesheet = () => {
         </CardContent>
       </Card>
 
-      {/* View Details Modal */}
-      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent className="max-w-2xl pr-10">
-          {selectedRecord && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">
-                  Attendance Record Details
-                </h2>
-                <Badge
-                  variant="outline"
-                  className={getAttendanceStatusColor(selectedRecord)}
-                >
-                  {getAttendanceStatusText(selectedRecord)}
-                </Badge>
-              </div>
+      <Modal
+        open={viewModalOpen}
+        setOpen={setViewModalOpen}
+        title="View Attendance Record"
+        description=""
+      >
+        {viewModalContent({ selectedRecord, getStatusBadges })}
+      </Modal>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Employee
-                  </label>
-                  <p className="text-sm font-medium">
-                    {selectedRecord.first_name} {selectedRecord.last_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedRecord.employee_id}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Date
-                  </label>
-                  <p className="text-sm">
-                    {new Date(selectedRecord.date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Time In
-                  </label>
-                  <p className="text-sm">
-                    {selectedRecord.time_in
-                      ? new Date(selectedRecord.time_in).toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                      : "--"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Time Out
-                  </label>
-                  <p className="text-sm">
-                    {selectedRecord.time_out
-                      ? new Date(selectedRecord.time_out).toLocaleTimeString(
-                          "en-US",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )
-                      : "--"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Total Hours
-                  </label>
-                  <p className="text-sm">
-                    {selectedRecord.total_hours
-                      ? `${selectedRecord.total_hours}h`
-                      : "--"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Overtime Hours
-                  </label>
-                  <p className="text-sm">
-                    {selectedRecord.overtime_hours
-                      ? `${selectedRecord.overtime_hours}h`
-                      : "0h"}
-                  </p>
-                </div>
-              </div>
-
-              {selectedRecord.notes && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Notes
-                  </label>
-                  <p className="text-sm mt-1 p-3 bg-muted rounded-md">
-                    {selectedRecord.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Record Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-2xl">
-          {selectedRecord && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">
-                  Edit Attendance Record
-                </h2>
-              </div>
-
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  Edit functionality will be implemented with a proper form
-                  component.
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Record ID: {selectedRecord.attendance_id}
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={handleCloseModals}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateSuccess}>Save Changes</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={editModalOpen}
+        setOpen={setEditModalOpen}
+        title=""
+        description=""
+        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+      >
+        {editModalContent({
+          selectedRecord,
+          editForm,
+          setEditForm,
+          handleUpdateAttendance,
+          handleCloseModals,
+          isUpdating,
+        })}
+      </Modal>
     </div>
   );
 };
