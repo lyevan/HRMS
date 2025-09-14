@@ -3,7 +3,6 @@ import { useAttendanceStore } from "@/store/attendanceStore";
 import { AttendanceTable } from "@/components/tables/attendance-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { AttendanceRecord } from "@/models/attendance-model";
 import { viewModalContent } from "@/components/modal-contents/view-attendance-modal";
 import { editModalContent } from "@/components/modal-contents/edit-attendance-modal";

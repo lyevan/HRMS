@@ -38,7 +38,6 @@ import ManualLogDetailsContent from "@/components/modal-contents/manual-log-deta
 import BulkUploadModal from "@/components/modals/bulk-upload-modal";
 import type { BaseRequest } from "@/models/request-model";
 import { fetchAllRequests, formatRequestDate } from "@/models/request-model";
-import { Separator } from "@radix-ui/react-separator";
 import axios from "axios";
 import { toast } from "sonner";
 
