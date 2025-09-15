@@ -4,21 +4,25 @@ import {
   useDepartments,
   useFetchDepartments,
   useSetSelectedDepartment,
+  useSelectedDepartment,
 } from "@/store/departmentStore";
 import { useEffect, useState } from "react";
 import { type Department } from "@/models/department-model";
+import { DepartmentModal } from "@/components/modals/department-modal";
 
 const Departments = () => {
   const [isAddDepartmentModalOpen, setIsAddDepartmentModalOpen] =
     useState(false);
-  // TODO: Uncomment when modal components are implemented
-  // const [isViewDepartmentModalOpen, setIsViewDepartmentModalOpen] = useState(false);
-  // const [isEditDepartmentModalOpen, setIsEditDepartmentModalOpen] = useState(false);
+  const [isViewDepartmentModalOpen, setIsViewDepartmentModalOpen] =
+    useState(false);
+  const [isEditDepartmentModalOpen, setIsEditDepartmentModalOpen] =
+    useState(false);
 
   // Use department store
   const departments = useDepartments();
   const fetchDepartments = useFetchDepartments();
   const setSelectedDepartment = useSetSelectedDepartment();
+  const selectedDepartment = useSelectedDepartment();
 
   // Fetch departments on component mount
   useEffect(() => {
@@ -27,14 +31,12 @@ const Departments = () => {
 
   const handleViewDetails = (department: Department) => {
     setSelectedDepartment(department);
-    // TODO: Open view modal
-    console.log("View department:", department);
+    setIsViewDepartmentModalOpen(true);
   };
 
   const handleEdit = (department: Department) => {
     setSelectedDepartment(department);
-    // TODO: Open edit modal
-    console.log("Edit department:", department);
+    setIsEditDepartmentModalOpen(true);
   };
 
   const handleDelete = (department: Department) => {
@@ -43,26 +45,42 @@ const Departments = () => {
   };
 
   const columns = departmentColumns({
-    setIsViewDepartmentModalOpen: () => {}, // TODO: Replace with actual setter when modal is implemented
-    setIsEditDepartmentModalOpen: () => {}, // TODO: Replace with actual setter when modal is implemented
+    setIsViewDepartmentModalOpen,
+    setIsEditDepartmentModalOpen,
     onViewDetails: handleViewDetails,
     onEdit: handleEdit,
     onDelete: handleDelete,
   });
-  // TODO: Add modal components when implemented
-  // {isAddDepartmentModalOpen && <AddDepartmentModal />}
-  // {isViewDepartmentModalOpen && <ViewDepartmentModal />}
-  // {isEditDepartmentModalOpen && <EditDepartmentModal />}
-
-  // Suppress unused variable warning - will be used when modal is implemented
-  void isAddDepartmentModalOpen;
 
   return (
-    <DepartmentTable
-      columns={columns}
-      data={departments}
-      setIsAddDepartmentModalOpen={setIsAddDepartmentModalOpen}
-    />
+    <>
+      <DepartmentTable
+        columns={columns}
+        data={departments}
+        setIsAddDepartmentModalOpen={setIsAddDepartmentModalOpen}
+      />
+
+      {/* Department Modals */}
+      <DepartmentModal
+        open={isAddDepartmentModalOpen}
+        onOpenChange={setIsAddDepartmentModalOpen}
+        mode="create"
+      />
+
+      <DepartmentModal
+        open={isViewDepartmentModalOpen}
+        onOpenChange={setIsViewDepartmentModalOpen}
+        department={selectedDepartment || undefined}
+        mode="view"
+      />
+
+      <DepartmentModal
+        open={isEditDepartmentModalOpen}
+        onOpenChange={setIsEditDepartmentModalOpen}
+        department={selectedDepartment || undefined}
+        mode="edit"
+      />
+    </>
   );
 };
 

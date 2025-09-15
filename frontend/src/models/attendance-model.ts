@@ -21,6 +21,11 @@ export interface AttendanceRecord {
   is_dayoff: boolean;
   is_regular_holiday: boolean;
   is_special_holiday: boolean;
+  late_minutes: number;
+  undertime_minutes: number;
+  night_differential_hours: number;
+  rest_day_hours_worked: number;
+  is_entitled_holiday: boolean;
   status: string | null;
   notes: string | null;
   created_at: string;
@@ -31,6 +36,21 @@ export interface AttendanceRecord {
   last_name?: string;
   calculated_total_hours?: number;
   break_duration?: number; // From schedule
+
+  // Additional fields can be added as needed
+  processed_by?: string;
+  date_last_processed?: string;
+  timesheet_id?: number;
+  timesheet_start_date?: string;
+  timesheet_end_date?: string;
+  is_timesheet_consumed?: boolean;
+}
+
+export interface TimesheetResponse {
+  timesheet_id: number;
+  start_date: string;
+  end_date: string;
+  is_consumed: boolean;
 }
 
 export interface AttendanceSummary {
@@ -145,6 +165,22 @@ export const fetchEmployeeAttendanceSummary = async (
       error instanceof Error
         ? error.message
         : "Failed to fetch attendance summary"
+    );
+  }
+};
+
+export const fetchUnconsumedTimesheets = async (): Promise<
+  TimesheetResponse[]
+> => {
+  try {
+    const response = await axios.get("/attendance/get-timesheets");
+    return response.data.data || [];
+  } catch (error) {
+    console.error("Error fetching unconsumed timesheets:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch unconsumed timesheets"
     );
   }
 };

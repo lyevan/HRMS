@@ -1,0 +1,1 @@
+curl "http://localhost:3000/api/payroll/debug/attendance?employee_id=EMPLOYEE_ID&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD"

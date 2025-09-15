@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useDepartments } from "@/store/departmentStore";
+import { type Department } from "@/models/department-model";
 
 interface PositionColumnProps {
   setIsViewPositionModalOpen?: (open: boolean) => void;
@@ -26,6 +26,7 @@ interface PositionColumnProps {
   onViewDetails?: (position: Position) => void;
   onEdit?: (position: Position) => void;
   onDelete?: (position: Position) => void;
+  departments?: Department[];
 }
 
 const positionColumns = ({
@@ -34,6 +35,7 @@ const positionColumns = ({
   onViewDetails,
   onEdit,
   onDelete,
+  departments = [],
 }: PositionColumnProps) => {
   const handleViewDetails = (position: Position) => {
     if (onViewDetails) {
@@ -61,9 +63,8 @@ const positionColumns = ({
     }
   }; // Component to display department name
   const DepartmentNameCell = ({ departmentId }: { departmentId: number }) => {
-    const departments = useDepartments();
     const department = departments.find(
-      (dept) => dept.department_id === departmentId
+      (dept: Department) => dept.department_id === departmentId
     );
 
     return (
@@ -97,12 +98,20 @@ const positionColumns = ({
       ),
     },
     {
-      id: "department_id",
+      id: "department_name",
       accessorKey: "department_id",
       header: (info: any) => <PositionHeaders info={info} name="Department" />,
       cell: ({ getValue }: { getValue: () => number }) => (
         <DepartmentNameCell departmentId={getValue()} />
       ),
+      filterFn: (row, columnId, filterValue) => {
+        const departmentId = row.getValue(columnId) as number;
+        const department = departments.find(
+          (dept: Department) => dept.department_id === departmentId
+        );
+        const departmentName = department?.name || "";
+        return departmentName.toLowerCase().includes(filterValue.toLowerCase());
+      },
     },
     {
       id: "description",

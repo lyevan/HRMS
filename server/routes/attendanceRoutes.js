@@ -12,6 +12,8 @@ import {
   manualUpdate,
   createManualAttendance,
   getEmployeeAttendance,
+  processTimesheet,
+  getUnconsumedTimesheet,
 } from "../controllers/attendanceController.js";
 
 import verifyToken from "../middleware/verifyToken.js";
@@ -43,6 +45,8 @@ router.put(
 // Only admin can create manual attendance records
 router.post("/manual-create", verifyToken, verifyAdmin, createManualAttendance);
 
+router.patch("/process-timesheet", verifyToken, verifyAdmin, processTimesheet);
+router.get("/get-timesheets", getUnconsumedTimesheet);
 // Employee attendance routes
 router.post("/clock-in", verifyToken, clockIn);
 router.post("/clock-out", verifyToken, clockOut);

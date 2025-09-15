@@ -1,3 +1,4 @@
+import PayrollManagement from "./pages/admin/payroll/payroll-management";
 import AdminLayout from "./pages/admin/layout";
 import LoginPage from "./pages/authentication";
 import Dashboard from "./pages/admin/dashboard";
@@ -20,6 +21,8 @@ import Organization from "./pages/admin/employees/organization";
 import ShiftManagement from "./pages/admin/timekeeping/shift-management";
 import FilingAndApproval from "./pages/admin/timekeeping/timesheet-management/filing-and-approval";
 import RawTimesheet from "./pages/admin/timekeeping/timesheet-management/raw-timesheet";
+import ProcessingTimesheet from "./pages/admin/timekeeping/timesheet-management/processing-timesheet";
+import LoanManagementPage from "./pages/LoanManagementPage";
 
 function App() {
   // Validate environment variables and configure axios
@@ -171,7 +174,7 @@ function App() {
                       />
                       <Route
                         path="tk/tm/processing-timesheet"
-                        element={<div>Processing Timesheet Page</div>}
+                        element={<ProcessingTimesheet />}
                       />
                       <Route
                         path="tk/tm/deleted-logs"
@@ -179,7 +182,8 @@ function App() {
                       />
 
                       {/* Admin Payroll Group Routes */}
-                      <Route path="payroll" element={<div>Payroll Page</div>} />
+                      <Route path="payroll" element={<PayrollManagement />} />
+                      <Route path="loan" element={<LoanManagementPage />} />
                       <Route
                         path="requests"
                         element={<div>Requests Page</div>}

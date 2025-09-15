@@ -14,8 +14,11 @@ import schedulesRoutes from "./routes/schedulesRoutes.js";
 import rfidRoutes from "./routes/rfidRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import payrollRoutes from "./routes/payrollRoutes.js";
+import payrollConfigRoutes from "./routes/payrollConfigRoutes.js";
+import loanRoutes from "./routes/loanRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
 import bulkUploadRoutes from "./routes/bulkUploadRoutes.js";
+import testRoutes from "./routes/testRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
 import { pool } from "./config/db.js";
@@ -96,8 +99,11 @@ app.use("/api/positions", positionRoutes);
 app.use("/api/schedules", schedulesRoutes);
 app.use("/api/leave", leaveRoutes);
 app.use("/api/payroll", payrollRoutes);
+app.use("/api/payroll-config", payrollConfigRoutes);
+app.use("/api/loans", loanRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/bulk-upload", bulkUploadRoutes);
+app.use("/api/test", testRoutes);
 
 app.get("/test-db", async (req, res) => {
   try {

@@ -7,6 +7,7 @@ import type {
   ClockInRequest,
   ClockOutRequest,
   ManualAttendanceRequest,
+  TimesheetResponse,
 } from "@/models/attendance-model";
 import {
   fetchAllAttendance,
@@ -19,11 +20,13 @@ import {
   updateAttendanceRecord,
   deleteAttendanceRecord,
   calculateAttendanceStats,
+  fetchUnconsumedTimesheets,
 } from "@/models/attendance-model";
 
 interface AttendanceStore {
   // State
   attendanceRecords: AttendanceRecord[];
+  unconsumedTimesheets: TimesheetResponse[];
   todayAttendance: TodayAttendanceRecord[];
   selectedRecord: AttendanceRecord | null;
   attendanceSummary: AttendanceSummary | null;
@@ -52,12 +55,14 @@ interface AttendanceStore {
   setTodayAttendance: (records: TodayAttendanceRecord[]) => void;
   setSelectedRecord: (record: AttendanceRecord | null) => void;
   setAttendanceSummary: (summary: AttendanceSummary | null) => void;
+  setUnconsumedTimesheets: (timesheets: TimesheetResponse[]) => void;
   updateAttendanceRecord: (updatedRecord: AttendanceRecord) => void;
   addAttendanceRecord: (newRecord: AttendanceRecord) => void;
   removeAttendanceRecord: (attendanceId: number) => void;
 
   // API Actions
   fetchAttendanceRecords: (bustCache?: boolean) => Promise<void>;
+  fetchUnconsumedTimesheets: () => Promise<void>;
   fetchEmployeeAttendanceRecords: (employeeId: string) => Promise<void>;
   fetchTodayAttendanceRecords: () => Promise<void>;
   fetchEmployeeSummary: (
@@ -267,6 +272,38 @@ export const useAttendanceStore = create<AttendanceStore>()(
             },
             false,
             "fetchTodayAttendanceRecords:error"
+          );
+        }
+      },
+
+      fetchUnconsumedTimesheets: async () => {
+        set(
+          { loading: true, error: null },
+          false,
+          "fetchUnconsumedTimesheets:start"
+        );
+
+        try {
+          const timesheets = await fetchUnconsumedTimesheets();
+          set(
+            {
+              unconsumedTimesheets: timesheets,
+              loading: false,
+            },
+            false,
+            "fetchUnconsumedTimesheets:success"
+          );
+        } catch (error) {
+          set(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to fetch unconsumed timesheets",
+              loading: false,
+            },
+            false,
+            "fetchUnconsumedTimesheets:error"
           );
         }
       },

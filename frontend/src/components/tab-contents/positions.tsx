@@ -4,23 +4,26 @@ import {
   usePositions,
   useFetchPositions,
   useSetSelectedPosition,
+  useSelectedPosition,
 } from "@/store/positionStore";
-import { useFetchDepartments } from "@/store/departmentStore";
+import { useFetchDepartments, useDepartments } from "@/store/departmentStore";
 import { useEffect, useState } from "react";
 import { type Position } from "@/models/position-model";
+import { PositionModal } from "@/components/modals/position-modal";
 
 const Positions = () => {
   const [isAddPositionModalOpen, setIsAddPositionModalOpen] = useState(false);
-  // TODO: Uncomment when modal components are implemented
-  // const [isViewPositionModalOpen, setIsViewPositionModalOpen] = useState(false);
-  // const [isEditPositionModalOpen, setIsEditPositionModalOpen] = useState(false);
+  const [isViewPositionModalOpen, setIsViewPositionModalOpen] = useState(false);
+  const [isEditPositionModalOpen, setIsEditPositionModalOpen] = useState(false);
   // Use position store
   const positions = usePositions();
   const fetchPositions = useFetchPositions();
   const setSelectedPosition = useSetSelectedPosition();
+  const selectedPosition = useSelectedPosition();
 
   // Also fetch departments for department name lookup
   const fetchDepartments = useFetchDepartments();
+  const departments = useDepartments();
 
   // Fetch positions and departments on component mount
   useEffect(() => {
@@ -30,14 +33,12 @@ const Positions = () => {
 
   const handleViewDetails = (position: Position) => {
     setSelectedPosition(position);
-    // TODO: Open view modal
-    console.log("View position:", position);
+    setIsViewPositionModalOpen(true);
   };
 
   const handleEdit = (position: Position) => {
     setSelectedPosition(position);
-    // TODO: Open edit modal
-    console.log("Edit position:", position);
+    setIsEditPositionModalOpen(true);
   };
 
   const handleDelete = (position: Position) => {
@@ -46,26 +47,43 @@ const Positions = () => {
   };
 
   const columns = positionColumns({
-    setIsViewPositionModalOpen: () => {}, // TODO: Replace with actual setter when modal is implemented
-    setIsEditPositionModalOpen: () => {}, // TODO: Replace with actual setter when modal is implemented
+    setIsViewPositionModalOpen,
+    setIsEditPositionModalOpen,
     onViewDetails: handleViewDetails,
     onEdit: handleEdit,
     onDelete: handleDelete,
+    departments: departments, // Pass departments data to columns
   });
-  // TODO: Add modal components when implemented
-  // {isAddPositionModalOpen && <AddPositionModal />}
-  // {isViewPositionModalOpen && <ViewPositionModal />}
-  // {isEditPositionModalOpen && <EditPositionModal />}
-
-  // Suppress unused variable warning - will be used when modal is implemented
-  void isAddPositionModalOpen;
 
   return (
-    <PositionTable
-      columns={columns}
-      data={positions}
-      setIsAddPositionModalOpen={setIsAddPositionModalOpen}
-    />
+    <>
+      <PositionTable
+        columns={columns}
+        data={positions}
+        setIsAddPositionModalOpen={setIsAddPositionModalOpen}
+      />
+
+      {/* Position Modals */}
+      <PositionModal
+        open={isAddPositionModalOpen}
+        onOpenChange={setIsAddPositionModalOpen}
+        mode="create"
+      />
+
+      <PositionModal
+        open={isViewPositionModalOpen}
+        onOpenChange={setIsViewPositionModalOpen}
+        position={selectedPosition || undefined}
+        mode="view"
+      />
+
+      <PositionModal
+        open={isEditPositionModalOpen}
+        onOpenChange={setIsEditPositionModalOpen}
+        position={selectedPosition || undefined}
+        mode="edit"
+      />
+    </>
   );
 };
 

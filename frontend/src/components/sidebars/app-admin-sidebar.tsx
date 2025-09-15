@@ -157,6 +157,11 @@ const items: MenuItemType[] = [
     url: `${baseUrl}/reports`,
     icon: ClipboardList,
   },
+  {
+    title: "Loan Management",
+    url: `${baseUrl}/loan`,
+    icon: DollarSign,
+  },
 ];
 
 const adminItems: MenuItemType[] = [

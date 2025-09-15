@@ -1,26 +1,14 @@
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Eye, Edit, MoreHorizontal } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { AttendanceRecord } from "@/models/attendance-model";
 import type { JSX } from "react";
 
-interface AttendanceColumnsProps {
+interface ProcessTimesheetColumnsProps {
   getStatusBadges: (record: AttendanceRecord) => JSX.Element;
-  handleViewRecord: (record: AttendanceRecord) => void;
-  handleEditRecord: (record: AttendanceRecord) => void;
 }
 
-export const createAttendanceColumns = ({
+export const createProcessTimesheetColumns = ({
   getStatusBadges,
-  handleViewRecord,
-  handleEditRecord,
-}: AttendanceColumnsProps): ColumnDef<AttendanceRecord>[] => [
+}: ProcessTimesheetColumnsProps): ColumnDef<AttendanceRecord>[] => [
   {
     accessorKey: "date",
     header: "Date",
@@ -123,52 +111,6 @@ export const createAttendanceColumns = ({
     cell: ({ row }) => {
       const record = row.original;
       return getStatusBadges(record);
-    },
-  },
-  {
-    accessorKey: "notes",
-    header: "Notes",
-    cell: ({ row }) => {
-      const notes = row.getValue("notes") as string | null;
-      if (!notes) return <span className="text-muted-foreground">--</span>;
-      return (
-        <div className="max-w-[200px] truncate" title={notes}>
-          {notes}
-        </div>
-      );
-    },
-  },
-  {
-    id: "actions",
-    header: "Actions",
-    cell: ({ row }) => {
-      const record = row.original;
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => handleViewRecord(record)}
-              className="cursor-pointer"
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleEditRecord(record)}
-              className="cursor-pointer"
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Record
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
     },
   },
 ];

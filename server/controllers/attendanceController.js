@@ -66,10 +66,14 @@ export const getAllAttendance = async (req, res) => {
         a.*, e.first_name, e.last_name,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
-        s.break_duration
+        s.break_duration,
+        ts.start_date as timesheet_start_date,
+        ts.end_date as timesheet_end_date,
+        ts.is_consumed as is_timesheet_consumed
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      LEFT JOIN timesheets ts ON a.timesheet_id = ts.timesheet_id
       ORDER BY a.date DESC, a.time_in DESC
     `);
     res.status(200).json({ success: true, data: result.rows });
@@ -550,12 +554,29 @@ export const createManualAttendance = async (req, res) => {
       [employee_id, date]
     );
 
+    const schedule = await pool.query(
+      `SELECT e.schedule_id, s.break_duration, s.start_time, s.end_time
+       FROM schedules s
+       JOIN employees e ON e.schedule_id = s.schedule_id
+       WHERE e.employee_id = $1`,
+      [employee_id]
+    );
+
     if (existing.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: "Attendance already exists for this date",
       });
     }
+
+    if (schedule.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee does not have an assigned schedule",
+      });
+    }
+
+    const scheduleData = schedule.rows[0];
 
     // Auto-detect holiday status if not manually specified
     let finalIsRegularHoliday = is_regular_holiday;
@@ -571,6 +592,21 @@ export const createManualAttendance = async (req, res) => {
     let hoursWorked = null;
     let overtime = null;
 
+    // Convert schedule times to numbers for easier calculation
+    const shiftStart = scheduleData.start_time
+      .split(":")
+      .reduce((acc, time, index) => {
+        return acc + parseInt(time) / Math.pow(60, index);
+      }, 0);
+    const shiftEnd = scheduleData.end_time
+      .split(":")
+      .reduce((acc, time, index) => {
+        return acc + parseInt(time) / Math.pow(60, index);
+      }, 0);
+    // Convert break duration from minutes to hours
+    const breakDuration = (scheduleData.break_duration || 0) / 60;
+    const shiftHours = shiftEnd - shiftStart - breakDuration;
+
     if (time_in && time_out) {
       const timeInDate = new Date(`${date}T${time_in}`);
       const timeOutDate = new Date(`${date}T${time_out}`);
@@ -583,13 +619,33 @@ export const createManualAttendance = async (req, res) => {
       const diffMs = timeOutDate - timeInDate;
       const diffHours = diffMs / (1000 * 60 * 60);
 
-      hoursWorked = Math.round(diffHours * 100) / 100; // Round to 2 decimal places
+      hoursWorked = Math.round(diffHours * 100) / 100 - breakDuration; // Round to 2 decimal places
 
-      // Calculate overtime (hours over 8)
-      if (hoursWorked > 8) {
-        overtime = Math.round((hoursWorked - 8) * 100) / 100;
+      // Calculate shift hours
+
+      // Calculate overtime (hours over shift hours)
+      if (hoursWorked > shiftHours) {
+        overtime = Math.round((hoursWorked - shiftHours) * 100) / 100;
       }
     }
+
+    console.log(
+      "Calculated hoursWorked:",
+      hoursWorked,
+      "Overtime:",
+      overtime,
+      "Shift Hours:",
+      shiftHours
+    );
+
+    console.log(
+      "Shift Start:",
+      shiftStart,
+      "Shift End:",
+      shiftEnd,
+      "Break:",
+      breakDuration
+    );
 
     // Set boolean flags based on status
     const is_present = status === "PRESENT";
@@ -870,5 +926,151 @@ export const manualUpdate = async (req, res) => {
       message: "Failed to update attendance record",
       error: error.message,
     });
+  }
+};
+
+export const processTimesheet = async (req, res) => {
+  try {
+    const { startDate, endDate, attendanceIds, approverId } = req.body;
+
+    if (!startDate || !endDate || !approverId) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate, endDate, and approverId are required",
+      });
+    }
+
+    if (!Array.isArray(attendanceIds) || attendanceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one attendance record to process",
+      });
+    }
+
+    const existingEmployeeCheck = await pool.query(
+      `SELECT employee_id FROM employees WHERE employee_id = $1`,
+      [approverId]
+    );
+
+    if (existingEmployeeCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Approver employee not found",
+      });
+    }
+
+    // Check date range validity
+    if (new Date(startDate) > new Date(endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate cannot be after endDate",
+      });
+    }
+
+    console.log(
+      "Processing timesheet for attendance IDs:",
+      attendanceIds,
+      "from",
+      startDate,
+      "to",
+      endDate
+    );
+
+    // Convert timezone-aware dates to Philippine local dates for comparison
+    // Frontend sends UTC timestamps like "2025-09-14T16:00:00.000Z" which is actually Sept 15 in Philippines
+    const startDatePH = dayjs(startDate).tz("Asia/Manila").format("YYYY-MM-DD");
+    const endDatePH = dayjs(endDate).tz("Asia/Manila").format("YYYY-MM-DD");
+
+    console.log("Converted to Philippine dates:", startDatePH, "to", endDatePH);
+
+    // Debug: Check a sample attendance record date
+    const sampleCheck = await pool.query(
+      `SELECT attendance_id, date, 
+       date AT TIME ZONE 'Asia/Manila' as date_ph,
+       date::text as date_string
+       FROM attendance WHERE attendance_id = ANY($1::int[]) LIMIT 1`,
+      [attendanceIds]
+    );
+
+    if (sampleCheck.rows.length > 0) {
+      console.log("Sample attendance record debug:", sampleCheck.rows[0]);
+    }
+
+    // Check if attendance records exist within the specified date range
+    // Use string comparison for dates to avoid timezone issues
+    const attendanceCheck = await pool.query(
+      `
+        SELECT attendance_id, date, date::text as date_string
+        FROM attendance 
+        WHERE attendance_id = ANY($1::int[])
+        AND date::text BETWEEN $2 AND $3
+      `,
+      [attendanceIds, startDatePH, endDatePH]
+    );
+
+    console.log(
+      `Found ${attendanceCheck.rows.length} matching records:`,
+      attendanceCheck.rows
+    );
+
+    // If no matching records found, return error
+    if (attendanceCheck.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: `The selected attendance records were not found in the specified date range`,
+      });
+    }
+
+    // Create timesheet query
+    const createTimesheetQuery = `
+      INSERT INTO timesheets
+      (start_date, end_date)
+      VALUES ($1, $2)
+      RETURNING timesheet_id
+    `;
+
+    const timesheetId = await pool.query(createTimesheetQuery, [
+      startDate,
+      endDate,
+    ]);
+
+    // Link attendance records to the created timesheet
+    const linkAttendanceQuery = `
+      UPDATE attendance
+      SET timesheet_id = $1, processed_by = $2, date_last_processed = NOW()
+      WHERE attendance_id = ANY($3::int[])
+      RETURNING *
+    `;
+
+    const result = await pool.query(linkAttendanceQuery, [
+      timesheetId.rows[0].timesheet_id,
+      approverId,
+      attendanceIds,
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: `${result.rows.length} attendance record${
+        result.rows.length === 1 ? "" : "s"
+      } processed successfully`,
+      data: result.rows,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getUnconsumedTimesheet = async (req, res) => {
+  try {
+    const timesheets = await pool.query(
+      `
+      SELECT * FROM timesheets
+      WHERE is_consumed = false
+      ORDER BY end_date DESC
+    `
+    );
+    res.status(200).json({ success: true, data: timesheets.rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

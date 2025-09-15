@@ -77,7 +77,7 @@ export const updateDepartment = async (req, res) => {
 
   try {
     const result = await pool.query(
-      "UPDATE departments SET name = $1, description = $2 WHERE id = $3 RETURNING *",
+      "UPDATE departments SET name = $1, description = $2 WHERE department_id = $3 RETURNING *",
       [name, description, id]
     );
 
@@ -95,9 +95,10 @@ export const deleteDepartment = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query("DELETE FROM departments WHERE id = $1", [
-      id,
-    ]);
+    const result = await pool.query(
+      "DELETE FROM departments WHERE department_id = $1",
+      [id]
+    );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ message: "Department not found" });

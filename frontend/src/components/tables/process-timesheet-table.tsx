@@ -19,6 +19,7 @@ import {
   CalendarDays,
   Filter,
   RefreshCcw,
+  CalendarCog,
 } from "lucide-react";
 
 import {
@@ -52,20 +53,26 @@ import { cn } from "@/lib/utils";
 import type { AttendanceRecord } from "@/models/attendance-model";
 import { getAttendanceStatusText } from "@/models/attendance-model";
 import { useAttendanceStore } from "@/store/attendanceStore";
+import axios from "axios";
+import { useUserSessionStore } from "@/store/userSessionStore";
 
-interface AttendanceTableProps<TData, TValue> {
+interface ProcessTimesheetTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   loading?: boolean;
   error?: string | null;
+  selectedRecords?: AttendanceRecord[];
+  onSelectionChange?: (records: AttendanceRecord[]) => void;
 }
 
-export function AttendanceTable<TData extends AttendanceRecord, TValue>({
+export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
   columns,
   data,
   loading = false,
   error = null,
-}: AttendanceTableProps<TData, TValue>) {
+  selectedRecords = [],
+  onSelectionChange,
+}: ProcessTimesheetTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("employee_name");
   const [pageSize, setPageSize] = useState(10);
@@ -80,6 +87,71 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
   });
   const isMobile = useIsMobile();
   const { fetchAttendanceRecords } = useAttendanceStore();
+  const { employee } = useUserSessionStore();
+
+  // Handle row selection for attendance records
+  const handleRecordSelection = (
+    record: AttendanceRecord,
+    isSelected: boolean
+  ) => {
+    if (!onSelectionChange) return;
+
+    if (isSelected) {
+      onSelectionChange([...selectedRecords, record]);
+    } else {
+      onSelectionChange(
+        selectedRecords.filter(
+          (rec) => rec.attendance_id !== record.attendance_id
+        )
+      );
+    }
+  };
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (!onSelectionChange) return;
+
+    if (isSelected) {
+      onSelectionChange(filteredData as AttendanceRecord[]);
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleProcessTimesheet = async () => {
+    try {
+      if (selectedRecords.length === 0) {
+        toast.error("No records selected for processing.");
+        return;
+      }
+
+      if (!dateRange.from || !dateRange.to) {
+        toast.error("Please select a valid date range.");
+        return;
+      }
+
+      const response = await axios.patch("/attendance/process-timesheet", {
+        attendanceIds: selectedRecords.map((rec) => rec.attendance_id),
+        startDate: dateRange.from,
+        endDate: dateRange.to,
+        approverId: employee?.employee_id,
+      });
+      if (response.data.success) {
+        toast.success(
+          `Timesheet for ${selectedRecords.length} records processed successfully.`
+        );
+      }
+    } catch (error) {
+      toast.error(
+        (error as any).response.data.message || "Failed to process timesheet."
+      );
+    }
+  };
+
+  const isRecordSelected = (record: AttendanceRecord) => {
+    return selectedRecords.some(
+      (rec) => rec.attendance_id === record.attendance_id
+    );
+  };
 
   // Filter data based on date range and status
   const filteredData = data.filter((record) => {
@@ -103,9 +175,44 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
     return true;
   });
 
+  // Create columns with checkbox (only if onSelectionChange is provided)
+  const columnsWithCheckbox = onSelectionChange
+    ? [
+        {
+          id: "select",
+          header: () => (
+            <input
+              type="checkbox"
+              checked={
+                selectedRecords.length === filteredData.length &&
+                filteredData.length > 0
+              }
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              className="rounded"
+              disabled={loading}
+            />
+          ),
+          cell: ({ row }: any) => (
+            <input
+              type="checkbox"
+              checked={isRecordSelected(row.original)}
+              onChange={(e) =>
+                handleRecordSelection(row.original, e.target.checked)
+              }
+              className="rounded"
+              disabled={loading}
+            />
+          ),
+          enableSorting: false,
+          enableColumnFilter: false,
+        },
+        ...columns,
+      ]
+    : columns;
+
   const table = useReactTable({
     data: filteredData,
-    columns,
+    columns: columnsWithCheckbox,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -289,22 +396,25 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button onClick={() => fetchAttendanceRecords(true)}>
+            <RefreshCcw />
+            Refresh View
+          </Button>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
           {/* Date Range Picker */}
-          <Button onClick={() => fetchAttendanceRecords(true)}>
-            <RefreshCcw />
-            Refresh View
-          </Button>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "gap-2 justify-start text-left font-normal",
-                  !dateRange.from && !dateRange.to && "text-muted-foreground"
+                  "gap-2 justify-start text-left font-normal cursor-pointer",
+                  !dateRange.from &&
+                    !dateRange.to &&
+                    "text-muted-foreground hover:text-primary"
                 )}
                 disabled={loading}
               >
@@ -340,7 +450,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
               {(dateRange.from || dateRange.to) && (
                 <div className="p-3 border-t">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={clearDateRange}
                     className="w-full"
@@ -353,20 +463,44 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
           </Popover>
 
           <Button
-            variant="outline"
+            variant="default"
             size={isMobile ? "icon" : "default"}
-            onClick={() =>
-              toast.warning(
-                "Export attendance table implementation coming soon"
-              )
-            }
+            className="bg-accent hover:bg-accent/90 cursor-pointer"
+            onClick={() => handleProcessTimesheet()}
             disabled={loading}
           >
-            <Download />
-            {!isMobile && "Export"}
+            <CalendarCog />
+            Process Timesheet
           </Button>
         </div>
       </div>
+
+      {/* Selection Summary */}
+      {onSelectionChange && selectedRecords.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border border-blue-200 rounded-md mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-blue-700">
+              {selectedRecords.length} record
+              {selectedRecords.length === 1 ? "" : "s"} selected
+            </span>
+            {selectedRecords.length === filteredData.length &&
+              filteredData.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  All visible
+                </Badge>
+              )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onSelectionChange([])}
+            className="text-xs"
+          >
+            Clear Selection
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Nunito]">
         <Table>
