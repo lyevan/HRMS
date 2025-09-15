@@ -60,6 +60,7 @@ export interface CreatePayrollHeader {
   run_by?: string;
   payroll_title?: string;
   notes?: string;
+  timesheet_id?: number;
 }
 
 // Payslip Models

@@ -198,6 +198,27 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
       if (response.data.success) {
         // Refresh payroll headers after generation
         await get().fetchPayrollHeaders();
+
+        // If a timesheet_id was provided, consume the timesheet
+        if (data.timesheet_id) {
+          try {
+            // Import the attendance store function dynamically to avoid circular dependencies
+            const { useAttendanceStore } = await import("./attendanceStore");
+            const { consumeTimesheet } = useAttendanceStore.getState();
+            await consumeTimesheet(data.timesheet_id);
+            console.log(
+              `Timesheet ${data.timesheet_id} consumed after payroll generation`
+            );
+          } catch (timesheetError) {
+            console.error(
+              "Failed to consume timesheet after payroll generation:",
+              timesheetError
+            );
+            // Note: We don't throw here because payroll generation was successful
+            // The timesheet consumption failure shouldn't affect the payroll success
+          }
+        }
+
         return response.data.data;
       } else {
         // Handle API-level success: false

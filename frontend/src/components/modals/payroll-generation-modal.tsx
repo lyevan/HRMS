@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -17,19 +16,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon, Loader2, Users } from "lucide-react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
-import { cn } from "@/lib/utils";
+import { Loader2, Eye } from "lucide-react";
+import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MultiSelectCombobox } from "@/components/ui/multi-select-combobox";
 import { useEmployeeStore } from "@/store/employeeStore";
 import { useDepartmentStore } from "@/store/departmentStore";
+import { useAttendanceStore } from "@/store/attendanceStore";
 import type { CreatePayrollHeader } from "@/models/payroll-model";
+import type { TimesheetResponse } from "@/models/attendance-model";
+import TimesheetViewModal from "./timesheet-view-modal";
 
 interface PayrollGenerationModalProps {
   open: boolean;
@@ -49,11 +46,7 @@ export function PayrollGenerationModal({
       | "all_employees"
       | "selected_employees"
       | "by_department",
-    date_range_type: "custom" as
-      | "current_cutoff"
-      | "previous_cutoff"
-      | "this_month"
-      | "custom",
+    timesheet_id: null as number | null,
     start_date: "",
     end_date: "",
     employee_ids: [] as string[],
@@ -62,81 +55,46 @@ export function PayrollGenerationModal({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [viewTimesheetModalOpen, setViewTimesheetModalOpen] = useState(false);
+  const [selectedViewTimesheet, setSelectedViewTimesheet] =
+    useState<TimesheetResponse | null>(null);
 
   // Use real stores instead of hardcoded data
   const { employees, fetchEmployees } = useEmployeeStore();
-
-  const { departments, fetchDepartments } = useDepartmentStore(); // Fetch real data when modal opens
+  const { departments, fetchDepartments } = useDepartmentStore();
+  const { unconsumedTimesheets, fetchUnconsumedTimesheets } =
+    useAttendanceStore(); // Fetch real data when modal opens
   useEffect(() => {
     if (open) {
       fetchEmployees();
       fetchDepartments();
+      fetchUnconsumedTimesheets();
     }
-  }, [open, fetchEmployees, fetchDepartments]);
+  }, [open, fetchEmployees, fetchDepartments, fetchUnconsumedTimesheets]);
 
-  // Auto-set dates based on range type
+  // Auto-set dates based on selected timesheet
   useEffect(() => {
-    const now = new Date();
-    let startDate = "";
-    let endDate = "";
+    if (formData.timesheet_id) {
+      const selectedTimesheet = unconsumedTimesheets.find(
+        (ts) => ts.timesheet_id === formData.timesheet_id
+      );
 
-    switch (formData.date_range_type) {
-      case "current_cutoff":
-        // Assuming 1st-15th and 16th-end of month cutoffs
-        const currentDay = now.getDate();
-        if (currentDay <= 15) {
-          startDate = format(
-            new Date(now.getFullYear(), now.getMonth(), 1),
-            "yyyy-MM-dd"
-          );
-          endDate = format(
-            new Date(now.getFullYear(), now.getMonth(), 15),
-            "yyyy-MM-dd"
-          );
-        } else {
-          startDate = format(
-            new Date(now.getFullYear(), now.getMonth(), 16),
-            "yyyy-MM-dd"
-          );
-          endDate = format(endOfMonth(now), "yyyy-MM-dd");
-        }
-        break;
-      case "previous_cutoff":
-        if (now.getDate() <= 15) {
-          // Previous month's 16th-end
-          const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 16);
-          startDate = format(prevMonth, "yyyy-MM-dd");
-          endDate = format(endOfMonth(prevMonth), "yyyy-MM-dd");
-        } else {
-          // Current month's 1st-15th
-          startDate = format(
-            new Date(now.getFullYear(), now.getMonth(), 1),
-            "yyyy-MM-dd"
-          );
-          endDate = format(
-            new Date(now.getFullYear(), now.getMonth(), 15),
-            "yyyy-MM-dd"
-          );
-        }
-        break;
-      case "this_month":
-        startDate = format(startOfMonth(now), "yyyy-MM-dd");
-        endDate = format(endOfMonth(now), "yyyy-MM-dd");
-        break;
-      case "custom":
-        // Keep existing dates or set to empty for manual selection
-        return;
+      if (selectedTimesheet) {
+        setFormData((prev) => ({
+          ...prev,
+          start_date: selectedTimesheet.start_date,
+          end_date: selectedTimesheet.end_date,
+        }));
+      }
     }
-
-    setFormData((prev) => ({
-      ...prev,
-      start_date: startDate,
-      end_date: endDate,
-    }));
-  }, [formData.date_range_type]);
+  }, [formData.timesheet_id, unconsumedTimesheets]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+
+    if (!formData.timesheet_id) {
+      newErrors.timesheet_id = "Please select a timesheet";
+    }
 
     if (!formData.start_date) {
       newErrors.start_date = "Start date is required";
@@ -148,7 +106,6 @@ export function PayrollGenerationModal({
     if (formData.start_date && formData.end_date) {
       const startDate = new Date(formData.start_date);
       const endDate = new Date(formData.end_date);
-
       if (startDate >= endDate) {
         newErrors.end_date = "End date must be after start date";
       }
@@ -159,13 +116,6 @@ export function PayrollGenerationModal({
       formData.employee_ids?.length === 0
     ) {
       newErrors.employees = "Please select at least one employee";
-    }
-
-    if (
-      formData.generation_type === "by_department" &&
-      formData.department_ids?.length === 0
-    ) {
-      newErrors.departments = "Please select at least one department";
     }
 
     setErrors(newErrors);
@@ -194,6 +144,7 @@ export function PayrollGenerationModal({
           "MMM dd"
         )} - ${format(new Date(formData.end_date!), "MMM dd, yyyy")}`,
         notes: formData.notes || "",
+        timesheet_id: formData.timesheet_id || undefined,
       };
 
       await onGenerate(payrollData);
@@ -205,11 +156,7 @@ export function PayrollGenerationModal({
           | "all_employees"
           | "selected_employees"
           | "by_department",
-        date_range_type: "custom" as
-          | "current_cutoff"
-          | "previous_cutoff"
-          | "this_month"
-          | "custom",
+        timesheet_id: null,
         start_date: "",
         end_date: "",
         employee_ids: [] as string[],
@@ -222,34 +169,6 @@ export function PayrollGenerationModal({
     }
   };
 
-  const handleDateSelect = (
-    field: "start_date" | "end_date",
-    date: Date | undefined
-  ) => {
-    if (date) {
-      setFormData((prev) => ({
-        ...prev,
-        [field]: format(date, "yyyy-MM-dd"),
-      }));
-
-      if (errors[field]) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
-      }
-    }
-  };
-
-  const handleEmployeeSelect = (employeeId: string, checked: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      employee_ids: checked
-        ? [...(prev.employee_ids || []), employeeId]
-        : (prev.employee_ids || []).filter((id) => id !== employeeId),
-    }));
-  };
-
   const handleDepartmentSelect = (departmentId: number, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -260,250 +179,221 @@ export function PayrollGenerationModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Generate Payroll
-          </DialogTitle>
-          <DialogDescription>
-            Create a new payroll run for the specified period and employees.
-            Configure the generation options below.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Generate Payroll</DialogTitle>
+            <DialogDescription>
+              Create payroll for employees based on timesheet data
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Generation Type Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Generation Type</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Select
-                value={formData.generation_type}
-                onValueChange={(value: any) =>
-                  setFormData((prev) => ({ ...prev, generation_type: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select generation type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all_employees">All Employees</SelectItem>
-                  <SelectItem value="selected_employees">
-                    Selected Employees
-                  </SelectItem>
-                  <SelectItem value="by_department">By Department</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Employee Selection */}
-              {formData.generation_type === "selected_employees" && (
-                <div className="space-y-3">
-                  <Label>Select Employees</Label>
-                  <div className="max-h-40 overflow-y-auto border rounded-lg p-3 space-y-2">
-                    {employees.map((emp) => (
-                      <div
-                        key={emp.employee_id}
-                        className="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          checked={formData.employee_ids?.includes(
-                            emp.employee_id
-                          )}
-                          onCheckedChange={(checked) =>
-                            handleEmployeeSelect(emp.employee_id, !!checked)
-                          }
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">
-                            {emp.first_name} {emp.last_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {emp.employee_id} - {emp.department}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {errors.employees && (
-                    <p className="text-sm text-red-500">{errors.employees}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Department Selection */}
-              {formData.generation_type === "by_department" && (
-                <div className="space-y-3">
-                  <Label>Select Departments</Label>
-                  <div className="space-y-2">
-                    {departments.map((dept) => (
-                      <div
-                        key={dept.department_id}
-                        className="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          checked={formData.department_ids?.includes(
-                            dept.department_id
-                          )}
-                          onCheckedChange={(checked) =>
-                            handleDepartmentSelect(
-                              dept.department_id,
-                              !!checked
-                            )
-                          }
-                        />
-                        <Label className="text-sm font-medium">
-                          {dept.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {errors.departments && (
-                    <p className="text-sm text-red-500">{errors.departments}</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Date Range Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Pay Period</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Date Range Type</Label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Generation Type Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Generation Type</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <Select
-                  value={formData.date_range_type}
+                  value={formData.generation_type}
                   onValueChange={(value: any) =>
-                    setFormData((prev) => ({ ...prev, date_range_type: value }))
+                    setFormData((prev) => ({ ...prev, generation_type: value }))
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select date range" />
+                    <SelectValue placeholder="Select generation type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="current_cutoff">
-                      Current Cutoff
+                    <SelectItem value="all_employees">All Employees</SelectItem>
+                    <SelectItem value="selected_employees">
+                      Selected Employees
                     </SelectItem>
-                    <SelectItem value="previous_cutoff">
-                      Previous Cutoff
-                    </SelectItem>
-                    <SelectItem value="this_month">This Month</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
+                    <SelectItem value="by_department">By Department</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              {/* Date Pickers */}
-              <div className="grid grid-cols-2 gap-4">
+                {/* Employee Selection */}
+                {formData.generation_type === "selected_employees" && (
+                  <div className="space-y-3">
+                    <Label>Select Employees</Label>
+                    <MultiSelectCombobox
+                      options={employees.map((emp) => ({
+                        value: emp.employee_id,
+                        label: `${emp.first_name} ${emp.last_name}`,
+                        subtitle: `${emp.employee_id} - ${emp.last_name}`,
+                      }))}
+                      value={formData.employee_ids || []}
+                      onValueChange={(selectedIds) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          employee_ids: selectedIds,
+                        }))
+                      }
+                      placeholder="Search and select employees..."
+                      searchPlaceholder="Search employees by name or ID..."
+                      className="w-full bg-accent"
+                    />
+                    {errors.employees && (
+                      <p className="text-sm text-red-500">{errors.employees}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Department Selection */}
+                {formData.generation_type === "by_department" && (
+                  <div className="space-y-3">
+                    <Label>Select Departments</Label>
+                    <div className="space-y-2">
+                      {departments.map((dept) => (
+                        <div
+                          key={dept.department_id}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            checked={formData.department_ids?.includes(
+                              dept.department_id
+                            )}
+                            onCheckedChange={(checked) =>
+                              handleDepartmentSelect(
+                                dept.department_id,
+                                !!checked
+                              )
+                            }
+                          />
+                          <Label className="text-sm font-medium">
+                            {dept.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {errors.departments && (
+                      <p className="text-sm text-red-500">
+                        {errors.departments}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Timesheet Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Timesheet Selection</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
+                  <Label>Select Timesheet to Generate Payroll</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={formData.timesheet_id?.toString() || ""}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          timesheet_id: parseInt(value),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a timesheet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unconsumedTimesheets.map(
+                          (timesheet: TimesheetResponse) => (
+                            <SelectItem
+                              key={timesheet.timesheet_id}
+                              value={timesheet.timesheet_id.toString()}
+                            >
+                              {format(new Date(timesheet.start_date), "MMM dd")}{" "}
+                              -{" "}
+                              {format(
+                                new Date(timesheet.end_date),
+                                "MMM dd, yyyy"
+                              )}
+                              {timesheet.is_consumed && " (Consumed)"}
+                            </SelectItem>
+                          )
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {formData.timesheet_id && (
                       <Button
+                        type="button"
                         variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !formData.start_date && "text-muted-foreground",
-                          errors.start_date && "border-red-500"
-                        )}
-                        disabled={formData.date_range_type !== "custom"}
+                        size="sm"
+                        onClick={() => {
+                          const timesheet = unconsumedTimesheets.find((t) => {
+                            // Convert both to numbers for comparison since API returns string but formData has number
+                            return (
+                              Number(t.timesheet_id) ===
+                              Number(formData.timesheet_id)
+                            );
+                          });
+
+                          if (timesheet) {
+                            setSelectedViewTimesheet(timesheet);
+                            setViewTimesheetModalOpen(true);
+                          }
+                        }}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.start_date ? (
-                          format(new Date(formData.start_date), "PPP")
-                        ) : (
-                          <span>Pick start date</span>
-                        )}
+                        <Eye className="h-4 w-4" />
+                        View
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          formData.start_date
-                            ? new Date(formData.start_date)
-                            : undefined
-                        }
-                        onSelect={(date) =>
-                          handleDateSelect("start_date", date)
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {errors.start_date && (
-                    <p className="text-sm text-red-500">{errors.start_date}</p>
+                    )}
+                  </div>
+                  {errors.timesheet_id && (
+                    <p className="text-sm text-red-500">
+                      {errors.timesheet_id}
+                    </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !formData.end_date && "text-muted-foreground",
-                          errors.end_date && "border-red-500"
-                        )}
-                        disabled={formData.date_range_type !== "custom"}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.end_date ? (
-                          format(new Date(formData.end_date), "PPP")
-                        ) : (
-                          <span>Pick end date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={
-                          formData.end_date
-                            ? new Date(formData.end_date)
-                            : undefined
-                        }
-                        onSelect={(date) => handleDateSelect("end_date", date)}
-                        disabled={(date) =>
-                          formData.start_date
-                            ? date <= new Date(formData.start_date)
-                            : false
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {errors.end_date && (
-                    <p className="text-sm text-red-500">{errors.end_date}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                {/* Date Display */}
+                {formData.start_date && formData.end_date && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <div className="p-3 bg-muted rounded-md">
+                        {format(new Date(formData.start_date), "PPP")}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <div className="p-3 bg-muted rounded-md">
+                        {format(new Date(formData.end_date), "PPP")}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {loading ? "Generating..." : "Generate Payroll"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? "Generating..." : "Generate Payroll"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Timesheet View Modal */}
+      <TimesheetViewModal
+        open={viewTimesheetModalOpen}
+        onOpenChange={setViewTimesheetModalOpen}
+        timesheet={selectedViewTimesheet}
+      />
+    </>
   );
 }

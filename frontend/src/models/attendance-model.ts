@@ -51,6 +51,8 @@ export interface TimesheetResponse {
   start_date: string;
   end_date: string;
   is_consumed: boolean;
+  recordCount: number;
+  employeeCount: number;
 }
 
 export interface AttendanceSummary {
@@ -181,6 +183,26 @@ export const fetchUnconsumedTimesheets = async (): Promise<
       error instanceof Error
         ? error.message
         : "Failed to fetch unconsumed timesheets"
+    );
+  }
+};
+
+export const fetchAttendanceByTimesheet = async (
+  timesheetId: number
+): Promise<{
+  timesheet: TimesheetResponse;
+  attendance: AttendanceRecord[];
+  count: number;
+}> => {
+  try {
+    const response = await axios.get(`/attendance/timesheet/${timesheetId}`);
+    return response.data.data;
+  } catch (error) {
+    console.error("Error fetching attendance by timesheet:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch attendance by timesheet"
     );
   }
 };

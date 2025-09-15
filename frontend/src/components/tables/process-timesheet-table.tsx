@@ -11,7 +11,6 @@ import {
 
 import {
   Funnel,
-  Download,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -30,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState } from "react";
+import { useState, useEffect, use } from "react";
 import { Input } from "../ui/input";
 import {
   DropdownMenu,
@@ -47,6 +46,14 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "../ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Label } from "../ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Calendar } from "../ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -85,6 +92,37 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
     from: undefined,
     to: undefined,
   });
+
+  const cutoffSettings = localStorage.getItem("timesheetCutoffSettings");
+  const defaultCutoffType = (cutoffSettings as any)?.cutoffType;
+  const defaultPeriodSelection = (cutoffSettings as any)?.periodSelection;
+
+  // Cutoff selection states - start with null to force user selection
+  const [cutoffType, setCutoffType] = useState<
+    "15-EOM" | "10-25" | "5-20" | "whole-month" | "custom" | null
+  >(defaultCutoffType || null);
+  const [periodSelection, setPeriodSelection] = useState<
+    "first-half" | "second-half" | null
+  >(defaultPeriodSelection || null);
+  const [selectedMonth, setSelectedMonth] = useState<number>(
+    new Date().getMonth()
+  ); // 0-11
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear()
+  );
+
+  // Everytime the cutoffType and periodSelection changes save in local storage
+  useEffect(() => {
+    const cutoffSettings = {
+      cutoffType,
+      periodSelection,
+    };
+    localStorage.setItem(
+      "timesheetCutoffSettings",
+      JSON.stringify(cutoffSettings)
+    );
+  }, [cutoffType, periodSelection]);
+
   const isMobile = useIsMobile();
   const { fetchAttendanceRecords } = useAttendanceStore();
   const { employee } = useUserSessionStore();
@@ -152,6 +190,93 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
       (rec) => rec.attendance_id === record.attendance_id
     );
   };
+
+  // Calculate date range based on cutoff type and selections
+  const calculateDateRange = () => {
+    // Return empty range if selections are not made
+    if (!cutoffType || !periodSelection) {
+      return { from: null, to: null };
+    }
+
+    const currentYear = selectedYear;
+    const currentMonth = selectedMonth;
+    const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const previousMonthYear =
+      currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    switch (cutoffType) {
+      case "15-EOM":
+        if (periodSelection === "first-half") {
+          // 1-15 of current month
+          return {
+            from: new Date(currentYear, currentMonth, 1),
+            to: new Date(currentYear, currentMonth, 15),
+          };
+        } else {
+          // 16-EOM (End of Month) of current month
+          return {
+            from: new Date(currentYear, currentMonth, 16),
+            to: new Date(currentYear, currentMonth + 1, 0), // Last day of current month
+          };
+        }
+
+      case "10-25":
+        if (periodSelection === "first-half") {
+          // 26 of previous month to 10 of current month
+          return {
+            from: new Date(previousMonthYear, previousMonth, 26),
+            to: new Date(currentYear, currentMonth, 10),
+          };
+        } else {
+          // 11-25 of current month
+          return {
+            from: new Date(currentYear, currentMonth, 11),
+            to: new Date(currentYear, currentMonth, 25),
+          };
+        }
+
+      case "5-20":
+        if (periodSelection === "first-half") {
+          // 21 of previous month to 5 of current month
+          return {
+            from: new Date(previousMonthYear, previousMonth, 21),
+            to: new Date(currentYear, currentMonth, 5),
+          };
+        } else {
+          // 6-20 of current month
+          return {
+            from: new Date(currentYear, currentMonth, 6),
+            to: new Date(currentYear, currentMonth, 20),
+          };
+        }
+
+      case "whole-month":
+        // Entire month: 1st to last day of selected month
+        return {
+          from: new Date(currentYear, currentMonth, 1),
+          to: new Date(currentYear, currentMonth + 1, 0), // Last day of month
+        };
+
+      case "custom":
+      default:
+        return dateRange;
+    }
+  };
+
+  // Update dateRange when cutoff selections change
+  const updateDateRangeFromCutoff = () => {
+    if (cutoffType !== "custom") {
+      const newRange = calculateDateRange();
+      if (newRange.from && newRange.to) {
+        setDateRange(newRange);
+      }
+    }
+  };
+
+  // Auto-update date range when cutoff settings change
+  useEffect(() => {
+    updateDateRangeFromCutoff();
+  }, [cutoffType, periodSelection, selectedMonth, selectedYear]);
 
   // Filter data based on date range and status
   const filteredData = data.filter((record) => {
@@ -249,6 +374,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
 
   const clearDateRange = () => {
     setDateRange({ from: undefined, to: undefined });
+    setCutoffType("custom"); // Reset to custom when clearing
   };
 
   const clearStatusFilter = () => {
@@ -404,8 +530,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Date Range Picker */}
-
+          {/* Cutoff Period Selection */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -429,36 +554,239 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
                     format(dateRange.from, "LLL dd, y")
                   )
                 ) : (
-                  <span>{isMobile ? "Date" : "Pick date range"}</span>
+                  <span>{isMobile ? "Date" : "Select cutoff period"}</span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange.from}
-                selected={{ from: dateRange.from, to: dateRange.to }}
-                onSelect={(range: any) =>
-                  setDateRange({
-                    from: range?.from,
-                    to: range?.to,
-                  })
-                }
-                numberOfMonths={2}
-              />
-              {(dateRange.from || dateRange.to) && (
-                <div className="p-3 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={clearDateRange}
-                    className="w-full"
-                  >
-                    Clear Date Range
-                  </Button>
+            <PopoverContent className="w-full p-4" align="start">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Cutoff Type</Label>
+                  <div className="grid grid-cols-1 gap-2 mt-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="cutoff-15-eom"
+                        name="cutoffType"
+                        value="15-EOM"
+                        checked={cutoffType === "15-EOM"}
+                        onChange={(e) => setCutoffType(e.target.value as any)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cutoff-15-eom" className="text-sm">
+                        15th and End of Month
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="cutoff-10-25"
+                        name="cutoffType"
+                        value="10-25"
+                        checked={cutoffType === "10-25"}
+                        onChange={(e) => setCutoffType(e.target.value as any)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cutoff-10-25" className="text-sm">
+                        10th and 25th
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="cutoff-5-20"
+                        name="cutoffType"
+                        value="5-20"
+                        checked={cutoffType === "5-20"}
+                        onChange={(e) => setCutoffType(e.target.value as any)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cutoff-5-20" className="text-sm">
+                        5th and 20th
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="cutoff-whole-month"
+                        name="cutoffType"
+                        value="whole-month"
+                        checked={cutoffType === "whole-month"}
+                        onChange={(e) => setCutoffType(e.target.value as any)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cutoff-whole-month" className="text-sm">
+                        Whole Month
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="cutoff-custom"
+                        name="cutoffType"
+                        value="custom"
+                        checked={cutoffType === "custom"}
+                        onChange={(e) => setCutoffType(e.target.value as any)}
+                        className="rounded"
+                      />
+                      <Label htmlFor="cutoff-custom" className="text-sm">
+                        Custom Date Range
+                      </Label>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* Period Selection for Cutoffs */}
+                {(cutoffType === "15-EOM" ||
+                  cutoffType === "10-25" ||
+                  cutoffType === "5-20") && (
+                  <div>
+                    <Label className="text-sm font-medium">
+                      Period (
+                      {cutoffType === "15-EOM"
+                        ? "1-15 or 16-EOM"
+                        : cutoffType === "10-25"
+                        ? "26-10 or 11-25"
+                        : "21-5 or 6-20"}
+                      )
+                    </Label>
+                    <div className="grid grid-cols-1 gap-2 mt-2">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="period-first-half"
+                          name="periodSelection"
+                          value="first-half"
+                          checked={periodSelection === "first-half"}
+                          onChange={(e) =>
+                            setPeriodSelection(e.target.value as any)
+                          }
+                          className="rounded"
+                        />
+                        <Label htmlFor="period-first-half" className="text-sm">
+                          {cutoffType === "15-EOM"
+                            ? "1 to 15"
+                            : cutoffType === "10-25"
+                            ? "26 to 10"
+                            : "21 to 5"}
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="period-second-half"
+                          name="periodSelection"
+                          value="second-half"
+                          checked={periodSelection === "second-half"}
+                          onChange={(e) =>
+                            setPeriodSelection(e.target.value as any)
+                          }
+                          className="rounded"
+                        />
+                        <Label htmlFor="period-second-half" className="text-sm">
+                          {cutoffType === "15-EOM"
+                            ? "16 to EOM"
+                            : cutoffType === "10-25"
+                            ? "11 to 25"
+                            : "6 to 20"}
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Month Selection for Whole Month */}
+                {cutoffType === "whole-month" && (
+                  <div>
+                    <Label className="text-sm font-medium">
+                      Select Month & Year
+                    </Label>
+                    <div className="flex gap-2 mt-2">
+                      <Select
+                        value={selectedMonth.toString()}
+                        onValueChange={(value) =>
+                          setSelectedMonth(parseInt(value))
+                        }
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => (
+                            <SelectItem key={i} value={i.toString()}>
+                              {new Date(0, i).toLocaleString("default", {
+                                month: "long",
+                              })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={selectedYear.toString()}
+                        onValueChange={(value) =>
+                          setSelectedYear(parseInt(value))
+                        }
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <SelectItem
+                              key={i}
+                              value={(
+                                new Date().getFullYear() -
+                                2 +
+                                i
+                              ).toString()}
+                            >
+                              {new Date().getFullYear() - 2 + i}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Date Picker */}
+                {cutoffType === "custom" && (
+                  <div>
+                    <Label className="text-sm font-medium">
+                      Custom Date Range
+                    </Label>
+                    <div className="mt-2">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange.from}
+                        selected={{ from: dateRange.from, to: dateRange.to }}
+                        onSelect={(range: any) =>
+                          setDateRange({
+                            from: range?.from,
+                            to: range?.to,
+                          })
+                        }
+                        numberOfMonths={2}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Clear Button */}
+                {(dateRange.from || dateRange.to) && (
+                  <div className="pt-3 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearDateRange}
+                      className="w-full"
+                    >
+                      Clear Date Range
+                    </Button>
+                  </div>
+                )}
+              </div>
             </PopoverContent>
           </Popover>
 

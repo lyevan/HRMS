@@ -14,6 +14,8 @@ import {
   getEmployeeAttendance,
   processTimesheet,
   getUnconsumedTimesheet,
+  consumeTimesheet,
+  getAttendanceByTimesheet,
 } from "../controllers/attendanceController.js";
 
 import verifyToken from "../middleware/verifyToken.js";
@@ -46,7 +48,19 @@ router.put(
 router.post("/manual-create", verifyToken, verifyAdmin, createManualAttendance);
 
 router.patch("/process-timesheet", verifyToken, verifyAdmin, processTimesheet);
+router.patch(
+  "/consume-timesheet/:timesheet_id",
+  verifyToken,
+  verifyAdmin,
+  consumeTimesheet
+);
 router.get("/get-timesheets", getUnconsumedTimesheet);
+router.get(
+  "/timesheet/:timesheet_id",
+  verifyToken,
+  verifyStaff,
+  getAttendanceByTimesheet
+);
 // Employee attendance routes
 router.post("/clock-in", verifyToken, clockIn);
 router.post("/clock-out", verifyToken, clockOut);

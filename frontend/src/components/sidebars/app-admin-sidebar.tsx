@@ -2,7 +2,7 @@ import {
   LayoutDashboard,
   Users,
   Settings,
-  ClipboardList,
+  // ClipboardList,
   DollarSign,
   Clock,
   ChevronRight,
@@ -12,7 +12,7 @@ import {
   FileClock,
   ListTodo,
   FileSpreadsheet,
-  Shredder,
+  // Shredder,
   CalendarClock,
 } from "lucide-react";
 
@@ -121,11 +121,11 @@ const items: MenuItemType[] = [
             url: `${baseUrl}/tk/tm/processing-timesheet`,
             icon: FileSpreadsheet,
           },
-          {
-            title: "Deleted Logs",
-            url: `${baseUrl}/tk/tm/deleted-logs`,
-            icon: Shredder,
-          },
+          // {
+          //   title: "Deleted Logs",
+          //   url: `${baseUrl}/tk/tm/deleted-logs`,
+          //   icon: Shredder,
+          // },
         ],
       },
     ],
@@ -152,11 +152,11 @@ const items: MenuItemType[] = [
   //   ],
   //   icon: BriefcaseBusiness,
   // },
-  {
-    title: "Reports",
-    url: `${baseUrl}/reports`,
-    icon: ClipboardList,
-  },
+  // {
+  //   title: "Reports",
+  //   url: `${baseUrl}/reports`,
+  //   icon: ClipboardList,
+  // },
   {
     title: "Loan Management",
     url: `${baseUrl}/loan`,

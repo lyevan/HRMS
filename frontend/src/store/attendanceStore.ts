@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
+import axios from "axios";
 import type {
   AttendanceRecord,
   AttendanceSummary,
@@ -78,6 +79,7 @@ interface AttendanceStore {
     data: Partial<ManualAttendanceRequest>
   ) => Promise<void>;
   deleteRecord: (attendanceId: number) => Promise<void>;
+  consumeTimesheet: (timesheetId: number) => Promise<void>;
 
   // Utility actions
   clearError: () => void;
@@ -93,6 +95,7 @@ export const useAttendanceStore = create<AttendanceStore>()(
     (set, get) => ({
       // Initial state
       attendanceRecords: [],
+      unconsumedTimesheets: [],
       todayAttendance: [],
       selectedRecord: null,
       attendanceSummary: null,
@@ -107,6 +110,13 @@ export const useAttendanceStore = create<AttendanceStore>()(
         const { attendanceRecords } = get();
         return calculateAttendanceStats(attendanceRecords);
       },
+
+      setUnconsumedTimesheets: (timesheets) =>
+        set(
+          { unconsumedTimesheets: timesheets },
+          false,
+          "setUnconsumedTimesheets"
+        ),
 
       // Set all attendance records
       setAttendanceRecords: (records) =>
@@ -277,6 +287,12 @@ export const useAttendanceStore = create<AttendanceStore>()(
       },
 
       fetchUnconsumedTimesheets: async () => {
+        // Don't fetch if already loading to prevent race conditions
+        if (get().loading) {
+          console.log("Already fetching unconsumed timesheets, skipping...");
+          return;
+        }
+
         set(
           { loading: true, error: null },
           false,
@@ -285,26 +301,39 @@ export const useAttendanceStore = create<AttendanceStore>()(
 
         try {
           const timesheets = await fetchUnconsumedTimesheets();
-          set(
-            {
-              unconsumedTimesheets: timesheets,
-              loading: false,
-            },
-            false,
-            "fetchUnconsumedTimesheets:success"
-          );
+
+          // Only update state if we're still in a valid state (component not unmounted)
+          const currentState = get();
+          if (currentState.loading) {
+            console.log(`Fetched ${timesheets.length} unconsumed timesheets`);
+
+            set(
+              {
+                unconsumedTimesheets: timesheets,
+                loading: false,
+              },
+              false,
+              "fetchUnconsumedTimesheets:success"
+            );
+          }
         } catch (error) {
-          set(
-            {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Failed to fetch unconsumed timesheets",
-              loading: false,
-            },
-            false,
-            "fetchUnconsumedTimesheets:error"
-          );
+          // Only update error state if we're still in a valid state
+          const currentState = get();
+          if (currentState.loading) {
+            console.error("Error fetching unconsumed timesheets:", error);
+
+            set(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to fetch unconsumed timesheets",
+                loading: false,
+              },
+              false,
+              "fetchUnconsumedTimesheets:error"
+            );
+          }
         }
       },
 
@@ -475,6 +504,55 @@ export const useAttendanceStore = create<AttendanceStore>()(
             },
             false,
             "deleteRecord:error"
+          );
+          throw error;
+        }
+      },
+
+      // Consume timesheet
+      consumeTimesheet: async (timesheetId) => {
+        set(
+          { submittingManual: true, error: null },
+          false,
+          "consumeTimesheet:start"
+        );
+
+        try {
+          const response = await axios.patch(
+            `/attendance/consume-timesheet/${timesheetId}`
+          );
+
+          if (response.data.success) {
+            // Remove consumed timesheet from unconsumed list
+            const currentTimesheets = get().unconsumedTimesheets;
+            const updatedTimesheets = currentTimesheets.filter(
+              (timesheet) => timesheet.timesheet_id !== timesheetId
+            );
+
+            set(
+              {
+                unconsumedTimesheets: updatedTimesheets,
+                submittingManual: false,
+              },
+              false,
+              "consumeTimesheet:success"
+            );
+          } else {
+            throw new Error(
+              response.data.message || "Failed to consume timesheet"
+            );
+          }
+        } catch (error) {
+          set(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to consume timesheet",
+              submittingManual: false,
+            },
+            false,
+            "consumeTimesheet:error"
           );
           throw error;
         }

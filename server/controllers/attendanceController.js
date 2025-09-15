@@ -1069,7 +1069,150 @@ export const getUnconsumedTimesheet = async (req, res) => {
       ORDER BY end_date DESC
     `
     );
-    res.status(200).json({ success: true, data: timesheets.rows });
+
+    // For each timesheet, get its attendance record count and distinct employee count
+    const timesheetsWithCounts = await Promise.all(
+      timesheets.rows.map(async (timesheet) => {
+        // Get attendance record count for this specific timesheet
+        const recordCountResult = await pool.query(
+          `
+          SELECT COUNT(*) as record_count
+          FROM attendance
+          WHERE timesheet_id = $1
+        `,
+          [timesheet.timesheet_id]
+        );
+
+        // Get distinct employee count for this specific timesheet
+        const employeeCountResult = await pool.query(
+          `
+          SELECT COUNT(DISTINCT employee_id) as employee_count
+          FROM attendance
+          WHERE timesheet_id = $1
+        `,
+          [timesheet.timesheet_id]
+        );
+
+        return {
+          ...timesheet,
+          recordCount: parseInt(recordCountResult.rows[0].record_count),
+          employeeCount: parseInt(employeeCountResult.rows[0].employee_count),
+        };
+      })
+    );
+
+    console.log("Unconsumed timesheet debug:", timesheetsWithCounts);
+
+    res.status(200).json({
+      success: true,
+      data: timesheetsWithCounts,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const consumeTimesheet = async (req, res) => {
+  try {
+    const { timesheet_id } = req.params;
+
+    if (!timesheet_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Timesheet ID is required",
+      });
+    }
+
+    // Check if timesheet exists and is unconsumed
+    const timesheetCheck = await pool.query(
+      `SELECT * FROM timesheets WHERE timesheet_id = $1`,
+      [timesheet_id]
+    );
+
+    if (timesheetCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Timesheet not found",
+      });
+    }
+
+    if (timesheetCheck.rows[0].is_consumed) {
+      return res.status(400).json({
+        success: false,
+        message: "Timesheet is already consumed",
+      });
+    }
+
+    // Mark timesheet as consumed
+    const result = await pool.query(
+      `
+      UPDATE timesheets
+      SET is_consumed = true, processed_at = NOW()
+      WHERE timesheet_id = $1
+      RETURNING *
+    `,
+      [timesheet_id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Timesheet marked as consumed",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getAttendanceByTimesheet = async (req, res) => {
+  try {
+    const { timesheet_id } = req.params;
+
+    if (!timesheet_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Timesheet ID is required",
+      });
+    }
+
+    // Get timesheet details first
+    const timesheetCheck = await pool.query(
+      `SELECT * FROM timesheets WHERE timesheet_id = $1`,
+      [timesheet_id]
+    );
+
+    if (timesheetCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Timesheet not found",
+      });
+    }
+
+    // Get all attendance records for this timesheet
+    const attendanceRecords = await pool.query(
+      `
+      SELECT 
+        a.*, e.first_name, e.last_name, e.employee_id,
+        COALESCE(a.total_hours, 0) as calculated_total_hours,
+        COALESCE(a.overtime_hours, 0) as overtime_hours,
+        s.break_duration
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.employee_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      WHERE a.timesheet_id = $1
+      ORDER BY a.date DESC, a.time_in DESC
+    `,
+      [timesheet_id]
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        timesheet: timesheetCheck.rows[0],
+        attendance: attendanceRecords.rows,
+        count: attendanceRecords.rows.length,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

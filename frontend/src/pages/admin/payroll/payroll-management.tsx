@@ -30,6 +30,7 @@ import type {
   CreatePayrollHeader,
 } from "@/models/payroll-model";
 import { formatCurrency, formatDate } from "@/models/payroll-model";
+import { useAttendanceStore } from "@/store/attendanceStore";
 
 const PayrollManagement = () => {
   const {
@@ -42,6 +43,12 @@ const PayrollManagement = () => {
     fetchConfigs,
     generatePayroll,
   } = usePayrollStore();
+
+  const {
+    unconsumedTimesheets,
+    fetchUnconsumedTimesheets,
+    loading: attendanceLoading,
+  } = useAttendanceStore();
 
   // Modal states
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
@@ -57,10 +64,47 @@ const PayrollManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("overview");
 
+  // Fetch initial data
   useEffect(() => {
-    fetchPayrollHeaders();
-    fetchConfigs();
-  }, [fetchPayrollHeaders, fetchConfigs]);
+    const fetchInitialData = async () => {
+      try {
+        await Promise.all([
+          fetchPayrollHeaders(),
+          fetchConfigs(),
+          fetchUnconsumedTimesheets(),
+        ]);
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      }
+    };
+
+    fetchInitialData();
+  }, []); // Remove functions from dependencies since they're stable Zustand actions
+
+  // Calculate totals from timesheets (moved before useEffect to avoid reference error)
+  const totalTimesheetRecords = unconsumedTimesheets.reduce(
+    (sum, timesheet) => sum + timesheet.recordCount,
+    0
+  );
+
+  const totalTimesheetEmployees = unconsumedTimesheets.reduce(
+    (sum, timesheet) => sum + timesheet.employeeCount,
+    0
+  );
+
+  // Log unconsumed timesheets when they change
+  useEffect(() => {
+    if (unconsumedTimesheets.length > 0) {
+      console.log("Unconsumed timesheets loaded:", {
+        count: unconsumedTimesheets.length,
+        totalRecords: totalTimesheetRecords,
+        totalEmployees: totalTimesheetEmployees,
+        timesheets: unconsumedTimesheets,
+      });
+    } else if (!attendanceLoading && unconsumedTimesheets.length === 0) {
+      console.log("No unconsumed timesheets found");
+    }
+  }, [unconsumedTimesheets, attendanceLoading]);
 
   useEffect(() => {
     if (selectedHeader) {
@@ -207,14 +251,17 @@ const PayrollManagement = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Payrolls
+              Timesheets Ready
             </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{payrollHeaders.length}</div>
+            <div className="text-2xl font-bold">
+              {unconsumedTimesheets.length}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {currentMonthPayrolls.length} this month
+              {totalTimesheetRecords} records, {totalTimesheetEmployees}{" "}
+              employees
             </p>
           </CardContent>
         </Card>

@@ -198,7 +198,7 @@ function App() {
                       />
                       <Route
                         path="settings"
-                        element={<div>Settings Page</div>}
+                        element={<div>Settings Coming Soon!</div>}
                       />
                     </Routes>
                   </AdminLayout>
