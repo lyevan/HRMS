@@ -2,58 +2,53 @@ import { pool } from "../config/db.js";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
+import {
+  getHolidayInfo,
+  enhancedClockInCalculation,
+  enhancedClockOutCalculation,
+  updateAttendanceWithEnhancedCalculations,
+  roundToPayrollIncrement,
+} from "../utils/attendanceCalculations.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// Helper function to check if a date is a holiday
+// Helper function to check if a date is a holiday (deprecated - use getHolidayInfo from utils)
 const checkHolidayStatus = async (date) => {
   try {
-    // Check if holidays table exists and query it
-    const holidayResult = await pool.query(
-      `SELECT holiday_type FROM holidays 
-       WHERE date = $1 AND is_active = true`,
-      [date]
-    );
-
-    if (holidayResult.rows.length > 0) {
-      const holidayType = holidayResult.rows[0].holiday_type;
-      return {
-        isRegularHoliday: holidayType === "regular",
-        isSpecialHoliday: holidayType === "special",
-      };
-    }
-
+    // Use the enhanced holiday info function
+    const holidayInfo = await getHolidayInfo(date);
     return {
-      isRegularHoliday: false,
-      isSpecialHoliday: false,
+      isRegularHoliday: holidayInfo.isRegularHoliday,
+      isSpecialHoliday: holidayInfo.isSpecialHoliday,
+      holidayName: holidayInfo.holidayName,
     };
   } catch (error) {
-    // If holidays table doesn't exist, return false for all
-    console.log("Holiday check skipped - holidays table may not exist");
+    console.error("Error checking holiday status:", error);
     return {
       isRegularHoliday: false,
       isSpecialHoliday: false,
+      holidayName: null,
     };
   }
 };
 
 // Payroll-friendly hour rounding function
-const roundToPayrollIncrement = (hours) => {
-  const wholeHours = Math.floor(hours);
-  const minutes = (hours - wholeHours) * 60;
+// const roundToPayrollIncrement = (hours) => {
+//   const wholeHours = Math.floor(hours);
+//   const minutes = (hours - wholeHours) * 60;
 
-  if (minutes <= 15) {
-    // 0-15 minutes: round down
-    return wholeHours;
-  } else if (minutes <= 45) {
-    // 16-45 minutes: round to 30 minutes (0.5 hours)
-    return wholeHours + 0.5;
-  } else {
-    // 46-59 minutes: round up to next hour
-    return wholeHours + 1;
-  }
-};
+//   if (minutes <= 15) {
+//     // 0-15 minutes: round down
+//     return wholeHours;
+//   } else if (minutes <= 45) {
+//     // 16-45 minutes: round to 30 minutes (0.5 hours)
+//     return wholeHours + 0.5;
+//   } else {
+//     // 46-59 minutes: round up to next hour
+//     return wholeHours + 1;
+//   }
+// };
 
 //     CASE WHEN a.total_hours IS NOT NULL THEN a.total_hours * e.hourly_rate ELSE NULL END AS daily_pay,
 //     CASE WHEN a.overtime_hours IS NOT NULL THEN a.overtime_hours * e.hourly_rate * 1.5 ELSE NULL END AS overtime_pay
@@ -221,31 +216,39 @@ export const clockIn = async (req, res) => {
       });
     }
 
-    // Determine if employee is late
-    const scheduleStartTime = foundEmployee.start_time;
-    const currentTimeOnly = now.format("HH:mm:ss");
-    const isLate = currentTimeOnly > scheduleStartTime;
+    // Get enhanced holiday information
+    const holidayInfo = await getHolidayInfo(today);
 
-    // Check holiday status
-    const holidayStatus = await checkHolidayStatus(today);
+    // Calculate enhanced clock-in data
+    const enhancedCalcs = await enhancedClockInCalculation(
+      actualEmployeeId,
+      currentTime,
+      {
+        start_time: foundEmployee.start_time,
+        end_time: foundEmployee.end_time,
+      },
+      holidayInfo
+    );
 
-    // Insert attendance record with boolean flags including payroll flags
+    // Insert attendance record with enhanced calculations
     const result = await pool.query(
       `INSERT INTO attendance (
         employee_id, date, time_in, is_present, is_late, is_absent, 
-        is_dayoff, is_regular_holiday, is_special_holiday
+        is_dayoff, is_regular_holiday, is_special_holiday, late_minutes, is_entitled_holiday
       ) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         actualEmployeeId,
         today,
         currentTime,
         true,
-        isLate,
+        enhancedCalcs.is_late,
         false,
-        isScheduledDayOff, // Flag if working on day off
-        holidayStatus.isRegularHoliday,
-        holidayStatus.isSpecialHoliday,
+        isScheduledDayOff,
+        enhancedCalcs.is_regular_holiday,
+        enhancedCalcs.is_special_holiday,
+        enhancedCalcs.late_minutes,
+        enhancedCalcs.is_entitled_holiday,
       ]
     );
 
@@ -253,23 +256,30 @@ export const clockIn = async (req, res) => {
       success: true,
       message: `Clocked in successfully - ${foundEmployee.first_name} ${
         foundEmployee.last_name
-      }${isLate ? " (Late)" : ""}${isScheduledDayOff ? " (Day Off Work)" : ""}${
-        holidayStatus.isRegularHoliday ? " (Regular Holiday)" : ""
-      }${holidayStatus.isSpecialHoliday ? " (Special Holiday)" : ""}`,
+      }${
+        enhancedCalcs.is_late
+          ? ` (Late by ${enhancedCalcs.late_minutes} min)`
+          : ""
+      }${isScheduledDayOff ? " (Day Off Work)" : ""}${
+        enhancedCalcs.is_regular_holiday ? " (Regular Holiday)" : ""
+      }${enhancedCalcs.is_special_holiday ? " (Special Holiday)" : ""}`,
       data: {
         ...result.rows[0],
         employee_name: `${foundEmployee.first_name} ${foundEmployee.last_name}`,
         schedule_name: foundEmployee.schedule_name,
-        scheduled_start_time: scheduleStartTime,
-        is_late: isLate,
+        scheduled_start_time: foundEmployee.start_time,
+        late_minutes: enhancedCalcs.late_minutes,
+        is_late: enhancedCalcs.is_late,
         is_dayoff: isScheduledDayOff,
-        is_regular_holiday: holidayStatus.isRegularHoliday,
-        is_special_holiday: holidayStatus.isSpecialHoliday,
+        is_regular_holiday: enhancedCalcs.is_regular_holiday,
+        is_special_holiday: enhancedCalcs.is_special_holiday,
+        is_entitled_holiday: enhancedCalcs.is_entitled_holiday,
+        holiday_name: holidayInfo.holidayName,
         method: rfid ? "RFID" : "Manual",
         payroll_note:
           isScheduledDayOff ||
-          holidayStatus.isRegularHoliday ||
-          holidayStatus.isSpecialHoliday
+          enhancedCalcs.is_regular_holiday ||
+          enhancedCalcs.is_special_holiday
             ? "Special pay rate applies"
             : "Regular pay rate applies",
       },
@@ -344,11 +354,7 @@ export const clockOut = async (req, res) => {
       });
     }
 
-    // Calculate total hours worked
-    const timeIn = dayjs(record.time_in);
-    const timeOut = dayjs(currentTime);
-
-    // Get employee schedule to calculate break duration
+    // Get employee schedule information
     const scheduleQuery = await pool.query(
       `SELECT s.break_duration, s.start_time, s.end_time
        FROM employees e 
@@ -357,71 +363,40 @@ export const clockOut = async (req, res) => {
       [actualEmployeeId]
     );
 
-    // Calculate raw hours worked
-    const rawHours = timeOut.diff(timeIn, "hour", true);
+    const scheduleInfo =
+      scheduleQuery.rows.length > 0
+        ? scheduleQuery.rows[0]
+        : {
+            break_duration: 60, // Default 1 hour break
+            start_time: "08:00:00",
+            end_time: "17:00:00",
+          };
 
-    // Calculate break duration in hours (from schedule)
-    let breakDurationHours = 0;
-    if (scheduleQuery.rows.length > 0 && scheduleQuery.rows[0].break_duration) {
-      // Convert break_duration from minutes to hours
-      breakDurationHours = scheduleQuery.rows[0].break_duration / 60;
-    }
+    // Use enhanced clock-out calculations
+    const enhancedCalcs = await enhancedClockOutCalculation(
+      record,
+      currentTime,
+      scheduleInfo
+    );
 
-    // Only deduct break time if the employee worked long enough to take a break
-    // Typically breaks are taken if working more than 4-6 hours
-    // For shorter periods, don't deduct break time
-    let totalHours = rawHours;
-    if (rawHours >= 4) {
-      totalHours = rawHours - breakDurationHours;
-    }
-
-    // Ensure total hours is never negative
-    if (totalHours < 0) {
-      totalHours = 0;
-    }
-
-    // Apply payroll-friendly rounding
-    // 0-15 minutes: round down, 16-45 minutes: round to 0.5, 46-59 minutes: round up
-    const payrollRoundedHours = roundToPayrollIncrement(totalHours);
-    const roundedTotalHours = Math.round(payrollRoundedHours * 100) / 100;
-
-    // Calculate scheduled work hours for undertime/halfday flags
-    let isUndertime = false;
-    let isHalfday = false;
-
-    if (scheduleQuery.rows.length > 0) {
-      const scheduledStartTime = scheduleQuery.rows[0].start_time;
-      const scheduledEndTime = scheduleQuery.rows[0].end_time;
-
-      // Calculate scheduled hours (raw schedule time minus break)
-      const scheduledRawHours = dayjs(`1970-01-01 ${scheduledEndTime}`).diff(
-        dayjs(`1970-01-01 ${scheduledStartTime}`),
-        "hour",
-        true
-      );
-      const scheduledWorkHours = scheduledRawHours - breakDurationHours;
-
-      // Calculate flags independently
-      isHalfday = roundedTotalHours < scheduledWorkHours / 2;
-      isUndertime = roundedTotalHours < scheduledWorkHours - 1;
-    }
-
-    // Note: overtime_hours will only be populated when overtime requests are approved
-    // Do not auto-calculate overtime here
-
-    // Update attendance record with new flags
+    // Update attendance record with enhanced calculations
     const result = await pool.query(
       `UPDATE attendance 
-       SET time_out = $1, total_hours = $2, notes = $3, updated_at = $4, is_undertime = $5, is_halfday = $6
-       WHERE employee_id = $7 AND date = $8 
+       SET time_out = $1, total_hours = $2, notes = $3, updated_at = $4, 
+           is_undertime = $5, is_halfday = $6, undertime_minutes = $7, 
+           night_differential_hours = $8, rest_day_hours_worked = $9
+       WHERE employee_id = $10 AND date = $11 
        RETURNING *`,
       [
         currentTime,
-        roundedTotalHours,
+        enhancedCalcs.total_hours,
         notes || null,
         currentTime,
-        isUndertime,
-        isHalfday,
+        enhancedCalcs.is_undertime,
+        enhancedCalcs.is_halfday,
+        enhancedCalcs.undertime_minutes,
+        enhancedCalcs.night_differential_hours,
+        enhancedCalcs.rest_day_hours_worked,
         actualEmployeeId,
         today,
       ]
@@ -430,16 +405,34 @@ export const clockOut = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Clocked out successfully - ${employeeName}${
-        isUndertime ? " (Undertime)" : ""
-      }${isHalfday ? " (Half-day)" : ""}`,
+        enhancedCalcs.is_undertime ? " (Undertime)" : ""
+      }${enhancedCalcs.is_halfday ? " (Half-day)" : ""}${
+        enhancedCalcs.night_differential_hours > 0
+          ? " (Night Differential)"
+          : ""
+      }`,
       data: {
         ...result.rows[0],
         employee_name: employeeName,
-        hours_worked: roundedTotalHours,
-        break_duration_hours: breakDurationHours,
-        is_undertime: isUndertime,
-        is_halfday: isHalfday,
+        hours_worked: enhancedCalcs.total_hours,
+        break_duration_hours: scheduleInfo.break_duration / 60,
+        is_undertime: enhancedCalcs.is_undertime,
+        is_halfday: enhancedCalcs.is_halfday,
+        undertime_minutes: enhancedCalcs.undertime_minutes,
+        night_differential_hours: enhancedCalcs.night_differential_hours,
+        rest_day_hours_worked: enhancedCalcs.rest_day_hours_worked,
         method: rfid ? "RFID" : "Manual",
+        payroll_summary: {
+          regular_hours: Math.max(
+            0,
+            enhancedCalcs.total_hours -
+              enhancedCalcs.night_differential_hours -
+              enhancedCalcs.rest_day_hours_worked
+          ),
+          night_diff_hours: enhancedCalcs.night_differential_hours,
+          rest_day_hours: enhancedCalcs.rest_day_hours_worked,
+          undertime_deduction: enhancedCalcs.undertime_minutes / 60,
+        },
       },
     });
   } catch (error) {
@@ -967,14 +960,14 @@ export const processTimesheet = async (req, res) => {
       });
     }
 
-    console.log(
-      "Processing timesheet for attendance IDs:",
-      attendanceIds,
-      "from",
-      startDate,
-      "to",
-      endDate
-    );
+    // console.log(
+    //   "Processing timesheet for attendance IDs:",
+    //   attendanceIds,
+    //   "from",
+    //   startDate,
+    //   "to",
+    //   endDate
+    // );
 
     // Convert timezone-aware dates to Philippine local dates for comparison
     // Frontend sends UTC timestamps like "2025-09-14T16:00:00.000Z" which is actually Sept 15 in Philippines
@@ -1008,10 +1001,10 @@ export const processTimesheet = async (req, res) => {
       [attendanceIds, startDatePH, endDatePH]
     );
 
-    console.log(
-      `Found ${attendanceCheck.rows.length} matching records:`,
-      attendanceCheck.rows
-    );
+    // console.log(
+    //   `Found ${attendanceCheck.rows.length} matching records:`,
+    //   attendanceCheck.rows
+    // );
 
     // If no matching records found, return error
     if (attendanceCheck.rows.length === 0) {
@@ -1030,8 +1023,8 @@ export const processTimesheet = async (req, res) => {
     `;
 
     const timesheetId = await pool.query(createTimesheetQuery, [
-      startDate,
-      endDate,
+      startDatePH,
+      endDatePH,
     ]);
 
     // Link attendance records to the created timesheet
@@ -1101,7 +1094,7 @@ export const getUnconsumedTimesheet = async (req, res) => {
       })
     );
 
-    console.log("Unconsumed timesheet debug:", timesheetsWithCounts);
+    // console.log("Unconsumed timesheet debug:", timesheetsWithCounts);
 
     res.status(200).json({
       success: true,

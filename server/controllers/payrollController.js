@@ -442,8 +442,8 @@ export const calculatePayroll = async (req, res) => {
   }
 };
 
-// Generate and save payroll (optimized version)
-export const generatePayroll = async (req, res) => {
+// Generate and save payroll (legacy version - kept for backward compatibility)
+export const generatePayrollLegacy = async (req, res) => {
   try {
     const { start_date, end_date, employee_ids, run_by } = req.body;
 
@@ -483,9 +483,9 @@ export const generatePayroll = async (req, res) => {
       });
     }
 
-    console.log(
-      `🏃 Generating payroll for ${employee_ids.length} employees from ${start_date} to ${end_date}...`
-    );
+    // console.log(
+    //   `🏃 Generating payroll for ${employee_ids.length} employees from ${start_date} to ${end_date}...`
+    // );
 
     // Check if payroll already exists for the specific employees in this period
     const existingPayslips = await pool.query(
@@ -532,7 +532,7 @@ export const generatePayroll = async (req, res) => {
 
       if (existingHeader.rows.length > 0) {
         payrollHeaderId = existingHeader.rows[0].payroll_header_id;
-        console.log(`📋 Using existing payroll header: ${payrollHeaderId}`);
+        // console.log(`📋 Using existing payroll header: ${payrollHeaderId}`);
       } else {
         // Create new payroll header
         const payrollHeader = await pool.query(
@@ -544,7 +544,7 @@ export const generatePayroll = async (req, res) => {
           [start_date, end_date, run_by || null]
         );
         payrollHeaderId = payrollHeader.rows[0].payroll_header_id;
-        console.log(`📋 Created new payroll header: ${payrollHeaderId}`);
+        // console.log(`📋 Created new payroll header: ${payrollHeaderId}`);
       }
 
       // Validate employee existence before processing
@@ -577,12 +577,12 @@ export const generatePayroll = async (req, res) => {
         );
       }
 
-      console.log(`👥 Processing ${validEmployees.length} active employees...`);
-      if (inactiveEmployees.length > 0) {
-        console.log(
-          `⚠️ Skipping ${inactiveEmployees.length} inactive employees`
-        );
-      }
+      // console.log(`👥 Processing ${validEmployees.length} active employees...`);
+      // if (inactiveEmployees.length > 0) {
+      //   console.log(
+      //     `⚠️ Skipping ${inactiveEmployees.length} inactive employees`
+      //   );
+      // }
 
       // Batch fetch all employee data and attendance data
       const batchResults = await calculateBatchPayroll(
@@ -615,8 +615,10 @@ export const generatePayroll = async (req, res) => {
               `
               INSERT INTO payslip (
                 employee_id, payroll_header_id, gross_pay, overtime_pay, 
-                night_diff_pay, leave_pay, bonuses, deductions, net_pay
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                night_diff_pay, leave_pay, bonuses, deductions, 
+                sss_contribution, philhealth_contribution, pagibig_contribution, 
+                income_tax, other_deductions, net_pay
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             `,
               [
                 result.employee_id,
@@ -627,6 +629,11 @@ export const generatePayroll = async (req, res) => {
                 result.leave_pay || 0,
                 result.bonuses || 0,
                 result.deductions || 0,
+                result.sss_contribution || 0,
+                result.philhealth_contribution || 0,
+                result.pagibig_contribution || 0,
+                result.income_tax || 0,
+                result.other_deductions || 0,
                 result.net_pay || 0,
               ]
             );
@@ -660,9 +667,9 @@ export const generatePayroll = async (req, res) => {
         }
       }
 
-      console.log(
-        `✅ Payroll completed: ${successfulPayslips.length} success, ${failedPayslips.length} failed`
-      );
+      // console.log(
+      //   `✅ Payroll completed: ${successfulPayslips.length} success, ${failedPayslips.length} failed`
+      // );
 
       const responseStatus = failedPayslips.length === 0 ? 201 : 207; // 207 = Multi-Status for partial success
 
@@ -759,18 +766,18 @@ export const generatePayroll = async (req, res) => {
 // Optimized batch payroll calculation
 const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
   try {
-    console.log(`\n� [CONTROLLER DEBUG] Starting batch payroll calculation`);
-    console.log(
-      `👥 [CONTROLLER DEBUG] Employees: ${
-        employee_ids.length
-      } (${employee_ids.join(", ")})`
-    );
-    console.log(`📅 [CONTROLLER DEBUG] Period: ${start_date} to ${end_date}`);
+    // console.log(`\n� [CONTROLLER DEBUG] Starting batch payroll calculation`);
+    // console.log(
+    //   `👥 [CONTROLLER DEBUG] Employees: ${
+    //     employee_ids.length
+    //   } (${employee_ids.join(", ")})`
+    // );
+    // console.log(`📅 [CONTROLLER DEBUG] Period: ${start_date} to ${end_date}`);
 
-    // Batch fetch all employee data
-    console.log(
-      `📊 [CONTROLLER DEBUG] Fetching employee data for ${employee_ids.length} employees...`
-    );
+    // // Batch fetch all employee data
+    // console.log(
+    //   `📊 [CONTROLLER DEBUG] Fetching employee data for ${employee_ids.length} employees...`
+    // );
     const employeeData = await pool.query(
       `
       SELECT 
@@ -792,19 +799,19 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
       [employee_ids]
     );
 
-    console.log(
-      `✅ [CONTROLLER DEBUG] Found ${employeeData.rows.length} active employees in database`
-    );
+    // console.log(
+    //   `✅ [CONTROLLER DEBUG] Found ${employeeData.rows.length} active employees in database`
+    // );
     employeeData.rows.forEach((emp) => {
-      console.log(
-        `   - ${emp.employee_id}: ${emp.first_name} ${emp.last_name} (₱${emp.rate} ${emp.rate_type}, ${emp.employment_type})`
-      );
+      // console.log(
+      //   `   - ${emp.employee_id}: ${emp.first_name} ${emp.last_name} (₱${emp.rate} ${emp.rate_type}, ${emp.employment_type})`
+      // );
     });
 
     // Batch fetch all attendance data
-    console.log(
-      `⏰ [CONTROLLER DEBUG] Fetching attendance data for ${employee_ids.length} employees...`
-    );
+    // console.log(
+    //   `⏰ [CONTROLLER DEBUG] Fetching attendance data for ${employee_ids.length} employees...`
+    // );
     const attendanceData = await pool.query(
       `
       SELECT 
@@ -826,19 +833,19 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
       [employee_ids, start_date, end_date]
     );
 
-    console.log(
-      `✅ [CONTROLLER DEBUG] Found attendance data for ${attendanceData.rows.length} employees`
-    );
-    attendanceData.rows.forEach((att) => {
-      console.log(
-        `   - ${att.employee_id}: ${att.days_worked} days worked, ${
-          att.total_regular_hours || 0
-        } reg hours, ${att.total_overtime_hours || 0} OT hours`
-      );
-    });
+    // console.log(
+    //   `✅ [CONTROLLER DEBUG] Found attendance data for ${attendanceData.rows.length} employees`
+    // );
+    // attendanceData.rows.forEach((att) => {
+    //   console.log(
+    //     `   - ${att.employee_id}: ${att.days_worked} days worked, ${
+    //       att.total_regular_hours || 0
+    //     } reg hours, ${att.total_overtime_hours || 0} OT hours`
+    //   );
+    // });
 
     // Create lookup maps for faster processing
-    console.log(`🗺️ [CONTROLLER DEBUG] Creating lookup maps...`);
+    // console.log(`🗺️ [CONTROLLER DEBUG] Creating lookup maps...`);
     const employeeMap = new Map();
     const attendanceMap = new Map();
 
@@ -850,16 +857,16 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
       attendanceMap.set(att.employee_id, att);
     });
 
-    console.log(
-      `📊 [CONTROLLER DEBUG] Processing individual payroll calculations...`
-    );
+    // console.log(
+    //   `📊 [CONTROLLER DEBUG] Processing individual payroll calculations...`
+    // );
 
     // Process each employee with the batched data
     const results = [];
     for (const employee_id of employee_ids) {
-      console.log(
-        `\n👤 [CONTROLLER DEBUG] Processing employee: ${employee_id}`
-      );
+      // console.log(
+      //   `\n👤 [CONTROLLER DEBUG] Processing employee: ${employee_id}`
+      // );
 
       const emp = employeeMap.get(employee_id);
       const attendance = attendanceMap.get(employee_id) || {
@@ -873,21 +880,21 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
         special_holiday_days: 0,
       };
 
-      console.log(
-        `📋 [CONTROLLER DEBUG] Employee data found: ${emp ? "YES" : "NO"}`
-      );
-      if (emp) {
-        console.log(`   Name: ${emp.first_name} ${emp.last_name}`);
-        console.log(`   Rate: ₱${emp.rate} (${emp.rate_type})`);
-        console.log(`   Employment: ${emp.employment_type}`);
-      }
+      // console.log(
+      //   `📋 [CONTROLLER DEBUG] Employee data found: ${emp ? "YES" : "NO"}`
+      // );
+      // if (emp) {
+      //   console.log(`   Name: ${emp.first_name} ${emp.last_name}`);
+      //   console.log(`   Rate: ₱${emp.rate} (${emp.rate_type})`);
+      //   console.log(`   Employment: ${emp.employment_type}`);
+      // }
 
-      console.log(`📊 [CONTROLLER DEBUG] Attendance data:`, attendance);
+      // console.log(`📊 [CONTROLLER DEBUG] Attendance data:`, attendance);
 
       if (!emp) {
-        console.log(
-          `❌ [CONTROLLER DEBUG] Employee ${employee_id} not found or inactive`
-        );
+        // console.log(
+        //   `❌ [CONTROLLER DEBUG] Employee ${employee_id} not found or inactive`
+        // );
         results.push({ employee_id, error: "Employee not found or inactive" });
         continue;
       }
@@ -897,9 +904,9 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
         emp.contract_start > end_date ||
         (emp.contract_end && emp.contract_end < start_date)
       ) {
-        console.log(
-          `❌ [CONTROLLER DEBUG] Contract invalid for ${employee_id}: start=${emp.contract_start}, end=${emp.contract_end}`
-        );
+        // console.log(
+        //   `❌ [CONTROLLER DEBUG] Contract invalid for ${employee_id}: start=${emp.contract_start}, end=${emp.contract_end}`
+        // );
         results.push({
           employee_id,
           error: "No active contract for this period",
@@ -907,69 +914,69 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
         continue;
       }
 
-      console.log(`✅ [CONTROLLER DEBUG] Contract valid for ${employee_id}`);
+      // console.log(`✅ [CONTROLLER DEBUG] Contract valid for ${employee_id}`);
 
       // Calculate payroll using comprehensive calculator
       try {
-        console.log(
-          `🔧 [CONTROLLER DEBUG] Calling calculateEmployeePayrollSync for ${employee_id}...`
-        );
+        // console.log(
+        //   `🔧 [CONTROLLER DEBUG] Calling calculateEmployeePayrollSync for ${employee_id}...`
+        // );
         const result = await calculateEmployeePayrollSync(
           emp,
           attendance,
           start_date,
           end_date
         );
-        console.log(
-          `✅ [CONTROLLER DEBUG] Successfully calculated payroll for ${employee_id}`
-        );
-        console.log(
-          `💰 [CONTROLLER DEBUG] Result summary - Gross: ₱${result.gross_pay}, Net: ₱${result.net_pay}`
-        );
+        // console.log(
+        //   `✅ [CONTROLLER DEBUG] Successfully calculated payroll for ${employee_id}`
+        // );
+        // console.log(
+        //   `💰 [CONTROLLER DEBUG] Result summary - Gross: ₱${result.gross_pay}, Net: ₱${result.net_pay}`
+        // );
         results.push(result);
       } catch (error) {
-        console.error(
-          `❌ [CONTROLLER DEBUG] Error calculating payroll for employee ${employee_id}:`,
-          error.message
-        );
+        // console.error(
+        //   `❌ [CONTROLLER DEBUG] Error calculating payroll for employee ${employee_id}:`,
+        //   error.message
+        // );
         results.push({ employee_id, error: error.message });
       }
     }
 
-    console.log(
-      `\n🏁 [CONTROLLER DEBUG] ===== Batch calculation completed =====`
-    );
-    console.log(
-      `📊 [CONTROLLER DEBUG] Total processed: ${results.length} employees`
-    );
+    // console.log(
+    //   `\n🏁 [CONTROLLER DEBUG] ===== Batch calculation completed =====`
+    // );
+    // console.log(
+    //   `📊 [CONTROLLER DEBUG] Total processed: ${results.length} employees`
+    // );
 
     const successCount = results.filter((r) => !r.error).length;
     const errorCount = results.filter((r) => r.error).length;
 
-    console.log(
-      `✅ [CONTROLLER DEBUG] Successful calculations: ${successCount}`
-    );
-    console.log(`❌ [CONTROLLER DEBUG] Failed calculations: ${errorCount}`);
+    // console.log(
+    //   `✅ [CONTROLLER DEBUG] Successful calculations: ${successCount}`
+    // );
+    // console.log(`❌ [CONTROLLER DEBUG] Failed calculations: ${errorCount}`);
 
     if (errorCount > 0) {
-      console.log(
-        `📋 [CONTROLLER DEBUG] Errors:`,
-        results
-          .filter((r) => r.error)
-          .map((r) => ({ employee_id: r.employee_id, error: r.error }))
-      );
+      // console.log(
+      //   `📋 [CONTROLLER DEBUG] Errors:`,
+      //   results
+      //     .filter((r) => r.error)
+      //     .map((r) => ({ employee_id: r.employee_id, error: r.error }))
+      // );
     }
 
-    console.log(
-      `⚡ [CONTROLLER DEBUG] Batch calculation completed for ${results.length} employees`
-    );
+    // console.log(
+    //   `⚡ [CONTROLLER DEBUG] Batch calculation completed for ${results.length} employees`
+    // );
     return results;
   } catch (error) {
-    console.error(
-      "💥 [CONTROLLER DEBUG] Batch calculation error:",
-      error.message
-    );
-    console.error("🔍 [CONTROLLER DEBUG] Error stack:", error.stack);
+    // console.error(
+    //   "💥 [CONTROLLER DEBUG] Batch calculation error:",
+    //   error.message
+    // );
+    // console.error("🔍 [CONTROLLER DEBUG] Error stack:", error.stack);
     throw error;
   }
 };
@@ -982,23 +989,23 @@ const calculateEmployeePayrollSync = async (
   endDate = null
 ) => {
   try {
-    console.log(
-      `\n🧮 [CALC DEBUG] ===== Starting calculateEmployeePayrollSync =====`
-    );
-    console.log(
-      `👤 [CALC DEBUG] Employee: ${emp.first_name} ${emp.last_name} (${emp.employee_id})`
-    );
-    console.log(`💰 [CALC DEBUG] Rate: ₱${emp.rate} (${emp.rate_type})`);
-    console.log(`🏢 [CALC DEBUG] Position: ${emp.position_title}`);
-    console.log(`📋 [CALC DEBUG] Employment Type: ${emp.employment_type}`);
+    // console.log(
+    //   `\n🧮 [CALC DEBUG] ===== Starting calculateEmployeePayrollSync =====`
+    // );
+    // console.log(
+    //   `👤 [CALC DEBUG] Employee: ${emp.first_name} ${emp.last_name} (${emp.employee_id})`
+    // );
+    // console.log(`💰 [CALC DEBUG] Rate: ₱${emp.rate} (${emp.rate_type})`);
+    // console.log(`🏢 [CALC DEBUG] Position: ${emp.position_title}`);
+    // console.log(`📋 [CALC DEBUG] Employment Type: ${emp.employment_type}`);
 
-    // Use AdvancedPayrollCalculator for comprehensive calculations
-    console.log(`🔧 [CALC DEBUG] Initializing AdvancedPayrollCalculator...`);
+    // // Use AdvancedPayrollCalculator for comprehensive calculations
+    // console.log(`🔧 [CALC DEBUG] Initializing AdvancedPayrollCalculator...`);
     const calculator = new AdvancedPayrollCalculator(pool);
 
-    // Convert attendance data to match AdvancedPayrollCalculator format
-    console.log(`📊 [CALC DEBUG] Converting attendance data format...`);
-    console.log(`📊 [CALC DEBUG] Raw attendance input:`, attendance);
+    // // Convert attendance data to match AdvancedPayrollCalculator format
+    // console.log(`📊 [CALC DEBUG] Converting attendance data format...`);
+    // console.log(`📊 [CALC DEBUG] Raw attendance input:`, attendance);
 
     const attendanceForCalculator = {
       days_worked: parseInt(attendance.days_worked) || 0,
@@ -1020,10 +1027,10 @@ const calculateEmployeePayrollSync = async (
         parseFloat(attendance.night_differential_hours) || 0,
     };
 
-    console.log(
-      `📊 [CALC DEBUG] Converted attendance for calculator:`,
-      attendanceForCalculator
-    );
+    // console.log(
+    //   `📊 [CALC DEBUG] Converted attendance for calculator:`,
+    //   attendanceForCalculator
+    // );
 
     // Use provided dates or fallback to current month
     const calculationStartDate =
@@ -1037,14 +1044,14 @@ const calculateEmployeePayrollSync = async (
         .toISOString()
         .split("T")[0];
 
-    console.log(
-      `📅 [CALC DEBUG] Calculation period: ${calculationStartDate} to ${calculationEndDate}`
-    );
+    // console.log(
+    //   `📅 [CALC DEBUG] Calculation period: ${calculationStartDate} to ${calculationEndDate}`
+    // );
 
     // Calculate comprehensive payroll using the provided attendance data
-    console.log(
-      `🚀 [CALC DEBUG] Calling AdvancedPayrollCalculator.calculateEmployeePayroll...`
-    );
+    // console.log(
+    //   `🚀 [CALC DEBUG] Calling AdvancedPayrollCalculator.calculateEmployeePayroll...`
+    // );
     const payrollData = await calculator.calculateEmployeePayroll(
       emp.employee_id,
       calculationStartDate,
@@ -1052,20 +1059,20 @@ const calculateEmployeePayrollSync = async (
       attendanceForCalculator // Pass attendance data to avoid re-querying
     );
 
-    console.log(
-      `✅ [CALC DEBUG] AdvancedPayrollCalculator result:`,
-      payrollData
-    );
+    // console.log(
+    //   `✅ [CALC DEBUG] AdvancedPayrollCalculator result:`,
+    //   payrollData
+    // );
 
     if (payrollData.error) {
-      console.error(
-        `❌ [CALC DEBUG] Calculator returned error: ${payrollData.error}`
-      );
+      // console.error(
+      //   `❌ [CALC DEBUG] Calculator returned error: ${payrollData.error}`
+      // );
       throw new Error(payrollData.error);
     }
 
-    // Map to legacy format for existing API compatibility
-    console.log(`🔄 [CALC DEBUG] Mapping to legacy format...`);
+    // // Map to legacy format for existing API compatibility
+    // console.log(`🔄 [CALC DEBUG] Mapping to legacy format...`);
     const result = {
       employee_id: emp.employee_id,
       employee_name: `${emp.first_name} ${emp.last_name}`,
@@ -1086,11 +1093,12 @@ const calculateEmployeePayrollSync = async (
       net_pay: Math.round(payrollData.net_pay * 100) / 100,
       // Additional comprehensive data
       basic_pay: Math.round(payrollData.earnings.base_pay * 100) / 100,
-      sss_deduction: Math.round(payrollData.deductions.sss * 100) / 100,
-      philhealth_deduction:
+      sss_contribution: Math.round(payrollData.deductions.sss * 100) / 100,
+      philhealth_contribution:
         Math.round(payrollData.deductions.philhealth * 100) / 100,
-      pagibig_deduction: Math.round(payrollData.deductions.pagibig * 100) / 100,
-      tax_deduction: Math.round(payrollData.deductions.tax * 100) / 100,
+      pagibig_contribution:
+        Math.round(payrollData.deductions.pagibig * 100) / 100,
+      income_tax: Math.round(payrollData.deductions.tax * 100) / 100,
       loans_deduction:
         Math.round((payrollData.deductions.loans || 0) * 100) / 100,
       other_deductions:
@@ -1099,21 +1107,21 @@ const calculateEmployeePayrollSync = async (
         Math.round((payrollData.thirteenth_month_pay || 0) * 100) / 100,
     };
 
-    console.log(`✅ [CALC DEBUG] Final mapped result:`, result);
-    console.log(
-      `💰 [CALC DEBUG] Key amounts - Gross: ₱${result.gross_pay}, Deductions: ₱${result.deductions}, Net: ₱${result.net_pay}`
-    );
-    console.log(
-      `🏁 [CALC DEBUG] ===== calculateEmployeePayrollSync completed =====\n`
-    );
+    // console.log(`✅ [CALC DEBUG] Final mapped result:`, result);
+    // console.log(
+    //   `💰 [CALC DEBUG] Key amounts - Gross: ₱${result.gross_pay}, Deductions: ₱${result.deductions}, Net: ₱${result.net_pay}`
+    // );
+    // console.log(
+    //   `🏁 [CALC DEBUG] ===== calculateEmployeePayrollSync completed =====\n`
+    // );
 
     return result;
   } catch (error) {
-    console.error(
-      `❌ [CALC DEBUG] Error in calculateEmployeePayrollSync for ${emp.employee_id}:`,
-      error.message
-    );
-    console.error(`🔍 [CALC DEBUG] Error stack:`, error.stack);
+    // console.error(
+    //   `❌ [CALC DEBUG] Error in calculateEmployeePayrollSync for ${emp.employee_id}:`,
+    //   error.message
+    // );
+    // console.error(`🔍 [CALC DEBUG] Error stack:`, error.stack);
     return { employee_id: emp.employee_id, error: error.message };
   }
 };
@@ -1150,11 +1158,12 @@ const calculateEmployeePayroll = async (employee_id, start_date, end_date) => {
       net_pay: Math.round(payrollData.net_pay * 100) / 100,
       // Additional comprehensive data
       basic_pay: Math.round(payrollData.earnings.base_pay * 100) / 100,
-      sss_deduction: Math.round(payrollData.deductions.sss * 100) / 100,
-      philhealth_deduction:
+      sss_contribution: Math.round(payrollData.deductions.sss * 100) / 100,
+      philhealth_contribution:
         Math.round(payrollData.deductions.philhealth * 100) / 100,
-      pagibig_deduction: Math.round(payrollData.deductions.pagibig * 100) / 100,
-      tax_deduction: Math.round(payrollData.deductions.tax * 100) / 100,
+      pagibig_contribution:
+        Math.round(payrollData.deductions.pagibig * 100) / 100,
+      income_tax: Math.round(payrollData.deductions.tax * 100) / 100,
       loans_deduction:
         Math.round((payrollData.deductions.loans || 0) * 100) / 100,
       other_deductions:
@@ -1332,7 +1341,7 @@ export const getPayrollSummary = async (req, res) => {
   }
 };
 
-// Optimized generatePayroll function using batch processing
+// Optimized generatePayroll function using batch processing and timesheet support
 const optimizedGeneratePayroll = async (req, res) => {
   try {
     const {
@@ -1342,7 +1351,19 @@ const optimizedGeneratePayroll = async (req, res) => {
       payroll_title,
       notes = "",
       run_by,
+      timesheet_id,
     } = req.body;
+
+    console.log("🚀 Generate Payroll Request Data:");
+    console.log("- timesheet_id:", timesheet_id, "type:", typeof timesheet_id);
+    console.log(
+      "- employee_ids:",
+      employee_ids,
+      "length:",
+      employee_ids?.length
+    );
+    console.log("- start_date:", start_date);
+    console.log("- end_date:", end_date);
 
     if (!start_date || !end_date || !run_by) {
       return res.status(400).json({
@@ -1351,25 +1372,42 @@ const optimizedGeneratePayroll = async (req, res) => {
       });
     }
 
-    // Get all active employees if no specific employee_ids provided
-    let targetEmployeeIds = employee_ids || [];
-    if (!targetEmployeeIds.length) {
+    // Get employees from timesheet if timesheet_id is provided, otherwise use employee_ids
+    let targetEmployeeIds = [];
+
+    console.log(
+      "🔍 Logic check - timesheet_id:",
+      timesheet_id,
+      "truthy:",
+      !!timesheet_id
+    );
+
+    if (timesheet_id) {
+      console.log(`🎯 Getting employees from timesheet ${timesheet_id}...`);
+      const timesheetEmployees = await pool.query(
+        "SELECT DISTINCT employee_id FROM attendance WHERE timesheet_id = $1",
+        [timesheet_id]
+      );
+      targetEmployeeIds = timesheetEmployees.rows.map((emp) => emp.employee_id);
       console.log(
-        "🔍 No employee IDs provided, fetching all active employees..."
+        `📊 Found ${targetEmployeeIds.length} employees in timesheet ${timesheet_id}:`,
+        targetEmployeeIds
+      );
+    } else if (employee_ids && employee_ids.length > 0) {
+      console.log("🎯 Using provided employee IDs:", employee_ids);
+      targetEmployeeIds = employee_ids;
+    } else {
+      console.log(
+        "🔍 No employee IDs or timesheet provided, fetching all active employees..."
       );
       const allEmployees = await pool.query(
         "SELECT employee_id FROM employees WHERE status = 'active'"
       );
       targetEmployeeIds = allEmployees.rows.map((emp) => emp.employee_id);
       console.log(`📊 Found ${targetEmployeeIds.length} active employees`);
-    } else {
-      console.log(
-        `🎯 Processing ${targetEmployeeIds.length} specific employee IDs`
-      );
     }
 
     if (!targetEmployeeIds.length) {
-      console.log("❌ No target employees found");
       return res.status(400).json({
         success: false,
         message: "No active employees found",
@@ -1386,8 +1424,8 @@ const optimizedGeneratePayroll = async (req, res) => {
         c.rate_type,
         c.start_date as contract_start,
         c.end_date as contract_end,
-        p.position_title,
-        et.type_name as employment_type
+        p.title as position_title,
+        et.name as employment_type
       FROM employees e
       JOIN contracts c ON e.contract_id = c.contract_id
       JOIN positions p ON c.position_id = p.position_id
@@ -1396,14 +1434,8 @@ const optimizedGeneratePayroll = async (req, res) => {
     `;
 
     const employees = await pool.query(employeeQuery, [targetEmployeeIds]);
-    console.log(
-      `👥 Employee query returned ${employees.rows.length} employees out of ${targetEmployeeIds.length} requested`
-    );
 
     if (employees.rows.length === 0) {
-      console.log(
-        "❌ No valid employees found after contract/position validation"
-      );
       return res.status(404).json({
         success: false,
         message: "No valid employees found",
@@ -1435,46 +1467,46 @@ const optimizedGeneratePayroll = async (req, res) => {
       GROUP BY a.employee_id
     `;
 
-    console.log(
-      `📅 Fetching attendance data for period: ${start_date} to ${end_date}`
-    );
-    console.log(`🔍 [ATTENDANCE DEBUG] Query parameters:`, {
-      targetEmployeeIds,
-      start_date,
-      end_date,
-    });
-    console.log(`🔍 [ATTENDANCE DEBUG] Full SQL query:`, attendanceQuery);
+    // console.log(
+    //   `📅 Fetching attendance data for period: ${start_date} to ${end_date}`
+    // );
+    // console.log(`🔍 [ATTENDANCE DEBUG] Query parameters:`, {
+    //   targetEmployeeIds,
+    //   start_date,
+    //   end_date,
+    // });
+    // console.log(`🔍 [ATTENDANCE DEBUG] Full SQL query:`, attendanceQuery);
     const attendance = await pool.query(attendanceQuery, [
       targetEmployeeIds,
       start_date,
       end_date,
     ]);
 
-    console.log(
-      `📊 Attendance query returned ${attendance.rows.length} employee attendance summaries`
-    );
+    // console.log(
+    //   `📊 Attendance query returned ${attendance.rows.length} employee attendance summaries`
+    // );
 
-    console.log(`🔍 [ATTENDANCE DEBUG] Raw query result:`, attendance.rows);
+    // console.log(`🔍 [ATTENDANCE DEBUG] Raw query result:`, attendance.rows);
 
     // Debug: Log first attendance record to see the calculation
-    if (attendance.rows.length > 0) {
-      console.log("🔍 Sample attendance calculation:", {
-        employee_id: attendance.rows[0].employee_id,
-        total_attendance_records: attendance.rows[0].total_attendance_records,
-        days_worked: attendance.rows[0].days_worked,
-        days_absent: attendance.rows[0].days_absent,
-        paid_leave_days: attendance.rows[0].paid_leave_days,
-        day_off_days: attendance.rows[0].day_off_days,
-        date_range: `${attendance.rows[0].first_attendance_date} to ${attendance.rows[0].last_attendance_date}`,
-      });
-    }
+    // if (attendance.rows.length > 0) {
+    //   console.log("🔍 Sample attendance calculation:", {
+    //     employee_id: attendance.rows[0].employee_id,
+    //     total_attendance_records: attendance.rows[0].total_attendance_records,
+    //     days_worked: attendance.rows[0].days_worked,
+    //     days_absent: attendance.rows[0].days_absent,
+    //     paid_leave_days: attendance.rows[0].paid_leave_days,
+    //     day_off_days: attendance.rows[0].day_off_days,
+    //     date_range: `${attendance.rows[0].first_attendance_date} to ${attendance.rows[0].last_attendance_date}`,
+    //   });
+    // }
 
-    console.log(
-      `📅 Attendance query executed for period ${start_date} to ${end_date}`
-    );
-    console.log(
-      `📊 Attendance results: ${attendance.rows.length} employees have attendance records`
-    );
+    // console.log(
+    //   `📅 Attendance query executed for period ${start_date} to ${end_date}`
+    // );
+    // console.log(
+    //   `📊 Attendance results: ${attendance.rows.length} employees have attendance records`
+    // );
 
     // Debug: Check raw attendance record count for comparison
     const rawAttendanceCount = await pool.query(
@@ -1493,7 +1525,7 @@ const optimizedGeneratePayroll = async (req, res) => {
       [targetEmployeeIds, start_date, end_date]
     );
 
-    console.log("📋 Raw attendance record counts:", rawAttendanceCount.rows);
+    // console.log("📋 Raw attendance record counts:", rawAttendanceCount.rows);
 
     // Create lookup map for attendance data
     const attendanceMap = {};
@@ -1517,12 +1549,12 @@ const optimizedGeneratePayroll = async (req, res) => {
         special_holiday_days: 0,
       };
 
-      console.log(
-        `👤 Processing payroll for ${emp.employee_id}: ${emp.first_name} ${emp.last_name}`
-      );
-      console.log(
-        `📊 Attendance summary: ${empAttendance.total_attendance_records} records, ${empAttendance.days_worked} days worked`
-      );
+      // console.log(
+      //   `👤 Processing payroll for ${emp.employee_id}: ${emp.first_name} ${emp.last_name}`
+      // );
+      // console.log(
+      //   `📊 Attendance summary: ${empAttendance.total_attendance_records} records, ${empAttendance.days_worked} days worked`
+      // );
 
       try {
         return await calculateEmployeePayrollSync(
@@ -1546,9 +1578,9 @@ const optimizedGeneratePayroll = async (req, res) => {
     const validPayrolls = payrollResults.filter((result) => !result.error);
     const errorPayrolls = payrollResults.filter((result) => result.error);
 
-    console.log(
-      `💰 Payroll calculation results: ${validPayrolls.length} valid, ${errorPayrolls.length} errors`
-    );
+    // console.log(
+    //   `💰 Payroll calculation results: ${validPayrolls.length} valid, ${errorPayrolls.length} errors`
+    // );
     if (errorPayrolls.length > 0) {
       console.log(
         "⚠️ Payroll calculation errors:",
@@ -1588,22 +1620,29 @@ const optimizedGeneratePayroll = async (req, res) => {
       payroll.leave_pay,
       payroll.bonuses || 0,
       payroll.deductions,
+      payroll.sss_contribution || 0,
+      payroll.philhealth_contribution || 0,
+      payroll.pagibig_contribution || 0,
+      payroll.income_tax || 0,
+      payroll.other_deductions || 0,
       payroll.net_pay,
     ]);
 
     const payslipQuery = `
-      INSERT INTO payslip (
-        payroll_header_id, employee_id, gross_pay, overtime_pay, 
-        night_diff_pay, leave_pay, bonuses, deductions, net_pay
-      ) VALUES ${payslipValues
-        .map(
-          (_, i) =>
-            `(${Array.from({ length: 9 }, (_, j) => `$${i * 9 + j + 1}`).join(
-              ","
-            )})`
-        )
-        .join(",")}}
-    `;
+  INSERT INTO payslip (
+    payroll_header_id, employee_id, gross_pay, overtime_pay, 
+    night_diff_pay, leave_pay, bonuses, deductions,
+    sss_contribution, philhealth_contribution, pagibig_contribution,
+    income_tax, other_deductions, net_pay
+  ) VALUES ${payslipValues
+    .map(
+      (_, i) =>
+        `(${Array.from({ length: 14 }, (_, j) => `$${i * 14 + j + 1}`).join(
+          ","
+        )})`
+    )
+    .join(",")}
+`;
 
     const flatValues = payslipValues.flat();
     await pool.query(payslipQuery, flatValues);
@@ -1632,18 +1671,16 @@ const optimizedGeneratePayroll = async (req, res) => {
 
 export const payrollController = {
   generatePayroll: optimizedGeneratePayroll, // Use optimized version by default
-  generatePayrollLegacy: generatePayroll, // Keep legacy version for backward compatibility
-  // getPayrollHeaders,
-  // getPayrollDetails,
+  generatePayrollLegacy: generatePayrollLegacy, // Keep legacy version for backward compatibility
   deletePayroll,
   getPayrollSummary,
   getAllPayrollHeaders,
   getPayrollHeaderById,
   getPayslipsByHeaderId,
-  // updatePayrollHeader,
-  // deletePayrollHeader,
-  // deletePayslip,
 };
+
+// Export the optimized version as the default generatePayroll for routes
+export { optimizedGeneratePayroll as generatePayroll };
 
 // Debug endpoint to investigate attendance calculation issues
 export const debugAttendanceCalculation = async (req, res) => {
@@ -1657,9 +1694,9 @@ export const debugAttendanceCalculation = async (req, res) => {
       });
     }
 
-    console.log(
-      `🔍 Debug attendance for ${employee_id} from ${start_date} to ${end_date}`
-    );
+    // console.log(
+    //   `🔍 Debug attendance for ${employee_id} from ${start_date} to ${end_date}`
+    // );
 
     // Get raw attendance records
     const rawRecords = await pool.query(

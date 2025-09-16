@@ -38,10 +38,14 @@
 //   night_differential_hours numeric DEFAULT 0,
 //   rest_day_hours_worked numeric DEFAULT 0,
 //   is_entitled_holiday boolean DEFAULT false,
+//   processed_by text,
+//   date_last_processed timestamp with time zone,
+//   timesheet_id bigint,
 //   CONSTRAINT attendance_pkey PRIMARY KEY (attendance_id),
 //   CONSTRAINT attendance_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
+//   CONSTRAINT attendance_leave_type_id_fkey FOREIGN KEY (leave_type_id) REFERENCES public.leave_types(leave_type_id),
 //   CONSTRAINT attendance_leave_request_id_fkey FOREIGN KEY (leave_request_id) REFERENCES public.leave_requests(leave_request_id),
-//   CONSTRAINT attendance_leave_type_id_fkey FOREIGN KEY (leave_type_id) REFERENCES public.leave_types(leave_type_id)
+//   CONSTRAINT attendance_timesheet_id_fkey FOREIGN KEY (timesheet_id) REFERENCES public.timesheets(timesheet_id)
 // );
 // CREATE TABLE public.audit_logs (
 //   audit_log_id integer NOT NULL DEFAULT nextval('audit_logs_audit_log_id_seq'::regclass),
@@ -81,8 +85,8 @@
 //   tax_withheld numeric DEFAULT 0,
 //   net_amount numeric,
 //   CONSTRAINT bonuses_pkey PRIMARY KEY (bonus_id),
-//   CONSTRAINT bonuses_bonus_type_id_fkey FOREIGN KEY (bonus_type_id) REFERENCES public.bonus_types(bonus_type_id),
-//   CONSTRAINT bonuses_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
+//   CONSTRAINT bonuses_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
+//   CONSTRAINT bonuses_bonus_type_id_fkey FOREIGN KEY (bonus_type_id) REFERENCES public.bonus_types(bonus_type_id)
 // );
 // CREATE TABLE public.change_dayoff_requests (
 //   change_dayoff_request_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -134,8 +138,8 @@
 //   notes text,
 //   created_at timestamp without time zone DEFAULT now(),
 //   CONSTRAINT deduction_payments_pkey PRIMARY KEY (payment_id),
-//   CONSTRAINT deduction_payments_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
-//   CONSTRAINT deduction_payments_deduction_id_fkey FOREIGN KEY (deduction_id) REFERENCES public.deductions(deduction_id)
+//   CONSTRAINT deduction_payments_deduction_id_fkey FOREIGN KEY (deduction_id) REFERENCES public.deductions(deduction_id),
+//   CONSTRAINT deduction_payments_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
 // );
 // CREATE TABLE public.deduction_types (
 //   deduction_type_id integer NOT NULL DEFAULT nextval('deduction_types_deduction_type_id_seq'::regclass),
@@ -168,8 +172,8 @@
 //   auto_deduct boolean DEFAULT true,
 //   next_deduction_date date,
 //   CONSTRAINT deductions_pkey PRIMARY KEY (deduction_id),
-//   CONSTRAINT deductions_deduction_type_id_fkey FOREIGN KEY (deduction_type_id) REFERENCES public.deduction_types(deduction_type_id),
-//   CONSTRAINT deductions_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
+//   CONSTRAINT deductions_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
+//   CONSTRAINT deductions_deduction_type_id_fkey FOREIGN KEY (deduction_type_id) REFERENCES public.deduction_types(deduction_type_id)
 // );
 // CREATE TABLE public.departments (
 //   department_id integer NOT NULL DEFAULT nextval('departments_department_id_seq'::regclass),
@@ -277,10 +281,10 @@
 //   rejected_date timestamp without time zone,
 //   comments text,
 //   CONSTRAINT leave_requests_pkey PRIMARY KEY (leave_request_id),
-//   CONSTRAINT leave_requests_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public.users(employee_id),
-//   CONSTRAINT leave_requests_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(employee_id),
 //   CONSTRAINT leave_requests_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
-//   CONSTRAINT leave_requests_leave_type_id_fkey FOREIGN KEY (leave_type_id) REFERENCES public.leave_types(leave_type_id)
+//   CONSTRAINT leave_requests_leave_type_id_fkey FOREIGN KEY (leave_type_id) REFERENCES public.leave_types(leave_type_id),
+//   CONSTRAINT leave_requests_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(employee_id),
+//   CONSTRAINT leave_requests_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public.users(employee_id)
 // );
 // CREATE TABLE public.leave_types (
 //   leave_type_id integer NOT NULL DEFAULT nextval('leave_types_leave_type_id_seq'::regclass),
@@ -388,7 +392,15 @@
 //   created_at timestamp without time zone DEFAULT now(),
 //   updated_at timestamp without time zone DEFAULT now(),
 //   run_by text,
-//   CONSTRAINT payroll_header_pkey PRIMARY KEY (payroll_header_id)
+//   status USER-DEFINED DEFAULT 'pending'::request_status,
+//   approved_by character varying,
+//   approved_date timestamp without time zone,
+//   rejected_by character varying,
+//   rejected_date timestamp without time zone,
+//   rejection_reason text,
+//   CONSTRAINT payroll_header_pkey PRIMARY KEY (payroll_header_id),
+//   CONSTRAINT payroll_header_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.employees(employee_id),
+//   CONSTRAINT payroll_header_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public.employees(employee_id)
 // );
 // CREATE TABLE public.payroll_run_details (
 //   detail_id integer NOT NULL DEFAULT nextval('payroll_run_details_detail_id_seq'::regclass),
@@ -444,6 +456,11 @@
 //   leave_pay numeric DEFAULT 0,
 //   bonuses numeric DEFAULT 0,
 //   deductions numeric DEFAULT 0,
+//   sss_contribution numeric DEFAULT 0,
+//   philhealth_contribution numeric DEFAULT 0,
+//   pagibig_contribution numeric DEFAULT 0,
+//   income_tax numeric DEFAULT 0,
+//   other_deductions numeric DEFAULT 0,
 //   net_pay numeric NOT NULL,
 //   created_at timestamp without time zone DEFAULT now(),
 //   updated_at timestamp without time zone DEFAULT now(),
@@ -507,9 +524,9 @@
 //   created_at timestamp without time zone DEFAULT now(),
 //   updated_at timestamp without time zone DEFAULT now(),
 //   CONSTRAINT requests_pkey PRIMARY KEY (request_id),
+//   CONSTRAINT requests_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id),
 //   CONSTRAINT requests_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(employee_id),
-//   CONSTRAINT requests_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public.users(employee_id),
-//   CONSTRAINT requests_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.employees(employee_id)
+//   CONSTRAINT requests_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES public.users(employee_id)
 // );
 // CREATE TABLE public.schedules (
 //   schedule_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -521,6 +538,15 @@
 //   break_duration numeric,
 //   days_of_week jsonb DEFAULT '[]'::jsonb,
 //   CONSTRAINT schedules_pkey PRIMARY KEY (schedule_id)
+// );
+// CREATE TABLE public.timesheets (
+//   timesheet_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+//   is_consumed boolean DEFAULT false,
+//   created_at timestamp with time zone NOT NULL DEFAULT now(),
+//   start_date date NOT NULL,
+//   end_date date NOT NULL,
+//   processed_at timestamp with time zone,
+//   CONSTRAINT timesheets_pkey PRIMARY KEY (timesheet_id)
 // );
 // CREATE TABLE public.undertime_requests (
 //   undertime_request_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,

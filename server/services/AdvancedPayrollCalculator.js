@@ -132,38 +132,124 @@ export class AdvancedPayrollCalculator {
    */
   async loadConfiguration() {
     try {
-      const configResult = await pool.query(
-        `SELECT config_key, config_value, data_type FROM payroll_config WHERE is_active = true`
-      );
+      // Load from the new payroll_configuration table
+      const configResult = await pool.query(`
+        SELECT 
+          config_type,
+          config_key,
+          config_value,
+          effective_date,
+          expiry_date
+        FROM payroll_configuration 
+        WHERE is_active = true 
+          AND effective_date <= CURRENT_DATE
+          AND (expiry_date IS NULL OR expiry_date > CURRENT_DATE)
+        ORDER BY effective_date DESC
+      `);
 
       const dbConfig = {};
-      configResult.rows.forEach((row) => {
-        const { config_key, config_value, data_type } = row;
 
-        switch (data_type) {
-          case "number":
-            dbConfig[config_key] = parseFloat(config_value);
-            break;
-          case "boolean":
-            dbConfig[config_key] = config_value === "true";
-            break;
-          case "json":
-            dbConfig[config_key] = JSON.parse(config_value);
-            break;
-          default:
-            dbConfig[config_key] = config_value;
+      // Group configurations by type and process them
+      const configGroups = {};
+      configResult.rows.forEach((row) => {
+        const { config_type, config_key, config_value, effective_date } = row;
+
+        if (!configGroups[config_type]) {
+          configGroups[config_type] = {};
         }
+
+        // Parse config value based on the key structure
+        let parsedValue;
+        try {
+          // Try to parse as JSON first (for complex objects)
+          parsedValue = JSON.parse(config_value);
+        } catch {
+          // If not JSON, try to parse as number
+          const numValue = parseFloat(config_value);
+          if (!isNaN(numValue)) {
+            parsedValue = numValue;
+          } else if (
+            config_value.toLowerCase() === "true" ||
+            config_value.toLowerCase() === "false"
+          ) {
+            parsedValue = config_value.toLowerCase() === "true";
+          } else {
+            parsedValue = config_value;
+          }
+        }
+
+        configGroups[config_type][config_key] = parsedValue;
       });
+
+      // Process specific configuration types
+      if (configGroups.rates) {
+        // Handle rate configurations
+        Object.assign(dbConfig, configGroups.rates);
+      }
+
+      if (configGroups.government) {
+        // Handle government contribution configurations
+        if (!dbConfig.government) dbConfig.government = {};
+        Object.assign(dbConfig.government, configGroups.government);
+      }
+
+      if (configGroups.holiday) {
+        // Handle holiday multipliers
+        Object.assign(dbConfig, configGroups.holiday);
+      }
+
+      if (configGroups.overtime) {
+        // Handle overtime configurations
+        Object.assign(dbConfig, configGroups.overtime);
+      }
+
+      if (configGroups.penalties) {
+        // Handle penalty configurations
+        Object.assign(dbConfig, configGroups.penalties);
+      }
 
       // Merge database config with default config
       this.config = { ...this.config, ...dbConfig };
-
-      console.log("📊 Payroll configuration loaded from database");
     } catch (error) {
       console.warn(
         "⚠️ Could not load payroll configuration from database, using defaults:",
         error.message
       );
+
+      // Fallback to old table if new one doesn't exist
+      try {
+        const oldConfigResult = await pool.query(
+          `SELECT config_key, config_value, data_type FROM payroll_config WHERE is_active = true`
+        );
+
+        const dbConfig = {};
+        oldConfigResult.rows.forEach((row) => {
+          const { config_key, config_value, data_type } = row;
+
+          switch (data_type) {
+            case "number":
+              dbConfig[config_key] = parseFloat(config_value);
+              break;
+            case "boolean":
+              dbConfig[config_key] = config_value === "true";
+              break;
+            case "json":
+              dbConfig[config_key] = JSON.parse(config_value);
+              break;
+            default:
+              dbConfig[config_key] = config_value;
+          }
+        });
+
+        this.config = { ...this.config, ...dbConfig };
+        console.log(
+          "📊 Payroll configuration loaded from legacy payroll_config table"
+        );
+      } catch (fallbackError) {
+        console.warn(
+          "⚠️ Could not load from legacy table either, using hardcoded defaults"
+        );
+      }
     }
   }
 
@@ -176,14 +262,14 @@ export class AdvancedPayrollCalculator {
     endDate,
     attendanceData = null
   ) {
-    console.log(
-      `\n🔍 [DEBUG] Starting payroll calculation for employee: ${employeeId}`
-    );
-    console.log(`📅 [DEBUG] Period: ${startDate} to ${endDate}`);
+    // console.log(
+    //   `\n🔍 [DEBUG] Starting payroll calculation for employee: ${employeeId}`
+    // );
+    // console.log(`📅 [DEBUG] Period: ${startDate} to ${endDate}`);
 
     try {
       // Get employee details
-      console.log(`👤 [DEBUG] Fetching employee details for: ${employeeId}`);
+      // console.log(`👤 [DEBUG] Fetching employee details for: ${employeeId}`);
       const employee = await this.getEmployeeDetails(employeeId);
       if (!employee) {
         console.error(
@@ -192,84 +278,84 @@ export class AdvancedPayrollCalculator {
         throw new Error(`Employee ${employeeId} not found or inactive`);
       }
 
-      console.log(
-        `✅ [DEBUG] Employee found: ${employee.first_name} ${employee.last_name}`
-      );
-      console.log(`💰 [DEBUG] Rate: ${employee.rate} (${employee.rate_type})`);
-      console.log(`🏢 [DEBUG] Position: ${employee.position_title}`);
-      console.log(`📋 [DEBUG] Employment Type: ${employee.employment_type}`);
+      // console.log(
+      //   `✅ [DEBUG] Employee found: ${employee.first_name} ${employee.last_name}`
+      // );
+      // console.log(`💰 [DEBUG] Rate: ${employee.rate} (${employee.rate_type})`);
+      // console.log(`🏢 [DEBUG] Position: ${employee.position_title}`);
+      // console.log(`📋 [DEBUG] Employment Type: ${employee.employment_type}`);
 
-      // Validate contract period
-      console.log(`📝 [DEBUG] Validating contract period...`);
-      this.validateContractPeriod(employee, startDate, endDate);
-      console.log(`✅ [DEBUG] Contract period validation passed`);
+      // // Validate contract period
+      // console.log(`📝 [DEBUG] Validating contract period...`);
+      // this.validateContractPeriod(employee, startDate, endDate);
+      // console.log(`✅ [DEBUG] Contract period validation passed`);
 
       // Get or calculate attendance data
-      console.log(
-        `⏰ [DEBUG] ${
-          attendanceData ? "Using provided" : "Fetching"
-        } attendance data...`
-      );
+      // console.log(
+      //   `⏰ [DEBUG] ${
+      //     attendanceData ? "Using provided" : "Fetching"
+      //   } attendance data...`
+      // );
       const attendance =
         attendanceData ||
         (await this.getAttendanceData(employeeId, startDate, endDate));
 
-      console.log(`📊 [DEBUG] Attendance Data:`, {
-        days_worked: attendance.days_worked || 0,
-        paid_leave_days: attendance.paid_leave_days || 0,
-        unpaid_leave_days: attendance.unpaid_leave_days || 0,
-        total_regular_hours: attendance.total_regular_hours || 0,
-        total_overtime_hours: attendance.total_overtime_hours || 0,
-        late_minutes: attendance.late_minutes || 0,
-        undertime_minutes: attendance.undertime_minutes || 0,
-        late_days: attendance.late_days || 0,
-        regular_holiday_days_worked:
-          attendance.regular_holiday_days_worked || 0,
-        special_holiday_days_worked:
-          attendance.special_holiday_days_worked || 0,
-        night_differential_hours: attendance.night_differential_hours || 0,
-      });
+      // console.log(`📊 [DEBUG] Attendance Data:`, {
+      //   days_worked: attendance.days_worked || 0,
+      //   paid_leave_days: attendance.paid_leave_days || 0,
+      //   unpaid_leave_days: attendance.unpaid_leave_days || 0,
+      //   total_regular_hours: attendance.total_regular_hours || 0,
+      //   total_overtime_hours: attendance.total_overtime_hours || 0,
+      //   late_minutes: attendance.late_minutes || 0,
+      //   undertime_minutes: attendance.undertime_minutes || 0,
+      //   late_days: attendance.late_days || 0,
+      //   regular_holiday_days_worked:
+      //     attendance.regular_holiday_days_worked || 0,
+      //   special_holiday_days_worked:
+      //     attendance.special_holiday_days_worked || 0,
+      //   night_differential_hours: attendance.night_differential_hours || 0,
+      // });
 
       // Calculate earnings
-      console.log(`💵 [DEBUG] Calculating earnings...`);
+      // console.log(`💵 [DEBUG] Calculating earnings...`);
       const earnings = await this.calculateEarnings(employee, attendance);
-      console.log(`💰 [DEBUG] Earnings breakdown:`, {
-        basePay: earnings.basePay,
-        overtimePay: earnings.overtimePay,
-        holidayPay: earnings.holidayPay,
-        nightDifferential: earnings.nightDifferential,
-        leavePay: earnings.leavePay,
-        lateDeductions: earnings.lateDeductions,
-        undertimeDeductions: earnings.undertimeDeductions,
-        grossPay: earnings.grossPay,
-      });
+      // console.log(`💰 [DEBUG] Earnings breakdown:`, {
+      //   basePay: earnings.basePay,
+      //   overtimePay: earnings.overtimePay,
+      //   holidayPay: earnings.holidayPay,
+      //   nightDifferential: earnings.nightDifferential,
+      //   leavePay: earnings.leavePay,
+      //   lateDeductions: earnings.lateDeductions,
+      //   undertimeDeductions: earnings.undertimeDeductions,
+      //   grossPay: earnings.grossPay,
+      // });
 
       // Calculate deductions
-      console.log(
-        `📉 [DEBUG] Calculating deductions for gross pay: ₱${earnings.grossPay}`
-      );
+      // console.log(
+      //   `📉 [DEBUG] Calculating deductions for gross pay: ₱${earnings.grossPay}`
+      // );
       const deductions = await this.calculateDeductions(
         earnings.grossPay,
         employeeId,
         employee.employment_type
       );
-      console.log(`💸 [DEBUG] Deductions breakdown:`, {
-        sss: deductions.sss,
-        philhealth: deductions.philhealth,
-        pagibig: deductions.pagibig,
-        tax: deductions.tax,
-        otherDeductions: deductions.otherDeductions,
-        totalDeductions: deductions.totalDeductions,
-      });
+      // console.log(`💸 [DEBUG] Deductions breakdown:`, {
+      //   sss: deductions.sss,
+      //   philhealth: deductions.philhealth,
+      //   pagibig: deductions.pagibig,
+      //   tax: deductions.tax,
+      //   otherDeductions: deductions.otherDeductions,
+      //   totalDeductions: deductions.totalDeductions,
+      // });
 
       // Calculate net pay
       const netPay = earnings.grossPay - deductions.totalDeductions;
-      console.log(
-        `💰 [DEBUG] Final calculation: Gross(₱${earnings.grossPay}) - Deductions(₱${deductions.totalDeductions}) = Net(₱${netPay})`
-      );
-      console.log(
-        `✅ [DEBUG] Payroll calculation completed successfully for ${employeeId}`
-      );
+      // console.log(
+      //   `💰 [DEBUG] Final calculation: Gross(₱${earnings.grossPay}) - Deductions(₱${deductions.totalDeductions}) = Net(₱${netPay})`
+      // );
+      // console.log(
+      //   `✅ [DEBUG] Payroll calculation completed successfully for ${employeeId}`
+      // );
 
       return {
         employee_id: employeeId,
@@ -344,9 +430,9 @@ export class AdvancedPayrollCalculator {
    * Calculate earnings for an employee
    */
   async calculateEarnings(employee, attendance) {
-    console.log(
-      `💵 [DEBUG] Starting earnings calculation for ${employee.first_name} ${employee.last_name}`
-    );
+    // console.log(
+    //   `💵 [DEBUG] Starting earnings calculation for ${employee.first_name} ${employee.last_name}`
+    // );
 
     const rate = parseFloat(employee.rate);
     let basePay = 0;
@@ -357,71 +443,71 @@ export class AdvancedPayrollCalculator {
     let lateDeductions = 0;
     let undertimeDeductions = 0;
 
-    console.log(`📊 [DEBUG] Employee rate: ₱${rate} (${employee.rate_type})`);
+    // console.log(`📊 [DEBUG] Employee rate: ₱${rate} (${employee.rate_type})`);
 
     // Calculate base pay based on rate type
     switch (employee.rate_type) {
       case "hourly":
-        console.log(
-          `⏰ [DEBUG] Calculating hourly pay: ${
-            attendance.total_regular_hours || 0
-          } hours × ₱${rate}`
-        );
+        // console.log(
+        //   `⏰ [DEBUG] Calculating hourly pay: ${
+        //     attendance.total_regular_hours || 0
+        //   } hours × ₱${rate}`
+        // );
         basePay = (attendance.total_regular_hours || 0) * rate;
-        console.log(`💰 [DEBUG] Base pay (hourly): ₱${basePay}`);
+        // console.log(`💰 [DEBUG] Base pay (hourly): ₱${basePay}`);
 
         overtimePay =
           (attendance.total_overtime_hours || 0) *
           rate *
           this.config.overtimeMultiplier;
-        console.log(
-          `⏰ [DEBUG] Overtime pay: ${
-            attendance.total_overtime_hours || 0
-          } hours × ₱${rate} × ${
-            this.config.overtimeMultiplier
-          } = ₱${overtimePay}`
-        );
+        // console.log(
+        //   `⏰ [DEBUG] Overtime pay: ${
+        //     attendance.total_overtime_hours || 0
+        //   } hours × ₱${rate} × ${
+        //     this.config.overtimeMultiplier
+        //   } = ₱${overtimePay}`
+        // );
 
         leavePay = await this.calculateLeavePay(employee, attendance);
-        console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
+        // console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
         break;
 
       case "daily":
-        console.log(
-          `📅 [DEBUG] Calculating daily pay: ${
-            attendance.days_worked || 0
-          } days × ₱${rate}`
-        );
+        // console.log(
+        //   `📅 [DEBUG] Calculating daily pay: ${
+        //     attendance.days_worked || 0
+        //   } days × ₱${rate}`
+        // );
         basePay = (attendance.days_worked || 0) * rate;
-        console.log(`💰 [DEBUG] Base pay (daily): ₱${basePay}`);
+        // console.log(`💰 [DEBUG] Base pay (daily): ₱${basePay}`);
 
         const dailyOvertimeRate = rate / this.config.standardWorkingHours;
         overtimePay =
           (attendance.total_overtime_hours || 0) *
           dailyOvertimeRate *
           this.config.overtimeMultiplier;
-        console.log(
-          `⏰ [DEBUG] Overtime pay: ${
-            attendance.total_overtime_hours || 0
-          } hours × ₱${dailyOvertimeRate.toFixed(2)} × ${
-            this.config.overtimeMultiplier
-          } = ₱${overtimePay}`
-        );
+        // console.log(
+        //   `⏰ [DEBUG] Overtime pay: ${
+        //     attendance.total_overtime_hours || 0
+        //   } hours × ₱${dailyOvertimeRate.toFixed(2)} × ${
+        //     this.config.overtimeMultiplier
+        //   } = ₱${overtimePay}`
+        // );
 
         leavePay = await this.calculateLeavePay(employee, attendance);
-        console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
+        // console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
 
         // Calculate late deductions (per DOLE: 1/216 of daily rate per minute)
         if (attendance.late_minutes > 0) {
           const lateRatePerMinute = rate * this.config.late_penalty_rate;
           lateDeductions = attendance.late_minutes * lateRatePerMinute;
-          console.log(
-            `⏰ [DEBUG] Late deductions: ${
-              attendance.late_minutes
-            } minutes × ₱${lateRatePerMinute.toFixed(
-              4
-            )} = ₱${lateDeductions.toFixed(2)}`
-          );
+          // console.log(
+          //   `⏰ [DEBUG] Late deductions: ${
+          //     attendance.late_minutes
+          //   } minutes × ₱${lateRatePerMinute.toFixed(
+          //     4
+          //   )} = ₱${lateDeductions.toFixed(2)}`
+          // );
         }
 
         // Calculate undertime deductions (proportional to daily rate)
@@ -432,40 +518,40 @@ export class AdvancedPayrollCalculator {
             attendance.undertime_minutes *
             dailyRatePerMinute *
             this.config.undertime_deduction_rate;
-          console.log(
-            `⏰ [DEBUG] Undertime deductions: ${
-              attendance.undertime_minutes
-            } minutes × ₱${dailyRatePerMinute.toFixed(4)} × ${
-              this.config.undertime_deduction_rate
-            } = ₱${undertimeDeductions.toFixed(2)}`
-          );
+          // console.log(
+          //   `⏰ [DEBUG] Undertime deductions: ${
+          //     attendance.undertime_minutes
+          //   } minutes × ₱${dailyRatePerMinute.toFixed(4)} × ${
+          //     this.config.undertime_deduction_rate
+          //   } = ₱${undertimeDeductions.toFixed(2)}`
+          // );
         }
         break;
 
       case "monthly":
         const workingDaysInPeriod = this.config.standardWorkingDays;
         const dailyRate = rate / workingDaysInPeriod;
-        console.log(
-          `📅 [DEBUG] Monthly calculation: ₱${rate} / ${workingDaysInPeriod} days = ₱${dailyRate.toFixed(
-            2
-          )} per day`
-        );
+        // console.log(
+        //   `📅 [DEBUG] Monthly calculation: ₱${rate} / ${workingDaysInPeriod} days = ₱${dailyRate.toFixed(
+        //     2
+        //   )} per day`
+        // );
 
         const totalPaidDays =
           (attendance.days_worked || 0) + (attendance.paid_leave_days || 0);
         basePay = totalPaidDays * dailyRate;
-        console.log(
-          `💰 [DEBUG] Base pay (monthly): ${totalPaidDays} paid days × ₱${dailyRate.toFixed(
-            2
-          )} = ₱${basePay.toFixed(2)}`
-        );
+        // console.log(
+        //   `💰 [DEBUG] Base pay (monthly): ${totalPaidDays} paid days × ₱${dailyRate.toFixed(
+        //     2
+        //   )} = ₱${basePay.toFixed(2)}`
+        // );
 
         // Monthly employees typically don't get overtime pay
         overtimePay = 0;
         leavePay = 0; // Already included in base pay for monthly employees
-        console.log(
-          `⏰ [DEBUG] Overtime and leave pay: ₱0 (included in monthly salary)`
-        );
+        // console.log(
+        //   `⏰ [DEBUG] Overtime and leave pay: ₱0 (included in monthly salary)`
+        // );
 
         // Calculate late deductions for monthly employees
         if (attendance.late_minutes > 0) {
@@ -473,13 +559,13 @@ export class AdvancedPayrollCalculator {
             rate /
             (workingDaysInPeriod * this.config.standardWorkingHours * 60);
           lateDeductions = attendance.late_minutes * monthlyRatePerMinute;
-          console.log(
-            `⏰ [DEBUG] Late deductions (monthly): ${
-              attendance.late_minutes
-            } minutes × ₱${monthlyRatePerMinute.toFixed(
-              6
-            )} = ₱${lateDeductions.toFixed(2)}`
-          );
+          // console.log(
+          //   `⏰ [DEBUG] Late deductions (monthly): ${
+          //     attendance.late_minutes
+          //   } minutes × ₱${monthlyRatePerMinute.toFixed(
+          //     6
+          //   )} = ₱${lateDeductions.toFixed(2)}`
+          // );
         }
 
         // Calculate undertime deductions for monthly employees
@@ -491,19 +577,19 @@ export class AdvancedPayrollCalculator {
             attendance.undertime_minutes *
             monthlyRatePerMinute *
             this.config.undertime_deduction_rate;
-          console.log(
-            `⏰ [DEBUG] Undertime deductions (monthly): ${
-              attendance.undertime_minutes
-            } minutes × ₱${monthlyRatePerMinute.toFixed(6)} × ${
-              this.config.undertime_deduction_rate
-            } = ₱${undertimeDeductions.toFixed(2)}`
-          );
+          // console.log(
+          //   `⏰ [DEBUG] Undertime deductions (monthly): ${
+          //     attendance.undertime_minutes
+          //   } minutes × ₱${monthlyRatePerMinute.toFixed(6)} × ${
+          //     this.config.undertime_deduction_rate
+          //   } = ₱${undertimeDeductions.toFixed(2)}`
+          // );
         }
         break;
     }
 
     // Calculate holiday pay (Philippine Labor Code compliance)
-    console.log(`🎉 [DEBUG] Calculating holiday pay...`);
+    // console.log(`🎉 [DEBUG] Calculating holiday pay...`);
 
     if (attendance.regular_holiday_days_worked > 0) {
       // Regular holiday worked: 200% of daily rate
@@ -514,13 +600,13 @@ export class AdvancedPayrollCalculator {
         this.config.standardWorkingHours *
         holidayRate;
       holidayPay += regularHolidayPay;
-      console.log(
-        `🎊 [DEBUG] Regular holiday worked: ${
-          attendance.regular_holiday_days_worked
-        } days × ${
-          this.config.standardWorkingHours
-        } hours × ₱${holidayRate.toFixed(2)} = ₱${regularHolidayPay.toFixed(2)}`
-      );
+      // console.log(
+      //   `🎊 [DEBUG] Regular holiday worked: ${
+      //     attendance.regular_holiday_days_worked
+      //   } days × ${
+      //     this.config.standardWorkingHours
+      //   } hours × ₱${holidayRate.toFixed(2)} = ₱${regularHolidayPay.toFixed(2)}`
+      // );
     }
 
     if (attendance.regular_holiday_days_not_worked > 0) {
@@ -533,15 +619,15 @@ export class AdvancedPayrollCalculator {
         this.config.standardWorkingHours *
         holidayRate;
       holidayPay += regularHolidayNotWorkedPay;
-      console.log(
-        `🎊 [DEBUG] Regular holiday not worked (entitled): ${
-          attendance.regular_holiday_days_not_worked
-        } days × ${
-          this.config.standardWorkingHours
-        } hours × ₱${holidayRate.toFixed(
-          2
-        )} = ₱${regularHolidayNotWorkedPay.toFixed(2)}`
-      );
+      // console.log(
+      //   `🎊 [DEBUG] Regular holiday not worked (entitled): ${
+      //     attendance.regular_holiday_days_not_worked
+      //   } days × ${
+      //     this.config.standardWorkingHours
+      //   } hours × ₱${holidayRate.toFixed(
+      //     2
+      //   )} = ₱${regularHolidayNotWorkedPay.toFixed(2)}`
+      // );
     }
 
     if (attendance.special_holiday_days_worked > 0) {
@@ -553,13 +639,13 @@ export class AdvancedPayrollCalculator {
         this.config.standardWorkingHours *
         holidayRate;
       holidayPay += specialHolidayPay;
-      console.log(
-        `🎊 [DEBUG] Special holiday worked: ${
-          attendance.special_holiday_days_worked
-        } days × ${
-          this.config.standardWorkingHours
-        } hours × ₱${holidayRate.toFixed(2)} = ₱${specialHolidayPay.toFixed(2)}`
-      );
+      // console.log(
+      //   `🎊 [DEBUG] Special holiday worked: ${
+      //     attendance.special_holiday_days_worked
+      //   } days × ${
+      //     this.config.standardWorkingHours
+      //   } hours × ₱${holidayRate.toFixed(2)} = ₱${specialHolidayPay.toFixed(2)}`
+      // );
     }
 
     // Rest day work (applies if worked on designated rest day)
@@ -568,14 +654,14 @@ export class AdvancedPayrollCalculator {
         this.getHourlyRate(employee) * this.config.restDayMultiplier;
       const restDayPay = attendance.rest_day_hours_worked * restDayRate;
       holidayPay += restDayPay;
-      console.log(
-        `🏖️ [DEBUG] Rest day work: ${
-          attendance.rest_day_hours_worked
-        } hours × ₱${restDayRate.toFixed(2)} = ₱${restDayPay.toFixed(2)}`
-      );
+      // console.log(
+      //   `🏖️ [DEBUG] Rest day work: ${
+      //     attendance.rest_day_hours_worked
+      //   } hours × ₱${restDayRate.toFixed(2)} = ₱${restDayPay.toFixed(2)}`
+      // );
     }
 
-    console.log(`🎉 [DEBUG] Total holiday pay: ₱${holidayPay.toFixed(2)}`);
+    // console.log(`🎉 [DEBUG] Total holiday pay: ₱${holidayPay.toFixed(2)}`);
 
     // Calculate night differential (10PM-6AM work per DOLE rules)
     if (attendance.night_differential_hours > 0) {
@@ -584,13 +670,13 @@ export class AdvancedPayrollCalculator {
         attendance.night_differential_hours *
         hourlyRate *
         this.config.nightDifferentialRate;
-      console.log(
-        `🌙 [DEBUG] Night differential: ${
-          attendance.night_differential_hours
-        } hours × ₱${hourlyRate.toFixed(2)} × ${
-          this.config.nightDifferentialRate
-        } = ₱${nightDifferential.toFixed(2)}`
-      );
+      // console.log(
+      //   `🌙 [DEBUG] Night differential: ${
+      //     attendance.night_differential_hours
+      //   } hours × ₱${hourlyRate.toFixed(2)} × ${
+      //     this.config.nightDifferentialRate
+      //   } = ₱${nightDifferential.toFixed(2)}`
+      // );
     }
 
     const grossPay =
@@ -602,21 +688,21 @@ export class AdvancedPayrollCalculator {
       lateDeductions -
       undertimeDeductions;
 
-    console.log(
-      `💰 [DEBUG] Gross pay calculation: Base(₱${basePay.toFixed(
-        2
-      )}) + Overtime(₱${overtimePay.toFixed(
-        2
-      )}) + Holiday(₱${holidayPay.toFixed(
-        2
-      )}) + Night(₱${nightDifferential.toFixed(2)}) + Leave(₱${leavePay.toFixed(
-        2
-      )}) - Late(₱${lateDeductions.toFixed(
-        2
-      )}) - Undertime(₱${undertimeDeductions.toFixed(2)}) = ₱${grossPay.toFixed(
-        2
-      )}`
-    );
+    // console.log(
+    //   `💰 [DEBUG] Gross pay calculation: Base(₱${basePay.toFixed(
+    //     2
+    //   )}) + Overtime(₱${overtimePay.toFixed(
+    //     2
+    //   )}) + Holiday(₱${holidayPay.toFixed(
+    //     2
+    //   )}) + Night(₱${nightDifferential.toFixed(2)}) + Leave(₱${leavePay.toFixed(
+    //     2
+    //   )}) - Late(₱${lateDeductions.toFixed(
+    //     2
+    //   )}) - Undertime(₱${undertimeDeductions.toFixed(2)}) = ₱${grossPay.toFixed(
+    //     2
+    //   )}`
+    // );
 
     const result = {
       basePay: this.roundAmount(basePay),
@@ -630,7 +716,7 @@ export class AdvancedPayrollCalculator {
       grossPay: this.roundAmount(grossPay),
     };
 
-    console.log(`✅ [DEBUG] Final earnings result:`, result);
+    // console.log(`✅ [DEBUG] Final earnings result:`, result);
     return result;
   }
 
@@ -638,12 +724,12 @@ export class AdvancedPayrollCalculator {
    * Calculate deductions for an employee (updated with Philippine law compliance)
    */
   async calculateDeductions(grossPay, employeeId, employmentType = "Regular") {
-    console.log(
-      `📉 [DEBUG] Starting deductions calculation for employee: ${employeeId}`
-    );
-    console.log(
-      `💰 [DEBUG] Gross pay: ₱${grossPay}, Employment type: ${employmentType}`
-    );
+    // console.log(
+    //   `📉 [DEBUG] Starting deductions calculation for employee: ${employeeId}`
+    // );
+    // console.log(
+    //   `💰 [DEBUG] Gross pay: ₱${grossPay}, Employment type: ${employmentType}`
+    // );
 
     let sss = 0;
     let philhealth = 0;
@@ -657,9 +743,9 @@ export class AdvancedPayrollCalculator {
     let employerPagIBIG = 0;
 
     // Get individual deductions for this employee
-    console.log(
-      `🔍 [DEBUG] Fetching individual deductions for employee: ${employeeId}`
-    );
+    // console.log(
+    //   `🔍 [DEBUG] Fetching individual deductions for employee: ${employeeId}`
+    // );
     const individualDeductions = await this.getIndividualDeductions(
       employeeId,
       new Date()
@@ -668,33 +754,33 @@ export class AdvancedPayrollCalculator {
       (sum, deduction) => sum + deduction.amount,
       0
     );
-    console.log(
-      `💸 [DEBUG] Individual deductions found: ${individualDeductions.length} items, total: ₱${otherDeductions}`
-    );
+    // console.log(
+    //   `💸 [DEBUG] Individual deductions found: ${individualDeductions.length} items, total: ₱${otherDeductions}`
+    // );
     if (individualDeductions.length > 0) {
-      console.log(
-        `📋 [DEBUG] Individual deductions details:`,
-        individualDeductions.map((d) => ({
-          type: d.deduction_type,
-          amount: d.amount,
-          description: d.description,
-        }))
-      );
+      // console.log(
+      //   `📋 [DEBUG] Individual deductions details:`,
+      //   individualDeductions.map((d) => ({
+      //     type: d.deduction_type,
+      //     amount: d.amount,
+      //     description: d.description,
+      //   }))
+      // );
     }
 
     // Only apply government contributions for regular employees
     if (employmentType === "Regular") {
-      console.log(
-        `🏛️ [DEBUG] Calculating government contributions for regular employee`
-      );
+      // console.log(
+      //   `🏛️ [DEBUG] Calculating government contributions for regular employee`
+      // );
 
       // Calculate government contributions based on monthly gross pay
       const monthlyGrossPay = this.convertToMonthlyPay(grossPay);
-      console.log(
-        `📊 [DEBUG] Monthly gross pay for deductions: ₱${monthlyGrossPay.toFixed(
-          2
-        )}`
-      );
+      // console.log(
+      //   `📊 [DEBUG] Monthly gross pay for deductions: ₱${monthlyGrossPay.toFixed(
+      //     2
+      //   )}`
+      // );
 
       // SSS Contribution (based on contribution table) - Use database config
       console.log(`🏦 [DEBUG] Calculating SSS contribution...`);
@@ -703,70 +789,70 @@ export class AdvancedPayrollCalculator {
       );
       sss = sssContributions.employee;
       employerSSS = sssContributions.employer;
-      console.log(
-        `🏦 [DEBUG] SSS: Employee ₱${sss}, Employer ₱${employerSSS}, Source: ${
-          sssContributions.source || "N/A"
-        }`
-      );
+      // console.log(
+      //   `🏦 [DEBUG] SSS: Employee ₱${sss}, Employer ₱${employerSSS}, Source: ${
+      //     sssContributions.source || "N/A"
+      //   }`
+      // );
 
       // PhilHealth Contribution (5.5% total for 2025) - Use database config
-      console.log(`🏥 [DEBUG] Calculating PhilHealth contribution...`);
+      // console.log(`🏥 [DEBUG] Calculating PhilHealth contribution...`);
       const philHealthContributions =
         await this.calculatePhilHealthContribution(monthlyGrossPay);
       philhealth = philHealthContributions.employee;
       employerPhilHealth = philHealthContributions.employer;
-      console.log(
-        `🏥 [DEBUG] PhilHealth: Employee ₱${philhealth}, Employer ₱${employerPhilHealth}, Source: ${
-          philHealthContributions.source || "N/A"
-        }`
-      );
+      // console.log(
+      //   `🏥 [DEBUG] PhilHealth: Employee ₱${philhealth}, Employer ₱${employerPhilHealth}, Source: ${
+      //     philHealthContributions.source || "N/A"
+      //   }`
+      // );
 
       // Pag-IBIG Contribution (enhanced tiers for 2025) - Use database config
-      console.log(`🏘️ [DEBUG] Calculating Pag-IBIG contribution...`);
+      // console.log(`🏘️ [DEBUG] Calculating Pag-IBIG contribution...`);
       const pagIBIGContributions = await this.calculatePagIBIGContribution(
         monthlyGrossPay
       );
       pagibig = pagIBIGContributions.employee;
       employerPagIBIG = pagIBIGContributions.employer;
-      console.log(
-        `🏘️ [DEBUG] Pag-IBIG: Employee ₱${pagibig}, Employer ₱${employerPagIBIG}, Source: ${
-          pagIBIGContributions.source || "N/A"
-        }`
-      );
+      // console.log(
+      //   `🏘️ [DEBUG] Pag-IBIG: Employee ₱${pagibig}, Employer ₱${employerPagIBIG}, Source: ${
+      //     pagIBIGContributions.source || "N/A"
+      //   }`
+      // );
 
       // Income Tax (2025 brackets with inflation adjustments) - Use database config
       const taxableIncome = monthlyGrossPay - sss - philhealth - pagibig;
-      console.log(
-        `💰 [DEBUG] Taxable income: ₱${monthlyGrossPay.toFixed(
-          2
-        )} - ₱${sss} - ₱${philhealth} - ₱${pagibig} = ₱${taxableIncome.toFixed(
-          2
-        )}`
-      );
+      // console.log(
+      //   `💰 [DEBUG] Taxable income: ₱${monthlyGrossPay.toFixed(
+      //     2
+      //   )} - ₱${sss} - ₱${philhealth} - ₱${pagibig} = ₱${taxableIncome.toFixed(
+      //     2
+      //   )}`
+      // );
 
-      console.log(`📊 [DEBUG] Calculating income tax...`);
+      // console.log(`📊 [DEBUG] Calculating income tax...`);
       tax = await this.calculateIncomeTax(taxableIncome);
-      console.log(`📊 [DEBUG] Income tax: ₱${tax}`);
+      // console.log(`📊 [DEBUG] Income tax: ₱${tax}`);
     } else {
-      console.log(
-        `👤 [DEBUG] Skipping government contributions for ${employmentType} employee`
-      );
+      // console.log(
+      //   `👤 [DEBUG] Skipping government contributions for ${employmentType} employee`
+      // );
     }
 
     const totalDeductions = sss + philhealth + pagibig + tax + otherDeductions;
     const totalEmployerContributions =
       employerSSS + employerPhilHealth + employerPagIBIG;
 
-    console.log(`💸 [DEBUG] Total deductions breakdown:`);
-    console.log(`   SSS: ₱${sss}`);
-    console.log(`   PhilHealth: ₱${philhealth}`);
-    console.log(`   Pag-IBIG: ₱${pagibig}`);
-    console.log(`   Income Tax: ₱${tax}`);
-    console.log(`   Other Deductions: ₱${otherDeductions}`);
-    console.log(`   TOTAL: ₱${totalDeductions}`);
-    console.log(
-      `💼 [DEBUG] Total employer contributions: ₱${totalEmployerContributions}`
-    );
+    // console.log(`💸 [DEBUG] Total deductions breakdown:`);
+    // console.log(`   SSS: ₱${sss}`);
+    // console.log(`   PhilHealth: ₱${philhealth}`);
+    // console.log(`   Pag-IBIG: ₱${pagibig}`);
+    // console.log(`   Income Tax: ₱${tax}`);
+    // console.log(`   Other Deductions: ₱${otherDeductions}`);
+    // console.log(`   TOTAL: ₱${totalDeductions}`);
+    // console.log(
+    //   `💼 [DEBUG] Total employer contributions: ₱${totalEmployerContributions}`
+    // );
 
     const result = {
       sss: this.roundAmount(sss),
@@ -793,7 +879,7 @@ export class AdvancedPayrollCalculator {
       },
     };
 
-    console.log(`✅ [DEBUG] Final deductions result:`, result);
+    // console.log(`✅ [DEBUG] Final deductions result:`, result);
     return result;
   }
 

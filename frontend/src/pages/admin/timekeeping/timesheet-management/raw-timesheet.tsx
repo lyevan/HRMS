@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { useAttendanceStore } from "@/store/attendanceStore";
 import { AttendanceTable } from "@/components/tables/attendance-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 import type { AttendanceRecord } from "@/models/attendance-model";
 import { viewModalContent } from "@/components/modal-contents/view-attendance-modal";
 import { editModalContent } from "@/components/modal-contents/edit-attendance-modal";
 import { createAttendanceColumns } from "@/components/tables/columns/attendance-columns";
 import { getStatusBadges } from "@/lib/badge-config";
+import { exportTimesheetToExcel } from "@/utils/excel-export";
 import axios from "axios";
 import Modal from "@/components/modal";
 
@@ -176,6 +179,23 @@ const RawTimesheet = () => {
     handleEditRecord,
   });
 
+  // Handle Excel export
+  const handleExportToExcel = async () => {
+    try {
+      if (attendanceRecords.length === 0) {
+        toast.error("No data to export");
+        return;
+      }
+
+      await exportTimesheetToExcel(attendanceRecords, "Raw Attendance Records");
+
+      toast.success("Data exported successfully!");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export data");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -191,10 +211,25 @@ const RawTimesheet = () => {
       {/* Attendance Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Attendance Records</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Complete attendance history with filtering and search capabilities
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Attendance Records</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Complete attendance history with filtering and search
+                capabilities
+              </p>
+            </div>
+            <Button
+              onClick={handleExportToExcel}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              disabled={loading || attendanceRecords.length === 0}
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <AttendanceTable

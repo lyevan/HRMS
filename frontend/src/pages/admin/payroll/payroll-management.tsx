@@ -470,13 +470,37 @@ const PayrollManagement = () => {
           value: number,
           effectiveDate?: string
         ) => {
-          // Handle individual config updates if needed
-          console.log("Config update:", {
-            configType,
-            configKey,
-            value,
-            effectiveDate,
-          });
+          try {
+            const response = await fetch("/api/payroll-config/update", {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+              },
+              body: JSON.stringify({
+                config_type: configType,
+                config_key: configKey,
+                config_value: value,
+                effective_date: effectiveDate,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (!result.success) {
+              throw new Error(
+                result.message || "Failed to update configuration"
+              );
+            }
+
+            console.log("Configuration updated successfully:", result.data);
+          } catch (error) {
+            console.error("Failed to update configuration:", error);
+            throw error; // Re-throw to let the modal handle the error
+          }
         }}
         loading={loading}
       />

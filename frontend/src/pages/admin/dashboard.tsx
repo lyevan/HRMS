@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useFetchEmployees, useEmployees } from "../../store/employeeStore";
 import { useAttendanceStore } from "@/store/attendanceStore";
+import { useHolidaysStore } from "@/store/holidays-store";
 
 export const description = "Attendance today";
 
@@ -50,11 +51,24 @@ const Dashboard = () => {
     fetchAttendanceRecords,
   } = useAttendanceStore();
 
+  // Holidays store
+  const {
+    currentYearHolidays,
+    loading: holidaysLoading,
+    fetchCurrentYearHolidays,
+  } = useHolidaysStore();
+
   useEffect(() => {
     fetchEmployees();
     fetchTodayAttendanceRecords();
     fetchAttendanceRecords();
-  }, [fetchEmployees, fetchTodayAttendanceRecords, fetchAttendanceRecords]);
+    fetchCurrentYearHolidays();
+  }, [
+    fetchEmployees,
+    fetchTodayAttendanceRecords,
+    fetchAttendanceRecords,
+    fetchCurrentYearHolidays,
+  ]);
 
   // Calculate dynamic chart data from real attendance data
   const chartData = [
@@ -312,15 +326,25 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="overflow-y-auto max-h-40 2xl:max-h-35 no-scrollbar">
               <ul className="list-disc list-inside marker:text-muted-foreground text-sm font-[Nunito]">
-                {/* Philippine Holidays */}
-                <li>New Year's Day - January 1</li>
-                <li>EDSA People Power Revolution - February 25</li>
-                <li>Holy Week - March 28 to April 1</li>
-                <li>Labor Day - May 1</li>
-                <li>Independence Day - June 12</li>
-                <li>National Heroes Day - August 28</li>
-                <li>Bonifacio Day - November 30</li>
-                <li>Christmas Day - December 25</li>
+                {holidaysLoading ? (
+                  <li>Loading holidays...</li>
+                ) : currentYearHolidays.length > 0 ? (
+                  currentYearHolidays.map((holiday) => (
+                    <li key={holiday.holiday_id}>
+                      {holiday.name} -{" "}
+                      {new Date(holiday.date).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                      })}
+                      {holiday.holiday_type === "regular" &&
+                        " (Regular Holiday)"}
+                      {holiday.holiday_type === "special" &&
+                        " (Special Holiday)"}
+                    </li>
+                  ))
+                ) : (
+                  <li>No holidays found for this year</li>
+                )}
               </ul>
             </CardContent>
           </Card>

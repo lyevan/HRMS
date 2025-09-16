@@ -5,27 +5,32 @@ import {
   useFetchEmployees,
   useEmployeeLoading,
   useEmployeeError,
+  useEmployeeStore,
 } from "@/store/employeeStore";
 import { useEffect, useState } from "react";
 import Modal from "@/components/modal";
-import { List, LayoutGrid } from "lucide-react";
+import { List, LayoutGrid, Download } from "lucide-react";
 import employeeColumns from "@/components/tables/columns/employee-columns";
 import EmployeeDirectory from "@/components/modal-contents/employee-directory";
 import { Button } from "@/components/ui/button";
 import EmployeeGrid from "@/components/grids/employee-grid";
 import useEmployeeViewStore from "@/store/employeeViewStore";
+import { exportEmployeesToExcel } from "@/utils/excel-export";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import AddEmployeeForm from "@/components/forms/add-employee-form";
+import { useBulkDelete } from "@/hooks/use-bulk-delete";
 
 const EmployeeDashboard = () => {
   const employees = useEmployees();
   const loading = useEmployeeLoading();
   const error = useEmployeeError();
   const fetchEmployees = useFetchEmployees();
+  const { bulkDeleteEmployees } = useEmployeeStore();
 
   useEffect(() => {
     // console.log("🔍 Dashboard: Fetching employees...");
@@ -39,15 +44,49 @@ const EmployeeDashboard = () => {
   );
   const { isTableView, setIsTableView } = useEmployeeViewStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [enableBulkSelect, setEnableBulkSelect] = useState(false);
 
-  const columns = employeeColumns(
-    setIsViewEmployeeModalOpen,
+  // Bulk delete functionality
+  const bulkDelete = useBulkDelete<Employee>({
+    onDelete: bulkDeleteEmployees,
+    getItemId: (employee) => employee.employee_id,
+    getItemName: (employee) => `${employee.first_name} ${employee.last_name}`,
+    itemTypeName: "employees",
+  });
+
+  const columns = employeeColumns({
+    setIsModalOpen: setIsViewEmployeeModalOpen,
     setIsEditing,
-    (employee) => {
+    onViewEmployee: (employee: Employee) => {
       setSelectedEmployee(employee);
       setIsViewEmployeeModalOpen(true);
+    },
+    // Bulk select props
+    isItemSelected: enableBulkSelect ? bulkDelete.isItemSelected : undefined,
+    toggleItemSelection: enableBulkSelect
+      ? bulkDelete.toggleItemSelection
+      : undefined,
+    toggleAllItems: enableBulkSelect ? bulkDelete.toggleAllItems : undefined,
+    allItems: enableBulkSelect ? employees : undefined,
+    enableBulkSelect,
+  });
+
+  // Handle Excel export
+  const handleExportToExcel = async () => {
+    try {
+      if (employees.length === 0) {
+        toast.error("No employees to export");
+        return;
+      }
+
+      await exportEmployeesToExcel(employees, "Employee Directory");
+
+      toast.success("Employee data exported successfully!");
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export employee data");
     }
-  );
+  };
 
   if (loading) {
     return (
@@ -92,21 +131,62 @@ const EmployeeDashboard = () => {
       >
         <AddEmployeeForm setOpen={setIsAddEmployeeModalOpen} />
       </Modal>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            // variant="primary"
-            className="mb-4"
-            onClick={() => setIsTableView(!isTableView)}
-          >
-            {isTableView ? <LayoutGrid /> : <List />}
-            Change View
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          Switch to {isTableView ? "Card" : "Table"} View
-        </TooltipContent>
-      </Tooltip>
+      <div className="flex items-center gap-2 mb-4">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              // variant="primary"
+              onClick={() => setIsTableView(!isTableView)}
+            >
+              {isTableView ? <LayoutGrid /> : <List />}
+              Change View
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            Switch to {isTableView ? "Card" : "Table"} View
+          </TooltipContent>
+        </Tooltip>
+
+        {isTableView && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={enableBulkSelect ? "default" : "outline"}
+                onClick={() => {
+                  setEnableBulkSelect(!enableBulkSelect);
+                  if (enableBulkSelect) {
+                    bulkDelete.clearSelection();
+                  }
+                }}
+              >
+                {enableBulkSelect ? "Exit" : "Bulk"} Select
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {enableBulkSelect
+                ? "Exit bulk selection mode"
+                : "Enable bulk selection for deletion"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              onClick={handleExportToExcel}
+              disabled={loading || employees.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export Excel
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            Export employee data to Excel
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       <div className="space-y-4">
         {isTableView ? (
@@ -114,6 +194,8 @@ const EmployeeDashboard = () => {
             columns={columns}
             data={employees}
             setIsAddEmployeeModalOpen={setIsAddEmployeeModalOpen}
+            onBulkDelete={bulkDeleteEmployees}
+            enableBulkSelect={enableBulkSelect}
           />
         ) : (
           <EmployeeGrid

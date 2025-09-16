@@ -132,7 +132,10 @@ export function PayrollTable({
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-primary">
+              <TableRow
+                key={headerGroup.id}
+                className="hover:bg-primary bg-primary"
+              >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}

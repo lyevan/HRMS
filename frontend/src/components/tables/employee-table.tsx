@@ -42,6 +42,9 @@ import {
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useBulkDelete } from "@/hooks/use-bulk-delete";
+import { BulkActionToolbar } from "@/components/ui/bulk-action-toolbar";
+import type { Employee } from "@/models/employee-model";
 // import { type DateRange } from "react-day-picker";
 // import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
@@ -49,18 +52,30 @@ interface EmployeeTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   setIsAddEmployeeModalOpen: (open: boolean) => void;
+  onBulkDelete?: (employees: Employee[]) => Promise<void>;
+  enableBulkSelect?: boolean;
 }
 
 export function EmployeeTable<TData, TValue>({
   columns,
   data,
   setIsAddEmployeeModalOpen,
+  onBulkDelete,
+  enableBulkSelect = false,
 }: EmployeeTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("full_name");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const isMobile = useIsMobile();
+
+  // Bulk delete functionality
+  const bulkDelete = useBulkDelete<Employee>({
+    onDelete: onBulkDelete || (async () => {}),
+    getItemId: (employee) => employee.employee_id,
+    getItemName: (employee) => `${employee.first_name} ${employee.last_name}`,
+    itemTypeName: "employees",
+  });
   //   const [dateRange, setDateRange] = useState<DateRange | undefined>({
   //     from: new Date(2025, 8, 15),
   //     to: new Date(2025, 9, 6),
@@ -99,6 +114,17 @@ export function EmployeeTable<TData, TValue>({
 
   return (
     <div>
+      {/* Bulk Action Toolbar */}
+      {enableBulkSelect && onBulkDelete && (
+        <BulkActionToolbar
+          selectedCount={bulkDelete.selectionCount}
+          onDelete={bulkDelete.handleBulkDelete}
+          onClearSelection={bulkDelete.clearSelection}
+          isDeleting={bulkDelete.isDeleting}
+          itemTypeName="employees"
+        />
+      )}
+
       <div className="flex items-center justify-between w-full gap-2 py-4 font-[Nunito]">
         <div className="flex items-center gap-2 w-xs">
           <Input

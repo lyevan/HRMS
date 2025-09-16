@@ -9,15 +9,65 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EllipsisVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const columnHelper = createColumnHelper<Employee>();
 
-const employeeColumns = (
-  setIsModalOpen: (isOpen: boolean) => void,
-  setIsEditing: (isEditing: boolean) => void,
-  onViewEmployee: (employee: Employee) => void
-) => {
-  return [
+interface EmployeeColumnsOptions {
+  setIsModalOpen: (isOpen: boolean) => void;
+  setIsEditing: (isEditing: boolean) => void;
+  onViewEmployee: (employee: Employee) => void;
+  // Bulk selection options
+  isItemSelected?: (employee: Employee) => boolean;
+  toggleItemSelection?: (employee: Employee) => void;
+  toggleAllItems?: (employees: Employee[]) => void;
+  allItems?: Employee[];
+  enableBulkSelect?: boolean;
+}
+
+const employeeColumns = ({
+  setIsModalOpen,
+  setIsEditing,
+  onViewEmployee,
+  isItemSelected,
+  toggleItemSelection,
+  toggleAllItems,
+  allItems = [],
+  enableBulkSelect = false,
+}: EmployeeColumnsOptions) => {
+  const columns = [];
+
+  // Add checkbox column if bulk selection is enabled
+  if (
+    enableBulkSelect &&
+    isItemSelected &&
+    toggleItemSelection &&
+    toggleAllItems
+  ) {
+    columns.push(
+      columnHelper.display({
+        id: "select",
+        header: () => (
+          <Checkbox
+            checked={allItems.length > 0 && allItems.every(isItemSelected)}
+            onCheckedChange={() => toggleAllItems(allItems)}
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={isItemSelected(row.original)}
+            onCheckedChange={() => toggleItemSelection(row.original)}
+            aria-label={`Select employee ${row.original.employee_id}`}
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      })
+    );
+  }
+
+  columns.push(
     columnHelper.accessor("employee_id", {
       header: (info) => (
         <EmployeeHeaders info={info} name="Employee ID" isNumber />
@@ -122,8 +172,10 @@ const employeeColumns = (
           </DropdownMenu>
         </div>
       ),
-    }),
-  ];
+    })
+  );
+
+  return columns;
 };
 
 export default employeeColumns;

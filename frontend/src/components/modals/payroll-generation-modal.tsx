@@ -74,17 +74,31 @@ export function PayrollGenerationModal({
 
   // Auto-set dates based on selected timesheet
   useEffect(() => {
+    console.log("Date auto-populate effect triggered:");
+    console.log("- timesheet_id:", formData.timesheet_id);
+    console.log("- unconsumedTimesheets:", unconsumedTimesheets);
+
     if (formData.timesheet_id) {
       const selectedTimesheet = unconsumedTimesheets.find(
-        (ts) => ts.timesheet_id === formData.timesheet_id
+        (ts) => Number(ts.timesheet_id) === Number(formData.timesheet_id)
       );
 
+      console.log("- selectedTimesheet found:", selectedTimesheet);
+
       if (selectedTimesheet) {
+        console.log(
+          "- Setting dates:",
+          selectedTimesheet.start_date,
+          "to",
+          selectedTimesheet.end_date
+        );
         setFormData((prev) => ({
           ...prev,
           start_date: selectedTimesheet.start_date,
           end_date: selectedTimesheet.end_date,
         }));
+      } else {
+        console.log("❌ No timesheet found with ID:", formData.timesheet_id);
       }
     }
   }, [formData.timesheet_id, unconsumedTimesheets]);
@@ -92,31 +106,20 @@ export function PayrollGenerationModal({
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
+    console.log("Validation check - formData:", formData);
+
     if (!formData.timesheet_id) {
+      console.log("❌ Validation failed: No timesheet_id");
       newErrors.timesheet_id = "Please select a timesheet";
+    } else {
+      console.log("✅ timesheet_id is valid:", formData.timesheet_id);
     }
 
-    if (!formData.start_date) {
-      newErrors.start_date = "Start date is required";
-    }
-    if (!formData.end_date) {
-      newErrors.end_date = "End date is required";
-    }
+    // start_date and end_date should be automatically set from timesheet selection
+    // No need to validate them separately since they come from the timesheet
 
-    if (formData.start_date && formData.end_date) {
-      const startDate = new Date(formData.start_date);
-      const endDate = new Date(formData.end_date);
-      if (startDate >= endDate) {
-        newErrors.end_date = "End date must be after start date";
-      }
-    }
-
-    if (
-      formData.generation_type === "selected_employees" &&
-      formData.employee_ids?.length === 0
-    ) {
-      newErrors.employees = "Please select at least one employee";
-    }
+    console.log("Validation errors:", newErrors);
+    console.log("Validation result:", Object.keys(newErrors).length === 0);
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -124,20 +127,17 @@ export function PayrollGenerationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    console.log("Clicked before validate");
     if (!validateForm()) {
       return;
     }
-
+    console.log("Clicked after validate");
     try {
       const payrollData: CreatePayrollHeader = {
         start_date: formData.start_date!,
         end_date: formData.end_date!,
         run_date: format(new Date(), "yyyy-MM-dd"),
-        employee_ids:
-          formData.generation_type === "selected_employees"
-            ? formData.employee_ids
-            : [], // Send empty array for "all employees" to trigger backend logic
+        employee_ids: [], // Let backend determine employees from timesheet_id
         run_by: "current_user", // Replace with actual user
         payroll_title: `Payroll for ${format(
           new Date(formData.start_date!),
@@ -147,6 +147,7 @@ export function PayrollGenerationModal({
         timesheet_id: formData.timesheet_id || undefined,
       };
 
+      console.log("Submitting payroll data:", payrollData);
       await onGenerate(payrollData);
       onOpenChange(false);
 
@@ -169,15 +170,6 @@ export function PayrollGenerationModal({
     }
   };
 
-  const handleDepartmentSelect = (departmentId: number, checked: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      department_ids: checked
-        ? [...(prev.department_ids || []), departmentId]
-        : (prev.department_ids || []).filter((id) => id !== departmentId),
-    }));
-  };
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -190,98 +182,14 @@ export function PayrollGenerationModal({
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Generation Type Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Generation Type</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Select
-                  value={formData.generation_type}
-                  onValueChange={(value: any) =>
-                    setFormData((prev) => ({ ...prev, generation_type: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select generation type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all_employees">All Employees</SelectItem>
-                    <SelectItem value="selected_employees">
-                      Selected Employees
-                    </SelectItem>
-                    <SelectItem value="by_department">By Department</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Employee Selection */}
-                {formData.generation_type === "selected_employees" && (
-                  <div className="space-y-3">
-                    <Label>Select Employees</Label>
-                    <MultiSelectCombobox
-                      options={employees.map((emp) => ({
-                        value: emp.employee_id,
-                        label: `${emp.first_name} ${emp.last_name}`,
-                        subtitle: `${emp.employee_id} - ${emp.last_name}`,
-                      }))}
-                      value={formData.employee_ids || []}
-                      onValueChange={(selectedIds) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          employee_ids: selectedIds,
-                        }))
-                      }
-                      placeholder="Search and select employees..."
-                      searchPlaceholder="Search employees by name or ID..."
-                      className="w-full bg-accent"
-                    />
-                    {errors.employees && (
-                      <p className="text-sm text-red-500">{errors.employees}</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Department Selection */}
-                {formData.generation_type === "by_department" && (
-                  <div className="space-y-3">
-                    <Label>Select Departments</Label>
-                    <div className="space-y-2">
-                      {departments.map((dept) => (
-                        <div
-                          key={dept.department_id}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            checked={formData.department_ids?.includes(
-                              dept.department_id
-                            )}
-                            onCheckedChange={(checked) =>
-                              handleDepartmentSelect(
-                                dept.department_id,
-                                !!checked
-                              )
-                            }
-                          />
-                          <Label className="text-sm font-medium">
-                            {dept.name}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    {errors.departments && (
-                      <p className="text-sm text-red-500">
-                        {errors.departments}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Timesheet Selection */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Timesheet Selection</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Select a timesheet to generate payroll. The employees and date
+                  range will be automatically determined from the timesheet.
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
