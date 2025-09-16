@@ -11,10 +11,10 @@ const EmployeeManagement = () => {
         <TabsTrigger value="pending">
           <ClipboardClock /> {isMobile ? "Pending" : "Pending Employees"}
         </TabsTrigger>
-        <TabsTrigger value="attrition">
+        <TabsTrigger value="attrition" disabled>
           <TrendingDown /> {isMobile ? "Attrition" : "Employee Attrition"}
         </TabsTrigger>
-        <TabsTrigger value="relations">
+        <TabsTrigger value="relations" disabled>
           <Handshake /> {isMobile ? "Relations" : "Employee Relations"}
         </TabsTrigger>
       </TabsList>

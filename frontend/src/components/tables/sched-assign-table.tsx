@@ -214,7 +214,7 @@ export function SchedAssignTable<TData, TValue>({
           </Button>
         </div>
       </div>
-      <div className="overflow-auto h-60 rounded-md border border-muted-foreground/30 font-[Nunito]">
+      <div className="overflow-auto h-120 rounded-md border border-muted-foreground/30 font-[Nunito]">
         <Table>
           <TableHeader className="bg-primary text-primary-foreground border border-muted-foreground/30">
             {table.getHeaderGroups().map((headerGroup) => (
