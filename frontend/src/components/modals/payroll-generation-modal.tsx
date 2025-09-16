@@ -18,9 +18,9 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MultiSelectCombobox } from "@/components/ui/multi-select-combobox";
+
 import { useEmployeeStore } from "@/store/employeeStore";
 import { useDepartmentStore } from "@/store/departmentStore";
 import { useAttendanceStore } from "@/store/attendanceStore";
@@ -60,8 +60,8 @@ export function PayrollGenerationModal({
     useState<TimesheetResponse | null>(null);
 
   // Use real stores instead of hardcoded data
-  const { employees, fetchEmployees } = useEmployeeStore();
-  const { departments, fetchDepartments } = useDepartmentStore();
+  const { fetchEmployees } = useEmployeeStore();
+  const { fetchDepartments } = useDepartmentStore();
   const { unconsumedTimesheets, fetchUnconsumedTimesheets } =
     useAttendanceStore(); // Fetch real data when modal opens
   useEffect(() => {
