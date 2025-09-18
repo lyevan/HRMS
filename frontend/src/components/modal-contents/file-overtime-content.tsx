@@ -168,9 +168,9 @@ const FileOvertimeContent = ({
     }
 
     // Must not be on leave
-    if (record.on_leave) {
-      return false;
-    }
+    // if (record.on_leave) {
+    //   return false;
+    // }
 
     // Must be present (not absent)
     if (record.is_absent) {
@@ -208,7 +208,7 @@ const FileOvertimeContent = ({
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 w-full">
         {/* Header */}
         <div className="flex items-center space-x-3 border-b pb-4">
           <div className="p-2 bg-primary/10 rounded-lg">
@@ -250,7 +250,7 @@ const FileOvertimeContent = ({
 
         {/* Attendance Record Selection */}
         {selectedEmployeeId && (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             <Label
               htmlFor="attendance_id"
               className="flex items-center space-x-2"
@@ -265,8 +265,9 @@ const FileOvertimeContent = ({
               }
               disabled={attendanceLoading}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue
+                  className="w-full"
                   placeholder={
                     attendanceLoading
                       ? "Loading attendance records..."
@@ -349,9 +350,17 @@ const FileOvertimeContent = ({
           </Label>
           <Input
             id="end_time"
-            type="time"
-            placeholder="19:00"
-            {...register("end_time")}
+            type="text"
+            placeholder="18:30 or 6:30 PM"
+            onFocus={(e) => (e.target.type = "time")}
+            {...register("end_time", {
+              onBlur: (e) => {
+                if (!e.target.value) {
+                  e.target.type = "text";
+                }
+              },
+            })}
+            value={watch("end_time")}
           />
           <p className="text-xs text-muted-foreground">
             When do you expect to finish the overtime work?
@@ -405,7 +414,7 @@ const FileOvertimeContent = ({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
+        <div className="flex justify-end space-x-3 py-4 border-t bg-background sticky bottom-0">
           <Button
             type="button"
             variant="outline"

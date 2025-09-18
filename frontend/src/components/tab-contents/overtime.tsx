@@ -39,6 +39,7 @@ import {
   formatRequestDate,
   formatRequestTime,
 } from "@/models/request-model";
+import { useUserSessionStore } from "@/store/userSessionStore";
 
 const Overtime = () => {
   const [requests, setRequests] = useState<BaseRequest[]>([]);
@@ -49,6 +50,8 @@ const Overtime = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedRequest, setSelectedRequest] =
     useState<RequestWithDetails | null>(null);
+
+  const { employee } = useUserSessionStore();
 
   // Modal states
   const [isFileOvertimeOpen, setIsFileOvertimeOpen] = useState(false);
@@ -423,12 +426,13 @@ const Overtime = () => {
         setOpen={setIsFileOvertimeOpen}
         title="File Overtime Request"
         description="Submit a new overtime request"
-        className="overflow-auto max-h-9/10"
+        className="overflow-auto max-h-9/10 pb-0"
       >
         <FileOvertimeContent
           onSuccess={handleFileOvertimeSuccess}
           onClose={() => setIsFileOvertimeOpen(false)}
-          isAdminFiling={true}
+          isAdminFiling={false}
+          currentEmployeeId={employee?.employee_id}
         />
       </Modal>
 

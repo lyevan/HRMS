@@ -5,6 +5,7 @@ import dayjs from "dayjs";
  * Advanced Payroll Calculator with Dynamic Configuration Support
  * Handles complex payroll calculations with configurable rates, multipliers, and business rules
  */
+
 export class AdvancedPayrollCalculator {
   constructor(config = {}) {
     // Default configuration - can be overridden by database config
@@ -133,6 +134,7 @@ export class AdvancedPayrollCalculator {
   async loadConfiguration() {
     try {
       // Load from the new payroll_configuration table
+      console.log("📊  Loading payroll configuration from database...");
       const configResult = await pool.query(`
         SELECT 
           config_type,
@@ -208,8 +210,14 @@ export class AdvancedPayrollCalculator {
         Object.assign(dbConfig, configGroups.penalties);
       }
 
-      // Merge database config with default config
+      // console.log("📊  Loaded payroll configuration from database:", dbConfig);
+
+      // Merge database config with default config using deep merge
       this.config = { ...this.config, ...dbConfig };
+
+      // console.log("📊  Final merged payroll configuration:", this.config);
+
+      // console.log("Final payroll configuration:", this.config);
     } catch (error) {
       console.warn(
         "⚠️ Could not load payroll configuration from database, using defaults:",
@@ -262,11 +270,6 @@ export class AdvancedPayrollCalculator {
     endDate,
     attendanceData = null
   ) {
-    // console.log(
-    //   `\n🔍 [DEBUG] Starting payroll calculation for employee: ${employeeId}`
-    // );
-    // console.log(`📅 [DEBUG] Period: ${startDate} to ${endDate}`);
-
     try {
       // Get employee details
       // console.log(`👤 [DEBUG] Fetching employee details for: ${employeeId}`);
@@ -278,84 +281,22 @@ export class AdvancedPayrollCalculator {
         throw new Error(`Employee ${employeeId} not found or inactive`);
       }
 
-      // console.log(
-      //   `✅ [DEBUG] Employee found: ${employee.first_name} ${employee.last_name}`
-      // );
-      // console.log(`💰 [DEBUG] Rate: ${employee.rate} (${employee.rate_type})`);
-      // console.log(`🏢 [DEBUG] Position: ${employee.position_title}`);
-      // console.log(`📋 [DEBUG] Employment Type: ${employee.employment_type}`);
-
-      // // Validate contract period
-      // console.log(`📝 [DEBUG] Validating contract period...`);
-      // this.validateContractPeriod(employee, startDate, endDate);
-      // console.log(`✅ [DEBUG] Contract period validation passed`);
-
-      // Get or calculate attendance data
-      // console.log(
-      //   `⏰ [DEBUG] ${
-      //     attendanceData ? "Using provided" : "Fetching"
-      //   } attendance data...`
-      // );
       const attendance =
         attendanceData ||
         (await this.getAttendanceData(employeeId, startDate, endDate));
 
-      // console.log(`📊 [DEBUG] Attendance Data:`, {
-      //   days_worked: attendance.days_worked || 0,
-      //   paid_leave_days: attendance.paid_leave_days || 0,
-      //   unpaid_leave_days: attendance.unpaid_leave_days || 0,
-      //   total_regular_hours: attendance.total_regular_hours || 0,
-      //   total_overtime_hours: attendance.total_overtime_hours || 0,
-      //   late_minutes: attendance.late_minutes || 0,
-      //   undertime_minutes: attendance.undertime_minutes || 0,
-      //   late_days: attendance.late_days || 0,
-      //   regular_holiday_days_worked:
-      //     attendance.regular_holiday_days_worked || 0,
-      //   special_holiday_days_worked:
-      //     attendance.special_holiday_days_worked || 0,
-      //   night_differential_hours: attendance.night_differential_hours || 0,
-      // });
-
       // Calculate earnings
-      // console.log(`💵 [DEBUG] Calculating earnings...`);
       const earnings = await this.calculateEarnings(employee, attendance);
-      // console.log(`💰 [DEBUG] Earnings breakdown:`, {
-      //   basePay: earnings.basePay,
-      //   overtimePay: earnings.overtimePay,
-      //   holidayPay: earnings.holidayPay,
-      //   nightDifferential: earnings.nightDifferential,
-      //   leavePay: earnings.leavePay,
-      //   lateDeductions: earnings.lateDeductions,
-      //   undertimeDeductions: earnings.undertimeDeductions,
-      //   grossPay: earnings.grossPay,
-      // });
 
       // Calculate deductions
-      // console.log(
-      //   `📉 [DEBUG] Calculating deductions for gross pay: ₱${earnings.grossPay}`
-      // );
       const deductions = await this.calculateDeductions(
         earnings.grossPay,
         employeeId,
         employee.employment_type
       );
-      // console.log(`💸 [DEBUG] Deductions breakdown:`, {
-      //   sss: deductions.sss,
-      //   philhealth: deductions.philhealth,
-      //   pagibig: deductions.pagibig,
-      //   tax: deductions.tax,
-      //   otherDeductions: deductions.otherDeductions,
-      //   totalDeductions: deductions.totalDeductions,
-      // });
 
       // Calculate net pay
       const netPay = earnings.grossPay - deductions.totalDeductions;
-      // console.log(
-      //   `💰 [DEBUG] Final calculation: Gross(₱${earnings.grossPay}) - Deductions(₱${deductions.totalDeductions}) = Net(₱${netPay})`
-      // );
-      // console.log(
-      //   `✅ [DEBUG] Payroll calculation completed successfully for ${employeeId}`
-      // );
 
       return {
         employee_id: employeeId,
@@ -444,32 +385,22 @@ export class AdvancedPayrollCalculator {
     let undertimeDeductions = 0;
 
     // console.log(`📊 [DEBUG] Employee rate: ₱${rate} (${employee.rate_type})`);
-
+    console.log("📊  Overtime Multiplier:", this.config.regular_overtime_rate);
     // Calculate base pay based on rate type
     switch (employee.rate_type) {
       case "hourly":
-        // console.log(
-        //   `⏰ [DEBUG] Calculating hourly pay: ${
-        //     attendance.total_regular_hours || 0
-        //   } hours × ₱${rate}`
-        // );
+        // Handle if day off worked
         basePay = (attendance.total_regular_hours || 0) * rate;
-        // console.log(`💰 [DEBUG] Base pay (hourly): ₱${basePay}`);
 
         overtimePay =
           (attendance.total_overtime_hours || 0) *
           rate *
-          this.config.overtimeMultiplier;
-        // console.log(
-        //   `⏰ [DEBUG] Overtime pay: ${
-        //     attendance.total_overtime_hours || 0
-        //   } hours × ₱${rate} × ${
-        //     this.config.overtimeMultiplier
-        //   } = ₱${overtimePay}`
-        // );
+          this.config.regular_overtime_rate;
 
         leavePay = await this.calculateLeavePay(employee, attendance);
         // console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
+
+        restDayPay;
         break;
 
       case "daily":
@@ -680,13 +611,9 @@ export class AdvancedPayrollCalculator {
     }
 
     const grossPay =
-      basePay +
-      overtimePay +
-      holidayPay +
-      nightDifferential +
-      leavePay -
-      lateDeductions -
-      undertimeDeductions;
+      basePay + overtimePay + holidayPay + nightDifferential + leavePay;
+    // lateDeductions -
+    // undertimeDeductions;
 
     // console.log(
     //   `💰 [DEBUG] Gross pay calculation: Base(₱${basePay.toFixed(
@@ -746,6 +673,8 @@ export class AdvancedPayrollCalculator {
     // console.log(
     //   `🔍 [DEBUG] Fetching individual deductions for employee: ${employeeId}`
     // );
+    const date = new Date();
+    console.log(date);
     const individualDeductions = await this.getIndividualDeductions(
       employeeId,
       new Date()

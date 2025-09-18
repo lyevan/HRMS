@@ -27,6 +27,7 @@ import { useAttendanceStore } from "@/store/attendanceStore";
 import type { CreatePayrollHeader } from "@/models/payroll-model";
 import type { TimesheetResponse } from "@/models/attendance-model";
 import TimesheetViewModal from "./timesheet-view-modal";
+import { useUserSessionStore } from "@/store/userSessionStore";
 
 interface PayrollGenerationModalProps {
   open: boolean;
@@ -62,6 +63,7 @@ export function PayrollGenerationModal({
   // Use real stores instead of hardcoded data
   const { fetchEmployees } = useEmployeeStore();
   const { fetchDepartments } = useDepartmentStore();
+  const { employee } = useUserSessionStore();
   const { unconsumedTimesheets, fetchUnconsumedTimesheets } =
     useAttendanceStore(); // Fetch real data when modal opens
   useEffect(() => {
@@ -132,13 +134,15 @@ export function PayrollGenerationModal({
       return;
     }
     console.log("Clicked after validate");
+
+    const run_by = employee?.first_name + " " + employee?.last_name;
     try {
       const payrollData: CreatePayrollHeader = {
         start_date: formData.start_date!,
         end_date: formData.end_date!,
         run_date: format(new Date(), "yyyy-MM-dd"),
         employee_ids: [], // Let backend determine employees from timesheet_id
-        run_by: "current_user", // Replace with actual user
+        run_by: run_by,
         payroll_title: `Payroll for ${format(
           new Date(formData.start_date!),
           "MMM dd"
@@ -264,13 +268,13 @@ export function PayrollGenerationModal({
                     <div className="space-y-2">
                       <Label>Start Date</Label>
                       <div className="p-3 bg-muted rounded-md">
-                        {format(new Date(formData.start_date), "PPP")}
+                        {new Date(formData.start_date).toLocaleDateString()}
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label>End Date</Label>
                       <div className="p-3 bg-muted rounded-md">
-                        {format(new Date(formData.end_date), "PPP")}
+                        {new Date(formData.end_date).toLocaleDateString()}
                       </div>
                     </div>
                   </div>

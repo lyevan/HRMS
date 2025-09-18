@@ -109,7 +109,12 @@ export function SchedulesList({
                       </div>
                     )}
                   <div className="text-xs text-muted-foreground">
-                    Break: {schedule.break_duration} minutes
+                    {schedule.break_start && schedule.break_end
+                      ? `Break: ${schedule.break_start.slice(
+                          0,
+                          5
+                        )} - ${schedule.break_end.slice(0, 5)}`
+                      : `Break: ${schedule.break_duration} minutes`}
                   </div>
                 </div>
                 {selectedSchedule?.schedule_id === schedule.schedule_id && (

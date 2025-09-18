@@ -44,10 +44,18 @@ export const getAllSchedules = async (req, res) => {
 };
 
 export const addSchedule = async (req, res) => {
-  const { schedule_name, start_time, end_time, break_duration, days_of_week } =
-    req.body;
+  const {
+    schedule_name,
+    start_time,
+    end_time,
+    break_start,
+    break_end,
+    break_duration,
+    days_of_week,
+  } = req.body;
+
   try {
-    const requiredFields = { start_time, end_time, break_duration };
+    const requiredFields = { start_time, end_time };
     for (const [field, value] of Object.entries(requiredFields)) {
       if (value === undefined || value === null) {
         return res.status(400).json({
@@ -56,16 +64,67 @@ export const addSchedule = async (req, res) => {
         });
       }
     }
+
+    // Validate break times if provided
+    if (break_start && break_end) {
+      // Convert times to minutes for comparison
+      const [startH, startM] = start_time.split(":").map(Number);
+      const [endH, endM] = end_time.split(":").map(Number);
+      const [breakStartH, breakStartM] = break_start.split(":").map(Number);
+      const [breakEndH, breakEndM] = break_end.split(":").map(Number);
+
+      const shiftStartMinutes = startH * 60 + startM;
+      const shiftEndMinutes = endH * 60 + endM;
+      const breakStartMinutes = breakStartH * 60 + breakStartM;
+      const breakEndMinutes = breakEndH * 60 + breakEndM;
+
+      // Check if break end is after break start
+      if (breakEndMinutes <= breakStartMinutes) {
+        return res.status(400).json({
+          success: false,
+          error: "Break end time must be after break start time",
+        });
+      }
+
+      // Check if break is within shift hours (handle overnight shifts)
+      const isOvernightShift = shiftEndMinutes <= shiftStartMinutes;
+      if (!isOvernightShift) {
+        // Normal shift: break must be between start and end
+        if (
+          breakStartMinutes < shiftStartMinutes ||
+          breakEndMinutes > shiftEndMinutes
+        ) {
+          return res.status(400).json({
+            success: false,
+            error: "Break times must be within shift hours",
+          });
+        }
+      }
+    }
+
+    // Calculate break_duration from break_start/break_end if provided
+    let calculatedBreakDuration = break_duration;
+    if (break_start && break_end && !break_duration) {
+      const [breakStartH, breakStartM] = break_start.split(":").map(Number);
+      const [breakEndH, breakEndM] = break_end.split(":").map(Number);
+      const breakStartMinutes = breakStartH * 60 + breakStartM;
+      const breakEndMinutes = breakEndH * 60 + breakEndM;
+      calculatedBreakDuration = breakEndMinutes - breakStartMinutes;
+    }
+
     const result = await pool.query(
-      "INSERT INTO schedules (schedule_name, start_time, end_time, break_duration, days_of_week) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      "INSERT INTO schedules (schedule_name, start_time, end_time, break_start, break_end, break_duration, days_of_week) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
       [
         schedule_name,
         start_time,
         end_time,
-        break_duration,
+        break_start || null,
+        break_end || null,
+        calculatedBreakDuration || null,
         JSON.stringify(days_of_week || []),
       ]
     );
+
     res.status(201).json({
       success: true,
       result: result.rows[0],
@@ -107,6 +166,27 @@ export const updateSchedule = async (req, res) => {
       processedUpdates.days_of_week = JSON.stringify(
         processedUpdates.days_of_week
       );
+    }
+
+    // Calculate break_duration if break_start/break_end are provided
+    if (processedUpdates.break_start && processedUpdates.break_end) {
+      const [breakStartH, breakStartM] = processedUpdates.break_start
+        .split(":")
+        .map(Number);
+      const [breakEndH, breakEndM] = processedUpdates.break_end
+        .split(":")
+        .map(Number);
+      const breakStartMinutes = breakStartH * 60 + breakStartM;
+      const breakEndMinutes = breakEndH * 60 + breakEndM;
+
+      if (breakEndMinutes <= breakStartMinutes) {
+        return res.status(400).json({
+          success: false,
+          error: "Break end time must be after break start time",
+        });
+      }
+
+      processedUpdates.break_duration = breakEndMinutes - breakStartMinutes;
     }
 
     // Remove any undefined or null values to avoid SQL errors

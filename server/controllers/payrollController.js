@@ -3,6 +3,11 @@ import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
 import { AdvancedPayrollCalculator } from "../services/AdvancedPayrollCalculator.js";
+import {
+  normalizeToPhilippineDate,
+  createDateRangeQuery,
+  debugDateFormats,
+} from "../utils/dateUtils.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -766,18 +771,20 @@ export const generatePayrollLegacy = async (req, res) => {
 // Optimized batch payroll calculation
 const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
   try {
-    // console.log(`\n� [CONTROLLER DEBUG] Starting batch payroll calculation`);
-    // console.log(
-    //   `👥 [CONTROLLER DEBUG] Employees: ${
-    //     employee_ids.length
-    //   } (${employee_ids.join(", ")})`
-    // );
-    // console.log(`📅 [CONTROLLER DEBUG] Period: ${start_date} to ${end_date}`);
+    // Debug date inputs
+    // debugDateFormats(start_date, "Payroll Start Date");
+    // debugDateFormats(end_date, "Payroll End Date");
 
-    // // Batch fetch all employee data
-    // console.log(
-    //   `📊 [CONTROLLER DEBUG] Fetching employee data for ${employee_ids.length} employees...`
-    // );
+    // Create normalized date range for consistent querying
+    const dateRangeQuery = createDateRangeQuery(start_date, end_date, "a.date");
+
+    console.log("📅 [PAYROLL] Normalized date range:", {
+      start: dateRangeQuery.startDate,
+      end: dateRangeQuery.endDate,
+      condition: dateRangeQuery.condition,
+    });
+
+    // Batch fetch all employee data
     const employeeData = await pool.query(
       `
       SELECT 
@@ -799,19 +806,11 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
       [employee_ids]
     );
 
-    // console.log(
-    //   `✅ [CONTROLLER DEBUG] Found ${employeeData.rows.length} active employees in database`
-    // );
-    employeeData.rows.forEach((emp) => {
-      // console.log(
-      //   `   - ${emp.employee_id}: ${emp.first_name} ${emp.last_name} (₱${emp.rate} ${emp.rate_type}, ${emp.employment_type})`
-      // );
-    });
+    console.log(
+      `✅ [PAYROLL] Found ${employeeData.rows.length} active employees`
+    );
 
-    // Batch fetch all attendance data
-    // console.log(
-    //   `⏰ [CONTROLLER DEBUG] Fetching attendance data for ${employee_ids.length} employees...`
-    // );
+    // Batch fetch all attendance data with proper date handling
     const attendanceData = await pool.query(
       `
       SELECT 
@@ -823,26 +822,28 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
         SUM(COALESCE(a.overtime_hours, 0)) as total_overtime_hours,
         COUNT(CASE WHEN a.is_late = true THEN 1 END) as late_days,
         COUNT(CASE WHEN a.is_regular_holiday = true THEN 1 END) as regular_holiday_days,
-        COUNT(CASE WHEN a.is_special_holiday = true THEN 1 END) as special_holiday_days
+        COUNT(CASE WHEN a.is_special_holiday = true THEN 1 END) as special_holiday_days,
+        -- Debug fields
+        COUNT(*) as total_attendance_records,
+        MIN(a.date) as first_date,
+        MAX(a.date) as last_date
       FROM attendance a
       LEFT JOIN leave_types lt ON a.leave_type_id = lt.leave_type_id
       WHERE a.employee_id = ANY($1) 
         AND a.date BETWEEN $2 AND $3
       GROUP BY a.employee_id
     `,
-      [employee_ids, start_date, end_date]
+      [employee_ids, dateRangeQuery.startDate, dateRangeQuery.endDate]
     );
 
-    // console.log(
-    //   `✅ [CONTROLLER DEBUG] Found attendance data for ${attendanceData.rows.length} employees`
-    // );
-    // attendanceData.rows.forEach((att) => {
-    //   console.log(
-    //     `   - ${att.employee_id}: ${att.days_worked} days worked, ${
-    //       att.total_regular_hours || 0
-    //     } reg hours, ${att.total_overtime_hours || 0} OT hours`
-    //   );
-    // });
+    console.log(
+      `✅ [PAYROLL] Found attendance data for ${attendanceData.rows.length} employees`
+    );
+    attendanceData.rows.forEach((att) => {
+      console.log(
+        `   - ${att.employee_id}: ${att.total_attendance_records} records, ${att.days_worked} days worked (${att.first_date} to ${att.last_date})`
+      );
+    });
 
     // Create lookup maps for faster processing
     // console.log(`🗺️ [CONTROLLER DEBUG] Creating lookup maps...`);
@@ -989,27 +990,12 @@ const calculateEmployeePayrollSync = async (
   endDate = null
 ) => {
   try {
-    // console.log(
-    //   `\n🧮 [CALC DEBUG] ===== Starting calculateEmployeePayrollSync =====`
-    // );
-    // console.log(
-    //   `👤 [CALC DEBUG] Employee: ${emp.first_name} ${emp.last_name} (${emp.employee_id})`
-    // );
-    // console.log(`💰 [CALC DEBUG] Rate: ₱${emp.rate} (${emp.rate_type})`);
-    // console.log(`🏢 [CALC DEBUG] Position: ${emp.position_title}`);
-    // console.log(`📋 [CALC DEBUG] Employment Type: ${emp.employment_type}`);
-
-    // // Use AdvancedPayrollCalculator for comprehensive calculations
-    // console.log(`🔧 [CALC DEBUG] Initializing AdvancedPayrollCalculator...`);
     const calculator = new AdvancedPayrollCalculator(pool);
-
-    // // Convert attendance data to match AdvancedPayrollCalculator format
-    // console.log(`📊 [CALC DEBUG] Converting attendance data format...`);
-    // console.log(`📊 [CALC DEBUG] Raw attendance input:`, attendance);
+    await calculator.loadConfiguration();
 
     const attendanceForCalculator = {
-      days_worked: parseInt(attendance.days_worked) || 0,
-      paid_leave_days: parseInt(attendance.paid_leave_days) || 0,
+      days_worked: parseInt(attendance.days_worked) || 0, // In attendance
+      paid_leave_days: parseInt(attendance.paid_leave_days) || 0, // In attendance
       unpaid_leave_days: parseInt(attendance.unpaid_leave_days) || 0,
       total_regular_hours: parseFloat(attendance.total_regular_hours) || 0,
       total_overtime_hours: parseFloat(attendance.total_overtime_hours) || 0,
@@ -1027,31 +1013,11 @@ const calculateEmployeePayrollSync = async (
         parseFloat(attendance.night_differential_hours) || 0,
     };
 
-    // console.log(
-    //   `📊 [CALC DEBUG] Converted attendance for calculator:`,
-    //   attendanceForCalculator
-    // );
+    const dateRangeQuery = createDateRangeQuery(startDate, endDate, "a.date");
+    const calculationStartDate = dateRangeQuery.startDate;
 
-    // Use provided dates or fallback to current month
-    const calculationStartDate =
-      startDate ||
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        .toISOString()
-        .split("T")[0];
-    const calculationEndDate =
-      endDate ||
-      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-        .toISOString()
-        .split("T")[0];
+    const calculationEndDate = dateRangeQuery.endDate;
 
-    // console.log(
-    //   `📅 [CALC DEBUG] Calculation period: ${calculationStartDate} to ${calculationEndDate}`
-    // );
-
-    // Calculate comprehensive payroll using the provided attendance data
-    // console.log(
-    //   `🚀 [CALC DEBUG] Calling AdvancedPayrollCalculator.calculateEmployeePayroll...`
-    // );
     const payrollData = await calculator.calculateEmployeePayroll(
       emp.employee_id,
       calculationStartDate,
@@ -1059,15 +1025,10 @@ const calculateEmployeePayrollSync = async (
       attendanceForCalculator // Pass attendance data to avoid re-querying
     );
 
-    // console.log(
-    //   `✅ [CALC DEBUG] AdvancedPayrollCalculator result:`,
-    //   payrollData
-    // );
-
     if (payrollData.error) {
-      // console.error(
-      //   `❌ [CALC DEBUG] Calculator returned error: ${payrollData.error}`
-      // );
+      console.error(
+        `❌ [CALC DEBUG] Calculator returned error: ${payrollData.error}`
+      );
       throw new Error(payrollData.error);
     }
 
@@ -1082,8 +1043,8 @@ const calculateEmployeePayrollSync = async (
       rate_type: emp.rate_type,
       days_worked: payrollData.attendance.days_worked,
       paid_leave_days: attendanceForCalculator.paid_leave_days,
-      total_hours: payrollData.attendance.total_hours,
-      overtime_hours: payrollData.attendance.overtime_hours,
+      total_hours: payrollData.attendance.total_regular_hours,
+      overtime_hours: payrollData.attendance.total_overtime_hours,
       late_days: 0, // Legacy field
       gross_pay: Math.round(payrollData.earnings.gross_pay * 100) / 100,
       overtime_pay: Math.round(payrollData.earnings.overtime_pay * 100) / 100,
@@ -1106,22 +1067,16 @@ const calculateEmployeePayrollSync = async (
       thirteenth_month_pay:
         Math.round((payrollData.thirteenth_month_pay || 0) * 100) / 100,
     };
-
-    // console.log(`✅ [CALC DEBUG] Final mapped result:`, result);
-    // console.log(
-    //   `💰 [CALC DEBUG] Key amounts - Gross: ₱${result.gross_pay}, Deductions: ₱${result.deductions}, Net: ₱${result.net_pay}`
-    // );
-    // console.log(
-    //   `🏁 [CALC DEBUG] ===== calculateEmployeePayrollSync completed =====\n`
-    // );
-
+    console.log(
+      `✅ [CALC DEBUG] Payroll calculated for ${emp.employee_id}:`,
+      result
+    );
     return result;
   } catch (error) {
-    // console.error(
-    //   `❌ [CALC DEBUG] Error in calculateEmployeePayrollSync for ${emp.employee_id}:`,
-    //   error.message
-    // );
-    // console.error(`🔍 [CALC DEBUG] Error stack:`, error.stack);
+    console.error(
+      `❌ [CALC DEBUG] Error in calculateEmployeePayrollSync for ${emp.employee_id}:`,
+      error.message
+    );
     return { employee_id: emp.employee_id, error: error.message };
   }
 };
@@ -1341,6 +1296,66 @@ export const getPayrollSummary = async (req, res) => {
   }
 };
 
+const getContractDetails = async (employee_id) => {
+  const contractQuery = `
+    SELECT 
+        e.employee_id,
+        e.first_name,
+        e.last_name,
+        c.rate,
+        c.rate_type,
+        c.start_date as contract_start,
+        c.end_date as contract_end,
+        p.title as position_title,
+        et.name as employment_type
+      FROM employees e
+      JOIN contracts c ON e.contract_id = c.contract_id
+      JOIN positions p ON c.position_id = p.position_id
+      JOIN employment_types et ON c.employment_type_id = et.employment_type_id
+      WHERE e.employee_id = ANY($1) AND e.status = 'active'
+  `;
+
+  const result = await pool.query(contractQuery, [[employee_id]]);
+  return result;
+};
+
+const getAttendanceDetails = async (employee_id, start_date, end_date) => {
+  // Create proper date range query using utilities
+  const dateRangeQuery = createDateRangeQuery(start_date, end_date, "a.date");
+
+  const attendanceQuery = `
+      SELECT 
+        a.employee_id,
+        COUNT(*) as total_attendance_records,
+        COUNT(CASE WHEN a.is_present = true THEN 1 END) as days_worked,
+        COUNT(CASE WHEN a.is_absent = true THEN 1 END) as days_absent,
+        COUNT(CASE WHEN a.on_leave = true AND lt.is_paid = true THEN 1 END) as paid_leave_days,
+        COUNT(CASE WHEN a.on_leave = true AND (lt.is_paid = false OR lt.is_paid IS NULL) THEN 1 END) as unpaid_leave_days,
+        COUNT(CASE WHEN a.is_dayoff = true THEN 1 END) as day_off_days,
+        COUNT(CASE WHEN a.is_regular_holiday = true THEN 1 END) as regular_holiday_days,
+        COUNT(CASE WHEN a.is_special_holiday = true THEN 1 END) as special_holiday_days,
+        SUM(COALESCE(a.total_hours, 0) - COALESCE(a.overtime_hours, 0) - COALESCE(a.rest_day_hours_worked, 0) - COALESCE(a.night_differential_hours, 0)) as total_regular_hours,
+        
+        SUM(COALESCE(a.overtime_hours, 0)) as total_overtime_hours,
+        COUNT(CASE WHEN a.is_late = true THEN 1 END) as late_days,
+        -- Debug: Get some sample dates
+        MIN(a.date) as first_attendance_date,
+        MAX(a.date) as last_attendance_date
+      FROM attendance a
+      LEFT JOIN leave_types lt ON a.leave_type_id = lt.leave_type_id
+      WHERE a.employee_id = ANY($1) 
+        AND a.date BETWEEN $2 AND $3
+      GROUP BY a.employee_id
+    `;
+
+  const result = await pool.query(attendanceQuery, [
+    [employee_id],
+    dateRangeQuery.startDate,
+    dateRangeQuery.endDate,
+  ]);
+  return result;
+};
+
 // Optimized generatePayroll function using batch processing and timesheet support
 const optimizedGeneratePayroll = async (req, res) => {
   try {
@@ -1354,17 +1369,6 @@ const optimizedGeneratePayroll = async (req, res) => {
       timesheet_id,
     } = req.body;
 
-    console.log("🚀 Generate Payroll Request Data:");
-    console.log("- timesheet_id:", timesheet_id, "type:", typeof timesheet_id);
-    console.log(
-      "- employee_ids:",
-      employee_ids,
-      "length:",
-      employee_ids?.length
-    );
-    console.log("- start_date:", start_date);
-    console.log("- end_date:", end_date);
-
     if (!start_date || !end_date || !run_by) {
       return res.status(400).json({
         success: false,
@@ -1374,13 +1378,6 @@ const optimizedGeneratePayroll = async (req, res) => {
 
     // Get employees from timesheet if timesheet_id is provided, otherwise use employee_ids
     let targetEmployeeIds = [];
-
-    console.log(
-      "🔍 Logic check - timesheet_id:",
-      timesheet_id,
-      "truthy:",
-      !!timesheet_id
-    );
 
     if (timesheet_id) {
       console.log(`🎯 Getting employees from timesheet ${timesheet_id}...`);
@@ -1415,25 +1412,7 @@ const optimizedGeneratePayroll = async (req, res) => {
     }
 
     // Batch fetch all employee details with contracts in a single query
-    const employeeQuery = `
-      SELECT 
-        e.employee_id,
-        e.first_name,
-        e.last_name,
-        c.rate,
-        c.rate_type,
-        c.start_date as contract_start,
-        c.end_date as contract_end,
-        p.title as position_title,
-        et.name as employment_type
-      FROM employees e
-      JOIN contracts c ON e.contract_id = c.contract_id
-      JOIN positions p ON c.position_id = p.position_id
-      JOIN employment_types et ON c.employment_type_id = et.employment_type_id
-      WHERE e.employee_id = ANY($1) AND e.status = 'active'
-    `;
-
-    const employees = await pool.query(employeeQuery, [targetEmployeeIds]);
+    const employees = await getContractDetails(targetEmployeeIds);
 
     if (employees.rows.length === 0) {
       return res.status(404).json({
@@ -1442,90 +1421,11 @@ const optimizedGeneratePayroll = async (req, res) => {
       });
     }
 
-    // Batch fetch all attendance data in a single query
-    const attendanceQuery = `
-      SELECT 
-        a.employee_id,
-        COUNT(*) as total_attendance_records,
-        COUNT(CASE WHEN a.is_present = true THEN 1 END) as days_worked,
-        COUNT(CASE WHEN a.is_absent = true THEN 1 END) as days_absent,
-        COUNT(CASE WHEN a.on_leave = true AND lt.is_paid = true THEN 1 END) as paid_leave_days,
-        COUNT(CASE WHEN a.on_leave = true AND (lt.is_paid = false OR lt.is_paid IS NULL) THEN 1 END) as unpaid_leave_days,
-        COUNT(CASE WHEN a.is_dayoff = true THEN 1 END) as day_off_days,
-        COUNT(CASE WHEN a.is_regular_holiday = true THEN 1 END) as regular_holiday_days,
-        COUNT(CASE WHEN a.is_special_holiday = true THEN 1 END) as special_holiday_days,
-        SUM(COALESCE(a.total_hours, 0) - COALESCE(a.overtime_hours, 0)) as total_regular_hours,
-        SUM(COALESCE(a.overtime_hours, 0)) as total_overtime_hours,
-        COUNT(CASE WHEN a.is_late = true THEN 1 END) as late_days,
-        -- Debug: Get some sample dates
-        MIN(a.date) as first_attendance_date,
-        MAX(a.date) as last_attendance_date
-      FROM attendance a
-      LEFT JOIN leave_types lt ON a.leave_type_id = lt.leave_type_id
-      WHERE a.employee_id = ANY($1) 
-        AND a.date BETWEEN $2 AND $3
-      GROUP BY a.employee_id
-    `;
-
-    // console.log(
-    //   `📅 Fetching attendance data for period: ${start_date} to ${end_date}`
-    // );
-    // console.log(`🔍 [ATTENDANCE DEBUG] Query parameters:`, {
-    //   targetEmployeeIds,
-    //   start_date,
-    //   end_date,
-    // });
-    // console.log(`🔍 [ATTENDANCE DEBUG] Full SQL query:`, attendanceQuery);
-    const attendance = await pool.query(attendanceQuery, [
+    const attendance = await getAttendanceDetails(
       targetEmployeeIds,
       start_date,
-      end_date,
-    ]);
-
-    // console.log(
-    //   `📊 Attendance query returned ${attendance.rows.length} employee attendance summaries`
-    // );
-
-    // console.log(`🔍 [ATTENDANCE DEBUG] Raw query result:`, attendance.rows);
-
-    // Debug: Log first attendance record to see the calculation
-    // if (attendance.rows.length > 0) {
-    //   console.log("🔍 Sample attendance calculation:", {
-    //     employee_id: attendance.rows[0].employee_id,
-    //     total_attendance_records: attendance.rows[0].total_attendance_records,
-    //     days_worked: attendance.rows[0].days_worked,
-    //     days_absent: attendance.rows[0].days_absent,
-    //     paid_leave_days: attendance.rows[0].paid_leave_days,
-    //     day_off_days: attendance.rows[0].day_off_days,
-    //     date_range: `${attendance.rows[0].first_attendance_date} to ${attendance.rows[0].last_attendance_date}`,
-    //   });
-    // }
-
-    // console.log(
-    //   `📅 Attendance query executed for period ${start_date} to ${end_date}`
-    // );
-    // console.log(
-    //   `📊 Attendance results: ${attendance.rows.length} employees have attendance records`
-    // );
-
-    // Debug: Check raw attendance record count for comparison
-    const rawAttendanceCount = await pool.query(
-      `
-      SELECT 
-        employee_id,
-        COUNT(*) as total_records,
-        COUNT(CASE WHEN is_present = true THEN 1 END) as present_records,
-        MIN(date) as first_date,
-        MAX(date) as last_date
-      FROM attendance 
-      WHERE employee_id = ANY($1) AND date BETWEEN $2 AND $3
-      GROUP BY employee_id
-      ORDER BY employee_id
-    `,
-      [targetEmployeeIds, start_date, end_date]
+      end_date
     );
-
-    // console.log("📋 Raw attendance record counts:", rawAttendanceCount.rows);
 
     // Create lookup map for attendance data
     const attendanceMap = {};
@@ -1549,13 +1449,6 @@ const optimizedGeneratePayroll = async (req, res) => {
         special_holiday_days: 0,
       };
 
-      // console.log(
-      //   `👤 Processing payroll for ${emp.employee_id}: ${emp.first_name} ${emp.last_name}`
-      // );
-      // console.log(
-      //   `📊 Attendance summary: ${empAttendance.total_attendance_records} records, ${empAttendance.days_worked} days worked`
-      // );
-
       try {
         return await calculateEmployeePayrollSync(
           emp,
@@ -1578,9 +1471,6 @@ const optimizedGeneratePayroll = async (req, res) => {
     const validPayrolls = payrollResults.filter((result) => !result.error);
     const errorPayrolls = payrollResults.filter((result) => result.error);
 
-    // console.log(
-    //   `💰 Payroll calculation results: ${validPayrolls.length} valid, ${errorPayrolls.length} errors`
-    // );
     if (errorPayrolls.length > 0) {
       console.log(
         "⚠️ Payroll calculation errors:",
@@ -1597,6 +1487,8 @@ const optimizedGeneratePayroll = async (req, res) => {
       });
     }
 
+    const dateRange = createDateRangeQuery(start_date, end_date);
+
     // Create payroll header using actual schema columns
     const headerResult = await pool.query(
       `
@@ -1605,7 +1497,7 @@ const optimizedGeneratePayroll = async (req, res) => {
       ) VALUES (CURRENT_DATE, $1, $2, $3)
       RETURNING payroll_header_id
     `,
-      [start_date, end_date, run_by]
+      [dateRange.startDate, dateRange.endDate, run_by]
     );
 
     const payroll_header_id = headerResult.rows[0].payroll_header_id;

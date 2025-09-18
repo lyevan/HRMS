@@ -1,0 +1,117 @@
+-- Migration: Add payroll_breakdown JSON column
+-- This is a non-breaking change that adds flexibility without affecting existing queries
+
+-- Add the payroll breakdown JSON column
+ALTER TABLE attendance ADD COLUMN IF NOT EXISTS payroll_breakdown jsonb;
+
+-- Create GIN index for efficient JSON queries
+CREATE INDEX IF NOT EXISTS idx_attendance_payroll_breakdown 
+ON attendance USING gin (payroll_breakdown);
+
+-- Add comment for documentation
+COMMENT ON COLUMN attendance.payroll_breakdown IS 'Comprehensive payroll calculation breakdown in JSON format. Handles ALL edge cases including combinations of regular/special holidays, day off, night differential, and overtime.';
+
+-- Example of the COMPREHENSIVE JSON structure covering ALL edge cases:
+-- {
+--   "regular_hours": 8.0,
+--   
+--   "overtime": {
+--     "total": 4.0,
+--     "regular_overtime": 1.0,
+--     "night_diff_overtime": 2.0,
+--     "rest_day_overtime": 0.5,
+--     "regular_holiday_overtime": 0.5,
+--     "special_holiday_overtime": 0.0
+--   },
+--   
+--   "premiums": {
+--     "night_differential": {
+--       "total": 6.0,
+--       "regular": 4.0,
+--       "overtime": 2.0
+--     },
+--     
+--     "rest_day": {
+--       "total": 12.0,
+--       "regular": 11.5,
+--       "overtime": 0.5
+--     },
+--     
+--     "holidays": {
+--       "regular_holiday": {
+--         "total": 12.0,
+--         "regular": 11.5,
+--         "overtime": 0.5,
+--         "night_diff": 6.0,
+--         "rest_day": 12.0
+--       },
+--       
+--       "special_holiday": {
+--         "total": 0.0,
+--         "regular": 0.0,
+--         "overtime": 0.0,
+--         "night_diff": 0.0,
+--         "rest_day": 0.0
+--       }
+--     }
+--   },
+--   
+--   "deductions": {
+--     "undertime_hours": 0.0,
+--     "late_hours": 0.5
+--   },
+--   
+--   "edge_case_flags": {
+--     "is_day_off": true,
+--     "is_regular_holiday": true,
+--     "is_special_holiday": false,
+--     "is_day_off_and_regular_holiday": true,
+--     "is_day_off_and_special_holiday": false,
+--     "has_night_differential": true,
+--     "has_overtime": true,
+--     "has_multiple_premiums": true
+--   }
+-- }
+
+-- EDGE CASES COVERED:
+-- 1. Regular working day
+-- 2. Regular day + overtime
+-- 3. Regular day + night differential
+-- 4. Regular day + night differential + overtime
+-- 5. Day off (rest day)
+-- 6. Day off + night differential
+-- 7. Day off + overtime
+-- 8. Day off + night differential + overtime
+-- 9. Regular holiday
+-- 10. Regular holiday + night differential
+-- 11. Regular holiday + overtime
+-- 12. Regular holiday + night differential + overtime
+-- 13. Special holiday
+-- 14. Special holiday + night differential
+-- 15. Special holiday + overtime
+-- 16. Special holiday + night differential + overtime
+-- 17. Day off + regular holiday (rest day that's also regular holiday)
+-- 18. Day off + regular holiday + night differential
+-- 19. Day off + regular holiday + overtime
+-- 20. Day off + regular holiday + night differential + overtime (ULTIMATE EDGE CASE!)
+-- 21. Day off + special holiday (rest day that's also special holiday)
+-- 22. Day off + special holiday + night differential
+-- 23. Day off + special holiday + overtime
+-- 24. Day off + special holiday + night differential + overtime
+
+-- PAYROLL MULTIPLIERS FOR REFERENCE:
+-- Regular hours: 1.0x
+-- Regular overtime: 1.25x
+-- Night differential: 1.10x (10% premium)
+-- Night differential overtime: 1.25x * 1.10x = 1.375x
+-- Rest day: 1.30x
+-- Rest day overtime: 1.69x (30% + 30% of 30%)
+-- Regular holiday: 2.0x (100% premium)
+-- Regular holiday overtime: 2.60x (100% + 30% of 100%)
+-- Regular holiday + night differential: 2.20x (100% + 10%)
+-- Regular holiday + night differential + overtime: 2.86x (100% + 30% + 10%)
+-- Special holiday: 1.30x (30% premium)
+-- Special holiday overtime: 1.69x (30% + 30% of 30%)
+-- Rest day + regular holiday: 2.60x (100% + 30% for rest day)
+-- Rest day + regular holiday + night differential: 2.86x
+-- Rest day + regular holiday + night differential + overtime: 3.718x (ULTIMATE MULTIPLIER!)

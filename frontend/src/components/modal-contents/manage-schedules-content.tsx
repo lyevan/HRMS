@@ -23,6 +23,8 @@ interface ScheduleFormData {
   start_time: string;
   end_time: string;
   break_duration: number;
+  break_start?: string;
+  break_end?: string;
   days_of_week: string[];
 }
 
@@ -65,6 +67,8 @@ export function ManageSchedulesContent() {
       start_time: "",
       end_time: "",
       break_duration: 60,
+      break_start: "12:00",
+      break_end: "13:00",
       days_of_week: [],
     });
     setIsCreating(false);
@@ -82,6 +86,8 @@ export function ManageSchedulesContent() {
       start_time: schedule.start_time,
       end_time: schedule.end_time,
       break_duration: schedule.break_duration,
+      break_start: schedule.break_start?.slice(0, 5) || "12:00",
+      break_end: schedule.break_end?.slice(0, 5) || "13:00",
       days_of_week: schedule.days_of_week || [],
     });
     setEditingId(schedule.schedule_id);
@@ -194,7 +200,7 @@ export function ManageSchedulesContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="break_duration">
-                    Break Duration (minutes)
+                    Break Duration (minutes) - Auto-calculated
                   </Label>
                   <Input
                     id="break_duration"
@@ -208,6 +214,8 @@ export function ManageSchedulesContent() {
                     }
                     min="0"
                     max="480"
+                    disabled
+                    className="bg-muted"
                   />
                 </div>
               </div>
@@ -239,6 +247,81 @@ export function ManageSchedulesContent() {
                         end_time: e.target.value,
                       }))
                     }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="break_start"
+                    className="flex items-center gap-2"
+                  >
+                    <Coffee className="w-4 h-4" />
+                    Break Start
+                  </Label>
+                  <Input
+                    id="break_start"
+                    type="time"
+                    value={formData.break_start}
+                    onChange={(e) => {
+                      const newBreakStart = e.target.value;
+                      setFormData((prev) => {
+                        // Auto-calculate break_duration when break times change
+                        const start = newBreakStart
+                          ? new Date(`1970-01-01T${newBreakStart}:00`)
+                          : null;
+                        const end = prev.break_end
+                          ? new Date(`1970-01-01T${prev.break_end}:00`)
+                          : null;
+                        const duration =
+                          start && end
+                            ? Math.max(
+                                0,
+                                (end.getTime() - start.getTime()) / (1000 * 60)
+                              )
+                            : prev.break_duration;
+
+                        return {
+                          ...prev,
+                          break_start: newBreakStart,
+                          break_duration: duration,
+                        };
+                      });
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="break_end">Break End</Label>
+                  <Input
+                    id="break_end"
+                    type="time"
+                    value={formData.break_end}
+                    onChange={(e) => {
+                      const newBreakEnd = e.target.value;
+                      setFormData((prev) => {
+                        // Auto-calculate break_duration when break times change
+                        const start = prev.break_start
+                          ? new Date(`1970-01-01T${prev.break_start}:00`)
+                          : null;
+                        const end = newBreakEnd
+                          ? new Date(`1970-01-01T${newBreakEnd}:00`)
+                          : null;
+                        const duration =
+                          start && end
+                            ? Math.max(
+                                0,
+                                (end.getTime() - start.getTime()) / (1000 * 60)
+                              )
+                            : prev.break_duration;
+
+                        return {
+                          ...prev,
+                          break_end: newBreakEnd,
+                          break_duration: duration,
+                        };
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -312,7 +395,12 @@ export function ManageSchedulesContent() {
                           className="flex items-center gap-1"
                         >
                           <Coffee className="w-3 h-3" />
-                          {schedule.break_duration}min break
+                          {schedule.break_start && schedule.break_end
+                            ? `${schedule.break_start.slice(
+                                0,
+                                5
+                              )} - ${schedule.break_end.slice(0, 5)}`
+                            : `${schedule.break_duration}min break`}
                         </Badge>
                       </div>
 

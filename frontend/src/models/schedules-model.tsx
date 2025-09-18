@@ -6,6 +6,8 @@ export type Schedule = {
   start_time: string;
   end_time: string;
   break_duration: number;
+  break_start?: string; // e.g., "12:00:00"
+  break_end?: string; // e.g., "13:00:00"
   days_of_week: string[];
   created_at: string;
   updated_at: string;

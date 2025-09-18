@@ -25,6 +25,10 @@ import testRoutes from "./routes/testRoutes.js";
 import cookieParser from "cookie-parser";
 import { initDB } from "./config/db.js";
 import { pool } from "./config/db.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerJSDoc from "swagger-jsdoc";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -51,6 +55,14 @@ app.use((req, res, next) => {
     // Only allow no-origin requests in development (Postman, etc.)
     res.header("Access-Control-Allow-Origin", "*");
     // console.log(`✅ Dev mode - no origin allowed`);
+  } else if (
+    process.env.NODE_ENV === "development" &&
+    origin &&
+    origin.includes("localhost")
+  ) {
+    // Allow any localhost origin in development for Swagger UI
+    res.header("Access-Control-Allow-Origin", origin);
+    // console.log(`✅ Dev mode - localhost origin allowed: ${origin}`);
   } else {
     // console.log(`❌ Origin blocked: ${origin}`);
     // Don't set CORS headers for blocked origins
@@ -91,6 +103,36 @@ app.get("/", (req, res) => {
   res.send("Hello from the backend");
 });
 
+const options = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Relyant HRMS API Documentation",
+      version: "1.0.0",
+      description: "API docs for Relyant HRMS backend",
+      contact: { name: "Rely-ANT Co." },
+    },
+    components: {
+      securitySchemes: {
+        CookieAuth: {
+          type: "apiKey", // apiKey for cookie
+          in: "cookie", // tells Swagger it’s in cookies
+          name: "token", // cookie name that holds JWT
+          description: "JWT stored in a cookie named 'token'",
+        },
+      },
+    },
+    security: [
+      {
+        CookieAuth: ["/login"], // apply globally (optional)
+      },
+    ],
+  },
+  apis: [".server/routes/*.js"], // adjust path to your routes
+};
+
+const swaggerSpec = swaggerJSDoc(options);
+
 app.use("/api/rfid", rfidRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/employees", employeeRoutes);
@@ -110,6 +152,13 @@ app.use("/api/holidays", holidaysRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/bulk-upload", bulkUploadRoutes);
 app.use("/api/test", testRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Debug endpoint to check swagger spec
+app.get("/api-docs.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 app.get("/test-db", async (req, res) => {
   try {

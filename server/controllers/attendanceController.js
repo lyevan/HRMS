@@ -9,9 +9,20 @@ import {
   updateAttendanceWithEnhancedCalculations,
   roundToPayrollIncrement,
 } from "../utils/attendanceCalculations.js";
+import {
+  normalizeToPhilippineDate,
+  normalizeToPhilippineDateTime,
+  createDateRangeQuery,
+  debugDateFormats,
+} from "../utils/dateUtils.js";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
+// DANGER: Debug mode - use fixed date/time for testing
+const isDebugMode = true;
+const isDebugDayoff = false;
+const isDebugNightDiff = true;
 
 // Helper function to check if a date is a holiday (deprecated - use getHolidayInfo from utils)
 const checkHolidayStatus = async (date) => {
@@ -62,6 +73,8 @@ export const getAllAttendance = async (req, res) => {
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
         s.break_duration,
+        s.break_start,
+        s.break_end,
         ts.start_date as timesheet_start_date,
         ts.end_date as timesheet_end_date,
         ts.is_consumed as is_timesheet_consumed
@@ -86,7 +99,9 @@ export const getEmployeeAttendance = async (req, res) => {
         a.*, e.first_name, e.last_name,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
-        s.break_duration
+        s.break_duration,
+        s.break_start,
+        s.break_end
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
@@ -108,7 +123,9 @@ export const getTodayAllAttendance = async (req, res) => {
         a.*, e.first_name, e.last_name,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
-        s.break_duration
+        s.break_duration,
+        s.break_start,
+        s.break_end
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
@@ -125,11 +142,57 @@ export const clockIn = async (req, res) => {
   try {
     const { employee_id, rfid } = req.body;
 
-    // Get current Philippine time
-    const now = dayjs().tz("Asia/Manila");
-    const today = now.format("YYYY-MM-DD");
-    const currentTime = now.format("YYYY-MM-DD HH:mm:ss");
-    const currentDayOfWeek = now.format("dddd").toLowerCase(); // monday, tuesday, etc.
+    // DEBUG block using UTC instead of dayjs
+    let debugDate = null;
+    let debugTime = null;
+    let debugDayOfWeek = null;
+
+    if (isDebugDayoff) {
+      // Sunday 8AM Manila = 2025-09-28T00:00:00Z in UTC
+      debugTime = new Date(Date.UTC(2025, 8, 28, 0, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0]; // "2025-09-28"
+      debugDayOfWeek = debugTime
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          timeZone: "Asia/Manila",
+        })
+        .toLowerCase();
+    } else if (isDebugNightDiff) {
+      // Friday 7PM Manila = 11:00 UTC
+      debugTime = new Date(Date.UTC(2025, 8, 29, 10, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0]; // "2025-09-29"
+      debugDayOfWeek = debugTime
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          timeZone: "Asia/Manila",
+        })
+        .toLowerCase();
+    } else {
+      // Monday 8AM Manila = 2025-09-29T00:00:00Z in UTC
+      debugTime = new Date(Date.UTC(2025, 8, 29, 0, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0];
+      debugDayOfWeek = debugTime
+        .toLocaleDateString("en-US", {
+          weekday: "long",
+          timeZone: "Asia/Manila",
+        })
+        .toLowerCase();
+    }
+
+    // Always anchor "now" in UTC
+    const now = new Date();
+    const today = isDebugMode ? debugDate : now.toISOString().split("T")[0];
+    const currentTime = isDebugMode
+      ? debugTime.toISOString()
+      : now.toISOString();
+    const currentDayOfWeek = isDebugMode
+      ? debugDayOfWeek
+      : now
+          .toLocaleDateString("en-US", {
+            weekday: "long",
+            timeZone: "Asia/Manila",
+          })
+          .toLowerCase();
 
     // Find employee by either employee_id or RFID
     let employee;
@@ -197,7 +260,8 @@ export const clockIn = async (req, res) => {
       const leave = leaveCheck.rows[0];
       return res.status(400).json({
         success: false,
-        message: "Cannot clock in - You have approved leave for today",
+        message:
+          "Cannot clock in - You have approved leave for today - Contact HR for manual attendance",
         info: `Leave Type: ${leave.leave_type_name} (${leave.start_date} to ${leave.end_date})`,
         leave_details: leave,
       });
@@ -293,10 +357,30 @@ export const clockOut = async (req, res) => {
   try {
     const { employee_id, rfid, notes } = req.body;
 
-    // Get current Philippine time
-    const now = dayjs().tz("Asia/Manila");
-    const today = now.format("YYYY-MM-DD");
-    const currentTime = now.format("YYYY-MM-DD HH:mm:ss");
+    let debugDate = null;
+    let debugTime = null;
+
+    if (isDebugDayoff) {
+      // Sunday 5PM Manila = 9AM UTC
+      debugTime = new Date(Date.UTC(2025, 8, 28, 9, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0]; // "2025-09-28"
+    } else if (isDebugNightDiff) {
+      // Friday 4AM Manila = 23:00 UTC
+      debugTime = new Date(Date.UTC(2025, 8, 29, 22, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0]; // "2025-09-29"
+    } else {
+      // Monday 5PM Manila = 9AM UTC
+      debugTime = new Date(Date.UTC(2025, 8, 29, 9, 0, 0));
+      debugDate = debugTime.toISOString().split("T")[0]; // "2025-09-29"
+    }
+
+    // Always use UTC internally
+    const now = new Date();
+
+    const today = isDebugMode ? debugDate : now.toISOString().split("T")[0];
+    const currentTime = isDebugMode
+      ? debugTime.toISOString() // "2025-09-28T09:00:00.000Z"
+      : now.toISOString();
 
     // Find employee by either employee_id or RFID
     let actualEmployeeId = employee_id;
@@ -332,16 +416,28 @@ export const clockOut = async (req, res) => {
       });
     }
 
-    // Get attendance record for today
-    const attendanceRecord = await pool.query(
+    // Get attendance record for today - also check previous day for overnight shifts
+    let attendanceRecord = await pool.query(
       "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2",
       [actualEmployeeId, today]
     );
 
+    // If no record found for today, check previous day for overnight shifts
+    if (attendanceRecord.rows.length === 0) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayDate = yesterday.toISOString().split("T")[0];
+
+      attendanceRecord = await pool.query(
+        "SELECT * FROM attendance WHERE employee_id = $1 AND date = $2 AND time_out IS NULL",
+        [actualEmployeeId, yesterdayDate]
+      );
+    }
+
     if (attendanceRecord.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No clock-in record found for today",
+        message: "No open clock-in record found for today or yesterday",
       });
     }
 
@@ -356,7 +452,7 @@ export const clockOut = async (req, res) => {
 
     // Get employee schedule information
     const scheduleQuery = await pool.query(
-      `SELECT s.break_duration, s.start_time, s.end_time
+      `SELECT s.break_duration, s.break_start, s.break_end, s.start_time, s.end_time
        FROM employees e 
        JOIN schedules s ON e.schedule_id = s.schedule_id 
        WHERE e.employee_id = $1`,
@@ -368,6 +464,8 @@ export const clockOut = async (req, res) => {
         ? scheduleQuery.rows[0]
         : {
             break_duration: 60, // Default 1 hour break
+            break_start: "12:00:00", // Default lunch break start
+            break_end: "13:00:00", // Default lunch break end
             start_time: "08:00:00",
             end_time: "17:00:00",
           };
@@ -384,8 +482,10 @@ export const clockOut = async (req, res) => {
       `UPDATE attendance 
        SET time_out = $1, total_hours = $2, notes = $3, updated_at = $4, 
            is_undertime = $5, is_halfday = $6, undertime_minutes = $7, 
-           night_differential_hours = $8, rest_day_hours_worked = $9
-       WHERE employee_id = $10 AND date = $11 
+           night_differential_hours = $8, rest_day_hours_worked = $9, overtime_hours = $10,
+           regular_holiday_hours_worked = $11, special_holiday_hours_worked = $12,
+           payroll_breakdown = $13
+       WHERE attendance_id = $14
        RETURNING *`,
       [
         currentTime,
@@ -397,8 +497,11 @@ export const clockOut = async (req, res) => {
         enhancedCalcs.undertime_minutes,
         enhancedCalcs.night_differential_hours,
         enhancedCalcs.rest_day_hours_worked,
-        actualEmployeeId,
-        today,
+        enhancedCalcs.overtime_hours,
+        enhancedCalcs.regular_holiday_hours_worked || 0,
+        enhancedCalcs.special_holiday_hours_worked || 0,
+        JSON.stringify(enhancedCalcs.payroll_breakdown),
+        record.attendance_id,
       ]
     );
 
@@ -410,28 +513,63 @@ export const clockOut = async (req, res) => {
         enhancedCalcs.night_differential_hours > 0
           ? " (Night Differential)"
           : ""
+      }${enhancedCalcs.overtime_hours > 0 ? " (Overtime)" : ""}${
+        enhancedCalcs.rest_day_hours_worked > 0 ? " (Rest Day)" : ""
+      }${
+        enhancedCalcs.regular_holiday_hours_worked > 0
+          ? " (Regular Holiday)"
+          : ""
+      }${
+        enhancedCalcs.special_holiday_hours_worked > 0
+          ? " (Special Holiday)"
+          : ""
       }`,
       data: {
         ...result.rows[0],
         employee_name: employeeName,
         hours_worked: enhancedCalcs.total_hours,
-        break_duration_hours: scheduleInfo.break_duration / 60,
+        overtime_hours: enhancedCalcs.overtime_hours,
+        break_duration_hours:
+          scheduleInfo.break_start && scheduleInfo.break_end
+            ? (() => {
+                const [startH, startM] = scheduleInfo.break_start
+                  .split(":")
+                  .map(Number);
+                const [endH, endM] = scheduleInfo.break_end
+                  .split(":")
+                  .map(Number);
+                return (endH * 60 + endM - (startH * 60 + startM)) / 60;
+              })()
+            : (scheduleInfo.break_duration || 0) / 60,
+        break_start: scheduleInfo.break_start,
+        break_end: scheduleInfo.break_end,
         is_undertime: enhancedCalcs.is_undertime,
         is_halfday: enhancedCalcs.is_halfday,
         undertime_minutes: enhancedCalcs.undertime_minutes,
         night_differential_hours: enhancedCalcs.night_differential_hours,
         rest_day_hours_worked: enhancedCalcs.rest_day_hours_worked,
+        regular_holiday_hours_worked:
+          enhancedCalcs.regular_holiday_hours_worked || 0,
+        special_holiday_hours_worked:
+          enhancedCalcs.special_holiday_hours_worked || 0,
         method: rfid ? "RFID" : "Manual",
         payroll_summary: {
-          regular_hours: Math.max(
-            0,
-            enhancedCalcs.total_hours -
-              enhancedCalcs.night_differential_hours -
-              enhancedCalcs.rest_day_hours_worked
-          ),
+          // Simple totals for basic queries
+          regular_hours: enhancedCalcs.payroll_breakdown.regular_hours,
           night_diff_hours: enhancedCalcs.night_differential_hours,
           rest_day_hours: enhancedCalcs.rest_day_hours_worked,
+          overtime_hours: enhancedCalcs.overtime_hours,
+          regular_holiday_hours:
+            enhancedCalcs.regular_holiday_hours_worked || 0,
+          special_holiday_hours:
+            enhancedCalcs.special_holiday_hours_worked || 0,
           undertime_deduction: enhancedCalcs.undertime_minutes / 60,
+
+          // Detailed breakdown from JSON
+          detailed_breakdown: enhancedCalcs.payroll_breakdown,
+
+          // Edge case summary for payroll processing
+          edge_cases: enhancedCalcs.payroll_breakdown.edge_case_flags,
         },
       },
     });
@@ -548,7 +686,7 @@ export const createManualAttendance = async (req, res) => {
     );
 
     const schedule = await pool.query(
-      `SELECT e.schedule_id, s.break_duration, s.start_time, s.end_time
+      `SELECT e.schedule_id, s.break_duration, s.break_start, s.break_end, s.start_time, s.end_time
        FROM schedules s
        JOIN employees e ON e.schedule_id = s.schedule_id
        WHERE e.employee_id = $1`,
@@ -596,8 +734,22 @@ export const createManualAttendance = async (req, res) => {
       .reduce((acc, time, index) => {
         return acc + parseInt(time) / Math.pow(60, index);
       }, 0);
-    // Convert break duration from minutes to hours
-    const breakDuration = (scheduleData.break_duration || 0) / 60;
+
+    // Calculate break duration from break_start/break_end or fallback to break_duration
+    let breakDuration = 0;
+    if (scheduleData.break_start && scheduleData.break_end) {
+      const [breakStartH, breakStartM] = scheduleData.break_start
+        .split(":")
+        .map(Number);
+      const [breakEndH, breakEndM] = scheduleData.break_end
+        .split(":")
+        .map(Number);
+      breakDuration =
+        (breakEndH * 60 + breakEndM - (breakStartH * 60 + breakStartM)) / 60;
+    } else {
+      breakDuration = (scheduleData.break_duration || 0) / 60;
+    }
+
     const shiftHours = shiftEnd - shiftStart - breakDuration;
 
     if (time_in && time_out) {
@@ -721,7 +873,9 @@ export const getEmployeeStatus = async (req, res) => {
           WHEN a.time_in IS NOT NULL AND a.time_out IS NULL THEN 'clocked_in'
           ELSE 'not_started'
         END AS current_status,
-        s.break_duration
+        s.break_duration,
+        s.break_start,
+        s.break_end
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
@@ -898,7 +1052,9 @@ export const manualUpdate = async (req, res) => {
         a.*, e.first_name, e.last_name,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
-        s.break_duration
+        s.break_duration,
+        s.break_start,
+        s.break_end
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
@@ -969,36 +1125,39 @@ export const processTimesheet = async (req, res) => {
     //   endDate
     // );
 
-    // Convert timezone-aware dates to Philippine local dates for comparison
-    // Frontend sends UTC timestamps like "2025-09-14T16:00:00.000Z" which is actually Sept 15 in Philippines
-    const startDatePH = dayjs(startDate).tz("Asia/Manila").format("YYYY-MM-DD");
-    const endDatePH = dayjs(endDate).tz("Asia/Manila").format("YYYY-MM-DD");
+    // Debug input dates
+    // debugDateFormats(startDate, "Start Date Input");
+    // debugDateFormats(endDate, "End Date Input");
 
-    console.log("Converted to Philippine dates:", startDatePH, "to", endDatePH);
+    // Create proper date range query using utilities
+    const dateRangeQuery = createDateRangeQuery(startDate, endDate, "date");
+
+    console.log("📅 Normalized date range:", {
+      start: dateRangeQuery.startDate,
+      end: dateRangeQuery.endDate,
+      condition: dateRangeQuery.condition,
+    });
 
     // Debug: Check a sample attendance record date
     const sampleCheck = await pool.query(
       `SELECT attendance_id, date, 
-       date AT TIME ZONE 'Asia/Manila' as date_ph,
-       date::text as date_string
+       date::text as date_string,
+       date AT TIME ZONE 'Asia/Manila' as date_ph
        FROM attendance WHERE attendance_id = ANY($1::int[]) LIMIT 1`,
       [attendanceIds]
     );
 
     if (sampleCheck.rows.length > 0) {
-      console.log("Sample attendance record debug:", sampleCheck.rows[0]);
+      console.log("📋 Sample attendance record:", sampleCheck.rows[0]);
     }
 
     // Check if attendance records exist within the specified date range
-    // Use string comparison for dates to avoid timezone issues
     const attendanceCheck = await pool.query(
-      `
-        SELECT attendance_id, date, date::text as date_string
-        FROM attendance 
-        WHERE attendance_id = ANY($1::int[])
-        AND date::text BETWEEN $2 AND $3
-      `,
-      [attendanceIds, startDatePH, endDatePH]
+      `SELECT attendance_id, date, date::text as date_string
+       FROM attendance 
+       WHERE attendance_id = ANY($1::int[])
+       AND date BETWEEN $2 AND $3`,
+      [attendanceIds, dateRangeQuery.startDate, dateRangeQuery.endDate]
     );
 
     // console.log(
@@ -1014,7 +1173,7 @@ export const processTimesheet = async (req, res) => {
       });
     }
 
-    // Create timesheet query
+    // Create timesheet with normalized dates
     const createTimesheetQuery = `
       INSERT INTO timesheets
       (start_date, end_date)
@@ -1023,8 +1182,8 @@ export const processTimesheet = async (req, res) => {
     `;
 
     const timesheetId = await pool.query(createTimesheetQuery, [
-      startDatePH,
-      endDatePH,
+      dateRangeQuery.startDate,
+      dateRangeQuery.endDate,
     ]);
 
     // Link attendance records to the created timesheet
@@ -1188,7 +1347,9 @@ export const getAttendanceByTimesheet = async (req, res) => {
         a.*, e.first_name, e.last_name, e.employee_id,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
-        s.break_duration
+        s.break_duration,
+        s.break_start,
+        s.break_end
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
