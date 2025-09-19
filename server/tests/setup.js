@@ -21,7 +21,7 @@ global.TEST_EMPLOYEE = {
   rate: 500,
   rate_type: "hourly",
   position_title: "Test Position",
-  employment_type: "Regular"
+  employment_type: "Regular",
 };
 
 global.TEST_SCHEDULE = {
@@ -31,7 +31,7 @@ global.TEST_SCHEDULE = {
   break_end: "13:00:00",
   break_duration: 60,
   start_time: "08:00:00",
-  end_time: "17:00:00"
+  end_time: "17:00:00",
 };
 
 // Global test helpers
@@ -46,23 +46,25 @@ global.createMockAttendance = (overrides = {}) => {
     late_minutes: 0,
     undertime_minutes: 0,
     days_worked: 1,
-    payroll_breakdowns: [{
-      regular_hours: 8,
-      overtime: { total: 0 },
-      premiums: {
-        night_differential: { total: 0 },
-        rest_day: { total: 0 },
-        holidays: {}
-      }
-    }],
-    ...overrides
+    payroll_breakdowns: [
+      {
+        regular_hours: 8,
+        overtime: { total: 0 },
+        premiums: {
+          night_differential: { total: 0 },
+          rest_day: { total: 0 },
+          holidays: {},
+        },
+      },
+    ],
+    ...overrides,
   };
 };
 
 // Setup test environment
 beforeAll(() => {
   // Set timezone for consistent test results
-  process.env.TZ = 'Asia/Manila';
+  process.env.TZ = "Asia/Manila";
 });
 
 afterAll(() => {
@@ -71,8 +73,8 @@ afterAll(() => {
 });
 
 // Global error handler for unhandled promise rejections in tests
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
 
 export {};

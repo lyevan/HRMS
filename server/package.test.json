@@ -15,9 +15,7 @@
     "transform": {},
     "extensionsToTreatAsEsm": [".js"],
     "testEnvironment": "node",
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ],
+    "testMatch": ["**/tests/**/*.test.js"],
     "collectCoverageFrom": [
       "services/**/*.js",
       "controllers/**/*.js",
