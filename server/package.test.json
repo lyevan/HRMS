@@ -1,0 +1,30 @@
+{
+  "name": "hrms-tests",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:edge-cases": "jest comprehensive-edge-cases.test.js",
+    "test:payroll": "jest payroll-generation.test.js",
+    "test:validation": "node tests/edge-case-validation.js"
+  },
+  "jest": {
+    "preset": "default",
+    "transform": {},
+    "extensionsToTreatAsEsm": [".js"],
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "services/**/*.js",
+      "controllers/**/*.js",
+      "utils/**/*.js",
+      "!**/node_modules/**"
+    ],
+    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "verbose": true
+  }
+}

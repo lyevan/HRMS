@@ -993,36 +993,88 @@ const calculateEmployeePayrollSync = async (
     const calculator = new AdvancedPayrollCalculator(pool);
     await calculator.loadConfiguration();
 
+    // Enhanced attendance data with comprehensive breakdown
     const attendanceForCalculator = {
-      days_worked: parseInt(attendance.days_worked) || 0, // In attendance
-      paid_leave_days: parseInt(attendance.paid_leave_days) || 0, // In attendance
+      days_worked: parseInt(attendance.days_worked) || 0,
+      paid_leave_days: parseInt(attendance.paid_leave_days) || 0,
       unpaid_leave_days: parseInt(attendance.unpaid_leave_days) || 0,
+
+      // Basic totals
+      total_hours_worked: parseFloat(attendance.total_hours_worked) || 0,
       total_regular_hours: parseFloat(attendance.total_regular_hours) || 0,
       total_overtime_hours: parseFloat(attendance.total_overtime_hours) || 0,
+      total_night_diff_hours:
+        parseFloat(attendance.total_night_diff_hours) || 0,
+      total_rest_day_hours: parseFloat(attendance.total_rest_day_hours) || 0,
+      total_regular_holiday_hours:
+        parseFloat(attendance.total_regular_holiday_hours) || 0,
+      total_special_holiday_hours:
+        parseFloat(attendance.total_special_holiday_hours) || 0,
+
+      // Enhanced overtime breakdown
+      regular_overtime_hours:
+        parseFloat(attendance.regular_overtime_hours) || 0,
+      night_diff_overtime_hours:
+        parseFloat(attendance.night_diff_overtime_hours) || 0,
+      rest_day_overtime_hours:
+        parseFloat(attendance.rest_day_overtime_hours) || 0,
+      regular_holiday_overtime_hours:
+        parseFloat(attendance.regular_holiday_overtime_hours) || 0,
+      special_holiday_overtime_hours:
+        parseFloat(attendance.special_holiday_overtime_hours) || 0,
+
+      // ULTIMATE EDGE CASES: Holiday + Rest Day combinations
+      regular_holiday_rest_day_hours:
+        parseFloat(attendance.regular_holiday_rest_day_hours) || 0,
+      special_holiday_rest_day_hours:
+        parseFloat(attendance.special_holiday_rest_day_hours) || 0,
+      regular_holiday_rest_day_overtime_hours:
+        parseFloat(attendance.regular_holiday_rest_day_overtime_hours) || 0,
+      special_holiday_rest_day_overtime_hours:
+        parseFloat(attendance.special_holiday_rest_day_overtime_hours) || 0,
+
+      // Deductions
       late_days: parseInt(attendance.late_days) || 0,
-      late_minutes: parseInt(attendance.late_minutes) || 0,
-      undertime_minutes: parseInt(attendance.undertime_minutes) || 0,
-      regular_holiday_days_worked:
-        parseInt(attendance.regular_holiday_days_worked) || 0,
-      regular_holiday_days_not_worked:
-        parseInt(attendance.regular_holiday_days_not_worked) || 0,
-      special_holiday_days_worked:
-        parseInt(attendance.special_holiday_days_worked) || 0,
-      rest_day_hours_worked: parseFloat(attendance.rest_day_hours_worked) || 0,
-      night_differential_hours:
-        parseFloat(attendance.night_differential_hours) || 0,
+      total_late_minutes: parseInt(attendance.total_late_minutes) || 0,
+      total_undertime_minutes:
+        parseInt(attendance.total_undertime_minutes) || 0,
+
+      // Edge case flags for complex calculations
+      has_regular_holiday_rest_day:
+        attendance.has_regular_holiday_rest_day || false,
+      has_special_holiday_rest_day:
+        attendance.has_special_holiday_rest_day || false,
+      has_ultimate_case_regular: attendance.has_ultimate_case_regular || false,
+      has_ultimate_case_special: attendance.has_ultimate_case_special || false,
+      max_premium_stack_count:
+        parseInt(attendance.max_premium_stack_count) || 0,
+
+      // Comprehensive breakdown for detailed calculations
+      payroll_breakdowns: attendance.payroll_breakdowns || [],
     };
 
     const dateRangeQuery = createDateRangeQuery(startDate, endDate, "a.date");
     const calculationStartDate = dateRangeQuery.startDate;
-
     const calculationEndDate = dateRangeQuery.endDate;
+
+    // Enhanced schedule information for precise break calculations
+    const scheduleInfo = {
+      schedule_id: emp.schedule_id,
+      schedule_name: emp.schedule_name,
+      start_time: emp.schedule_start_time,
+      end_time: emp.schedule_end_time,
+      break_duration: parseFloat(emp.break_duration) || 0,
+      break_start: emp.break_start,
+      break_end: emp.break_end,
+      days_of_week: emp.days_of_week || [],
+    };
 
     const payrollData = await calculator.calculateEmployeePayroll(
       emp.employee_id,
       calculationStartDate,
       calculationEndDate,
-      attendanceForCalculator // Pass attendance data to avoid re-querying
+      attendanceForCalculator, // Pass attendance data to avoid re-querying
+      scheduleInfo // Pass enhanced schedule information for break calculations
     );
 
     if (payrollData.error) {
@@ -1032,8 +1084,7 @@ const calculateEmployeePayrollSync = async (
       throw new Error(payrollData.error);
     }
 
-    // // Map to legacy format for existing API compatibility
-    // console.log(`🔄 [CALC DEBUG] Mapping to legacy format...`);
+    // Enhanced result mapping with comprehensive breakdown
     const result = {
       employee_id: emp.employee_id,
       employee_name: `${emp.first_name} ${emp.last_name}`,
@@ -1052,7 +1103,8 @@ const calculateEmployeePayrollSync = async (
       deductions:
         Math.round(payrollData.deductions.total_deductions * 100) / 100,
       net_pay: Math.round(payrollData.net_pay * 100) / 100,
-      // Additional comprehensive data
+
+      // Basic comprehensive data
       basic_pay: Math.round(payrollData.earnings.base_pay * 100) / 100,
       sss_contribution: Math.round(payrollData.deductions.sss * 100) / 100,
       philhealth_contribution:
@@ -1066,6 +1118,58 @@ const calculateEmployeePayrollSync = async (
         Math.round((payrollData.deductions.other_deductions || 0) * 100) / 100,
       thirteenth_month_pay:
         Math.round((payrollData.thirteenth_month_pay || 0) * 100) / 100,
+
+      // ENHANCED: Comprehensive premium breakdown
+      night_diff_pay:
+        Math.round((payrollData.earnings.night_differential_pay || 0) * 100) /
+        100,
+      rest_day_pay:
+        Math.round((payrollData.earnings.rest_day_pay || 0) * 100) / 100,
+      regular_holiday_pay:
+        Math.round((payrollData.earnings.regular_holiday_pay || 0) * 100) / 100,
+      special_holiday_pay:
+        Math.round((payrollData.earnings.special_holiday_pay || 0) * 100) / 100,
+
+      // ULTIMATE EDGE CASES: Holiday + Rest Day combinations
+      regular_holiday_rest_day_pay:
+        Math.round(
+          (payrollData.earnings.regular_holiday_rest_day_pay || 0) * 100
+        ) / 100,
+      special_holiday_rest_day_pay:
+        Math.round(
+          (payrollData.earnings.special_holiday_rest_day_pay || 0) * 100
+        ) / 100,
+
+      // Enhanced overtime breakdown
+      regular_overtime_hours: attendanceForCalculator.regular_overtime_hours,
+      night_diff_overtime_hours:
+        attendanceForCalculator.night_diff_overtime_hours,
+      rest_day_overtime_hours: attendanceForCalculator.rest_day_overtime_hours,
+      regular_holiday_overtime_hours:
+        attendanceForCalculator.regular_holiday_overtime_hours,
+      special_holiday_overtime_hours:
+        attendanceForCalculator.special_holiday_overtime_hours,
+      regular_holiday_rest_day_overtime_hours:
+        attendanceForCalculator.regular_holiday_rest_day_overtime_hours,
+      special_holiday_rest_day_overtime_hours:
+        attendanceForCalculator.special_holiday_rest_day_overtime_hours,
+
+      // Edge case metadata for complex payroll validation
+      edge_case_flags: {
+        has_regular_holiday_rest_day:
+          attendanceForCalculator.has_regular_holiday_rest_day,
+        has_special_holiday_rest_day:
+          attendanceForCalculator.has_special_holiday_rest_day,
+        has_ultimate_case_regular:
+          attendanceForCalculator.has_ultimate_case_regular,
+        has_ultimate_case_special:
+          attendanceForCalculator.has_ultimate_case_special,
+        max_premium_stack_count:
+          attendanceForCalculator.max_premium_stack_count,
+      },
+
+      // Raw attendance breakdown for debugging and audit trails
+      comprehensive_breakdown: attendanceForCalculator.payroll_breakdowns,
     };
     console.log(
       `✅ [CALC DEBUG] Payroll calculated for ${emp.employee_id}:`,
@@ -1307,11 +1411,22 @@ const getContractDetails = async (employee_id) => {
         c.start_date as contract_start,
         c.end_date as contract_end,
         p.title as position_title,
-        et.name as employment_type
+        et.name as employment_type,
+        
+        -- Enhanced: Include schedule details with break_start/break_end
+        s.schedule_id,
+        s.schedule_name,
+        s.start_time as schedule_start_time,
+        s.end_time as schedule_end_time,
+        s.break_duration,
+        s.break_start,
+        s.break_end,
+        s.days_of_week
       FROM employees e
       JOIN contracts c ON e.contract_id = c.contract_id
       JOIN positions p ON c.position_id = p.position_id
       JOIN employment_types et ON c.employment_type_id = et.employment_type_id
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       WHERE e.employee_id = ANY($1) AND e.status = 'active'
   `;
 
@@ -1334,10 +1449,73 @@ const getAttendanceDetails = async (employee_id, start_date, end_date) => {
         COUNT(CASE WHEN a.is_dayoff = true THEN 1 END) as day_off_days,
         COUNT(CASE WHEN a.is_regular_holiday = true THEN 1 END) as regular_holiday_days,
         COUNT(CASE WHEN a.is_special_holiday = true THEN 1 END) as special_holiday_days,
-        SUM(COALESCE(a.total_hours, 0) - COALESCE(a.overtime_hours, 0) - COALESCE(a.rest_day_hours_worked, 0) - COALESCE(a.night_differential_hours, 0)) as total_regular_hours,
         
+        -- Enhanced payroll breakdown aggregation using the new JSON schema
+        SUM(COALESCE(a.total_hours, 0)) as total_hours_worked,
         SUM(COALESCE(a.overtime_hours, 0)) as total_overtime_hours,
+        SUM(COALESCE(a.night_differential_hours, 0)) as total_night_diff_hours,
+        SUM(COALESCE(a.rest_day_hours_worked, 0)) as total_rest_day_hours,
+        SUM(COALESCE(a.regular_holiday_hours_worked, 0)) as total_regular_holiday_hours,
+        SUM(COALESCE(a.special_holiday_hours_worked, 0)) as total_special_holiday_hours,
+        
+        -- Enhanced breakdown from payroll_breakdown JSON
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->>'regular_hours' AS NUMERIC)), 0
+        ) as total_regular_hours,
+        
+        -- Overtime breakdown
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'regular_overtime' AS NUMERIC)), 0
+        ) as regular_overtime_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'night_diff_overtime' AS NUMERIC)), 0
+        ) as night_diff_overtime_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'rest_day_overtime' AS NUMERIC)), 0
+        ) as rest_day_overtime_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'regular_holiday_overtime' AS NUMERIC)), 0
+        ) as regular_holiday_overtime_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'special_holiday_overtime' AS NUMERIC)), 0
+        ) as special_holiday_overtime_hours,
+        
+        -- ULTIMATE EDGE CASES: Holiday + Rest Day overtime
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'regular_holiday_rest_day_overtime' AS NUMERIC)), 0
+        ) as regular_holiday_rest_day_overtime_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'overtime'->>'special_holiday_rest_day_overtime' AS NUMERIC)), 0
+        ) as special_holiday_rest_day_overtime_hours,
+        
+        -- Premium breakdowns
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'premiums'->'holidays'->'regular_holiday_rest_day'->>'total' AS NUMERIC)), 0
+        ) as regular_holiday_rest_day_hours,
+        COALESCE(
+          SUM(CAST(a.payroll_breakdown->'premiums'->'holidays'->'special_holiday_rest_day'->>'total' AS NUMERIC)), 0
+        ) as special_holiday_rest_day_hours,
+        
+        -- Edge case flags aggregation
+        BOOL_OR(CAST(a.payroll_breakdown->'edge_case_flags'->>'is_day_off_and_regular_holiday' AS BOOLEAN)) as has_regular_holiday_rest_day,
+        BOOL_OR(CAST(a.payroll_breakdown->'edge_case_flags'->>'is_day_off_and_special_holiday' AS BOOLEAN)) as has_special_holiday_rest_day,
+        BOOL_OR(CAST(a.payroll_breakdown->'edge_case_flags'->>'is_ultimate_case_regular' AS BOOLEAN)) as has_ultimate_case_regular,
+        BOOL_OR(CAST(a.payroll_breakdown->'edge_case_flags'->>'is_ultimate_case_special' AS BOOLEAN)) as has_ultimate_case_special,
+        MAX(CAST(a.payroll_breakdown->'edge_case_flags'->>'premium_stack_count' AS INTEGER)) as max_premium_stack_count,
+        
+        -- Deductions
+        SUM(COALESCE(a.late_minutes, 0)) as total_late_minutes,
+        SUM(COALESCE(a.undertime_minutes, 0)) as total_undertime_minutes,
         COUNT(CASE WHEN a.is_late = true THEN 1 END) as late_days,
+        
+        -- Comprehensive payroll breakdown as JSON aggregation
+        JSON_AGG(
+          CASE 
+            WHEN a.payroll_breakdown IS NOT NULL THEN a.payroll_breakdown
+            ELSE NULL
+          END
+        ) FILTER (WHERE a.payroll_breakdown IS NOT NULL) as payroll_breakdowns,
+        
         -- Debug: Get some sample dates
         MIN(a.date) as first_attendance_date,
         MAX(a.date) as last_attendance_date

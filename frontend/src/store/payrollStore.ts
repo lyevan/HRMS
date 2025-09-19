@@ -95,7 +95,7 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
       set({ loading: true, error: null });
 
       const response = await axios.get<PayrollApiResponse<PayrollConfig[]>>(
-        "/payroll-config/config"
+        "/payroll-configuration/all"
       );
 
       if (response.data.success && response.data.data) {
@@ -120,9 +120,16 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // Parse config type and key from the key parameter (format: "type.key")
+      const [configType, configKey] = key.split(".");
+
       const response = await axios.put<PayrollApiResponse<PayrollConfig>>(
-        `/payroll-config/config/${key}`,
-        { value }
+        `/payroll-configuration/update`,
+        {
+          config_type: configType,
+          config_key: configKey,
+          config_value: value,
+        }
       );
 
       if (response.data.success) {
@@ -148,12 +155,18 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      // Update multiple configs in parallel
-      const updatePromises = Object.entries(updates).map(([key, value]) =>
-        axios.put(`/payroll-config/config/${key}`, { value })
-      );
+      // Convert updates to the new API format
+      const configurations = Object.entries(updates).map(([key, value]) => {
+        const [configType, configKey] = key.split(".");
+        return {
+          config_type: configType,
+          config_key: configKey,
+          config_value: value,
+        };
+      });
 
-      await Promise.all(updatePromises);
+      // Use bulk update endpoint
+      await axios.post(`/payroll-configuration/bulk`, { configurations });
 
       // Refresh configs after all updates
       await get().fetchConfigs();

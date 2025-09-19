@@ -268,7 +268,8 @@ export class AdvancedPayrollCalculator {
     employeeId,
     startDate,
     endDate,
-    attendanceData = null
+    attendanceData = null,
+    scheduleInfo = null
   ) {
     try {
       // Get employee details
@@ -286,7 +287,11 @@ export class AdvancedPayrollCalculator {
         (await this.getAttendanceData(employeeId, startDate, endDate));
 
       // Calculate earnings
-      const earnings = await this.calculateEarnings(employee, attendance);
+      const earnings = await this.calculateEarnings(
+        employee,
+        attendance,
+        scheduleInfo
+      );
 
       // Calculate deductions
       const deductions = await this.calculateDeductions(
@@ -368,9 +373,9 @@ export class AdvancedPayrollCalculator {
   }
 
   /**
-   * Calculate earnings for an employee
+   * Calculate earnings for an employee with enhanced payroll breakdown support
    */
-  async calculateEarnings(employee, attendance) {
+  async calculateEarnings(employee, attendance, scheduleInfo = null) {
     // console.log(
     //   `💵 [DEBUG] Starting earnings calculation for ${employee.first_name} ${employee.last_name}`
     // );
@@ -384,8 +389,25 @@ export class AdvancedPayrollCalculator {
     let lateDeductions = 0;
     let undertimeDeductions = 0;
 
+    // Enhanced break time calculations if schedule info is available
+    if (scheduleInfo && scheduleInfo.break_start && scheduleInfo.break_end) {
+      // console.log(
+      //   `⏰ [DEBUG] Using enhanced break calculations: ${scheduleInfo.break_start} - ${scheduleInfo.break_end}`
+      // );
+    }
+
+    // ===== ENHANCED PAYROLL BREAKDOWN LOGIC =====
+    // Check if we have enhanced payroll breakdown data (from attendanceCalculations.js)
+    // This includes ultimate edge cases like Day Off + Holiday + Night Diff + Overtime
+    if (attendance.payroll_breakdowns && attendance.payroll_breakdowns.length > 0) {
+      console.log(`🚀 [CALC DEBUG] Using enhanced payroll breakdowns for ultimate edge cases...`);
+      
+      // Process comprehensive breakdown from attendance calculations
+      return await this.calculateEarningsFromBreakdown(employee, attendance, scheduleInfo);
+    }
+
     // console.log(`📊 [DEBUG] Employee rate: ₱${rate} (${employee.rate_type})`);
-    console.log("📊  Overtime Multiplier:", this.config.regular_overtime_rate);
+    console.log("📊  Overtime Multiplier:", this.config.overtimeMultiplier);
     // Calculate base pay based on rate type
     switch (employee.rate_type) {
       case "hourly":
@@ -395,12 +417,10 @@ export class AdvancedPayrollCalculator {
         overtimePay =
           (attendance.total_overtime_hours || 0) *
           rate *
-          this.config.regular_overtime_rate;
+          this.config.overtimeMultiplier;
 
         leavePay = await this.calculateLeavePay(employee, attendance);
         // console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
-
-        restDayPay;
         break;
 
       case "daily":
@@ -645,6 +665,281 @@ export class AdvancedPayrollCalculator {
 
     // console.log(`✅ [DEBUG] Final earnings result:`, result);
     return result;
+  }
+
+  /**
+   * Calculate earnings using enhanced payroll breakdown (ULTIMATE EDGE CASES)
+   * Handles Day Off + Holiday + Night Diff + Overtime stacking with proper rate calculations
+   */
+  async calculateEarningsFromBreakdown(employee, attendance, scheduleInfo = null) {
+    console.log(`🎯 [CALC DEBUG] Processing ultimate edge cases with comprehensive breakdown...`);
+    
+    const rate = parseFloat(employee.rate);
+    let basePay = 0;
+    let overtimePay = 0;
+    let holidayPay = 0;
+    let nightDifferential = 0;
+    let leavePay = 0;
+    let lateDeductions = 0;
+    let undertimeDeductions = 0;
+
+    // Aggregate all payroll breakdowns from attendance records
+    const aggregatedBreakdown = this.aggregatePayrollBreakdowns(attendance.payroll_breakdowns);
+    
+    console.log(`📊 [CALC DEBUG] Aggregated breakdown:`, JSON.stringify(aggregatedBreakdown, null, 2));
+
+    // Calculate hourly rate based on employee rate type
+    const hourlyRate = this.getHourlyRate(employee);
+    
+    // ===== ENHANCED EARNINGS CALCULATION WITH ULTIMATE EDGE CASES =====
+    
+    // 1. BASE PAY (Regular hours with no premiums)
+    basePay = (aggregatedBreakdown.regular_hours || 0) * hourlyRate;
+    
+    // 2. OVERTIME PAY (with comprehensive stacking)
+    if (aggregatedBreakdown.overtime) {
+      const overtime = aggregatedBreakdown.overtime;
+      
+      // Regular overtime (1.25x)
+      overtimePay += (overtime.regular_overtime || 0) * hourlyRate * this.config.overtimeMultiplier;
+      
+      // Night differential overtime (1.25x base + 10% night diff = 1.375x)
+      overtimePay += (overtime.night_diff_overtime || 0) * hourlyRate * this.config.overtimeMultiplier * (1 + this.config.nightDifferentialRate);
+      
+      // Rest day overtime (1.69x = 1.30x rest day × 1.30x overtime)
+      overtimePay += (overtime.rest_day_overtime || 0) * hourlyRate * this.config.restDayMultiplier * this.config.overtimeMultiplier;
+      
+      // Regular holiday overtime (2.60x = 2.0x holiday × 1.30x overtime)
+      overtimePay += (overtime.regular_holiday_overtime || 0) * hourlyRate * this.config.regularHolidayMultiplier * this.config.overtimeMultiplier;
+      
+      // Special holiday overtime (1.69x = 1.30x holiday × 1.30x overtime)
+      overtimePay += (overtime.special_holiday_overtime || 0) * hourlyRate * this.config.specialHolidayMultiplier * this.config.overtimeMultiplier;
+      
+      // ===== ULTIMATE EDGE CASES: Holiday + Rest Day overtime =====
+      // Regular Holiday + Rest Day overtime (3.38x = 2.0x holiday × 1.30x rest day × 1.30x overtime)
+      overtimePay += (overtime.regular_holiday_rest_day_overtime || 0) * hourlyRate * 
+                     this.config.regularHolidayMultiplier * this.config.restDayMultiplier * this.config.overtimeMultiplier;
+      
+      // Special Holiday + Rest Day overtime (2.197x = 1.30x holiday × 1.30x rest day × 1.30x overtime)
+      overtimePay += (overtime.special_holiday_rest_day_overtime || 0) * hourlyRate * 
+                     this.config.specialHolidayMultiplier * this.config.restDayMultiplier * this.config.overtimeMultiplier;
+    }
+    
+    // 3. HOLIDAY PAY (with comprehensive stacking)
+    if (aggregatedBreakdown.premiums && aggregatedBreakdown.premiums.holidays) {
+      const holidays = aggregatedBreakdown.premiums.holidays;
+      
+      // Regular holiday pay (2.0x for regular hours)
+      if (holidays.regular_holiday) {
+        holidayPay += (holidays.regular_holiday.regular || 0) * hourlyRate * this.config.regularHolidayMultiplier;
+      }
+      
+      // Special holiday pay (1.30x for regular hours)
+      if (holidays.special_holiday) {
+        holidayPay += (holidays.special_holiday.regular || 0) * hourlyRate * this.config.specialHolidayMultiplier;
+      }
+      
+      // ===== ULTIMATE EDGE CASES: Holiday + Rest Day regular hours =====
+      // Regular Holiday + Rest Day (2.60x = 2.0x holiday × 1.30x rest day)
+      if (holidays.regular_holiday_rest_day) {
+        holidayPay += (holidays.regular_holiday_rest_day.regular || 0) * hourlyRate * 
+                      this.config.regularHolidayMultiplier * this.config.restDayMultiplier;
+      }
+      
+      // Special Holiday + Rest Day (1.69x = 1.30x holiday × 1.30x rest day)
+      if (holidays.special_holiday_rest_day) {
+        holidayPay += (holidays.special_holiday_rest_day.regular || 0) * hourlyRate * 
+                      this.config.specialHolidayMultiplier * this.config.restDayMultiplier;
+      }
+    }
+    
+    // 4. REST DAY PAY (for pure rest day work, not holiday combinations)
+    if (aggregatedBreakdown.premiums && aggregatedBreakdown.premiums.rest_day) {
+      const restDay = aggregatedBreakdown.premiums.rest_day;
+      
+      // Pure rest day pay (1.30x, excluding holiday combinations)
+      holidayPay += (restDay.pure_rest_day || 0) * hourlyRate * this.config.restDayMultiplier;
+    }
+    
+    // 5. NIGHT DIFFERENTIAL (10% additional on all applicable hours)
+    if (aggregatedBreakdown.premiums && aggregatedBreakdown.premiums.night_differential) {
+      const nightDiff = aggregatedBreakdown.premiums.night_differential;
+      
+      // Regular night differential (10% of base rate)
+      nightDifferential += (nightDiff.regular || 0) * hourlyRate * this.config.nightDifferentialRate;
+      
+      // Night differential with holiday combinations is already calculated above in overtime/holiday sections
+      // This is just for tracking/reporting purposes
+    }
+    
+    // 6. LEAVE PAY
+    leavePay = await this.calculateLeavePay(employee, attendance);
+    
+    // 7. LATE AND UNDERTIME DEDUCTIONS
+    // Calculate based on rate type
+    switch (employee.rate_type) {
+      case "daily":
+        if (attendance.late_minutes > 0) {
+          const lateRatePerMinute = rate * this.config.late_penalty_rate;
+          lateDeductions = attendance.late_minutes * lateRatePerMinute;
+        }
+        
+        if (attendance.undertime_minutes > 0) {
+          const dailyRatePerMinute = rate / (this.config.standardWorkingHours * 60);
+          undertimeDeductions = attendance.undertime_minutes * dailyRatePerMinute * this.config.undertime_deduction_rate;
+        }
+        break;
+        
+      case "monthly":
+        const workingDaysInPeriod = this.config.standardWorkingDays;
+        
+        if (attendance.late_minutes > 0) {
+          const monthlyRatePerMinute = rate / (workingDaysInPeriod * this.config.standardWorkingHours * 60);
+          lateDeductions = attendance.late_minutes * monthlyRatePerMinute;
+        }
+        
+        if (attendance.undertime_minutes > 0) {
+          const monthlyRatePerMinute = rate / (workingDaysInPeriod * this.config.standardWorkingHours * 60);
+          undertimeDeductions = attendance.undertime_minutes * monthlyRatePerMinute * this.config.undertime_deduction_rate;
+        }
+        break;
+        
+      case "hourly":
+      default:
+        // For hourly employees, late/undertime is typically handled differently
+        // Usually no additional deductions since they're only paid for hours worked
+        break;
+    }
+
+    const grossPay = basePay + overtimePay + holidayPay + nightDifferential + leavePay;
+
+    console.log(`💰 [CALC DEBUG] Enhanced earnings breakdown:
+      Base Pay: ₱${basePay.toFixed(2)}
+      Overtime Pay: ₱${overtimePay.toFixed(2)}
+      Holiday Pay: ₱${holidayPay.toFixed(2)}
+      Night Differential: ₱${nightDifferential.toFixed(2)}
+      Leave Pay: ₱${leavePay.toFixed(2)}
+      Late Deductions: ₱${lateDeductions.toFixed(2)}
+      Undertime Deductions: ₱${undertimeDeductions.toFixed(2)}
+      ===========================
+      GROSS PAY: ₱${grossPay.toFixed(2)}`
+    );
+
+    const result = {
+      basePay: this.roundAmount(basePay),
+      overtimePay: this.roundAmount(overtimePay),
+      holidayPay: this.roundAmount(holidayPay),
+      nightDifferential: this.roundAmount(nightDifferential),
+      leavePay: this.roundAmount(leavePay),
+      lateDeductions: this.roundAmount(lateDeductions),
+      undertimeDeductions: this.roundAmount(undertimeDeductions),
+      otherEarnings: 0,
+      grossPay: this.roundAmount(grossPay),
+      // Add enhanced breakdown for detailed reporting
+      enhancedBreakdown: aggregatedBreakdown
+    };
+
+    console.log(`✅ [CALC DEBUG] Enhanced earnings result:`, result);
+    return result;
+  }
+
+  /**
+   * Aggregate payroll breakdowns from multiple attendance records
+   */
+  aggregatePayrollBreakdowns(breakdowns) {
+    const aggregated = {
+      regular_hours: 0,
+      overtime: {
+        total: 0,
+        regular_overtime: 0,
+        night_diff_overtime: 0,
+        rest_day_overtime: 0,
+        regular_holiday_overtime: 0,
+        special_holiday_overtime: 0,
+        regular_holiday_rest_day_overtime: 0,
+        special_holiday_rest_day_overtime: 0
+      },
+      premiums: {
+        night_differential: {
+          total: 0,
+          regular: 0,
+          overtime: 0
+        },
+        rest_day: {
+          total: 0,
+          regular: 0,
+          overtime: 0,
+          pure_rest_day: 0
+        },
+        holidays: {
+          regular_holiday: {
+            total: 0,
+            regular: 0,
+            overtime: 0
+          },
+          special_holiday: {
+            total: 0,
+            regular: 0,
+            overtime: 0
+          },
+          regular_holiday_rest_day: {
+            total: 0,
+            regular: 0,
+            overtime: 0
+          },
+          special_holiday_rest_day: {
+            total: 0,
+            regular: 0,
+            overtime: 0
+          }
+        }
+      }
+    };
+
+    // Aggregate all breakdown records
+    breakdowns.forEach(breakdown => {
+      if (!breakdown) return;
+      
+      // Regular hours
+      aggregated.regular_hours += breakdown.regular_hours || 0;
+      
+      // Overtime breakdown
+      if (breakdown.overtime) {
+        Object.keys(aggregated.overtime).forEach(key => {
+          aggregated.overtime[key] += breakdown.overtime[key] || 0;
+        });
+      }
+      
+      // Premiums breakdown
+      if (breakdown.premiums) {
+        // Night differential
+        if (breakdown.premiums.night_differential) {
+          Object.keys(aggregated.premiums.night_differential).forEach(key => {
+            aggregated.premiums.night_differential[key] += breakdown.premiums.night_differential[key] || 0;
+          });
+        }
+        
+        // Rest day
+        if (breakdown.premiums.rest_day) {
+          Object.keys(aggregated.premiums.rest_day).forEach(key => {
+            aggregated.premiums.rest_day[key] += breakdown.premiums.rest_day[key] || 0;
+          });
+        }
+        
+        // Holidays
+        if (breakdown.premiums.holidays) {
+          Object.keys(aggregated.premiums.holidays).forEach(holidayType => {
+            if (breakdown.premiums.holidays[holidayType]) {
+              Object.keys(aggregated.premiums.holidays[holidayType]).forEach(key => {
+                aggregated.premiums.holidays[holidayType][key] += breakdown.premiums.holidays[holidayType][key] || 0;
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    return aggregated;
   }
 
   /**

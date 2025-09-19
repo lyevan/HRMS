@@ -13,34 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save, RotateCcw, Calendar, Info } from "lucide-react";
-
-interface PayrollConfig2025 {
-  config_type: string;
-  config_key: string;
-  config_value: number;
-  description: string;
-  effective_date: string;
-  expiry_date?: string;
-}
-
-interface PayrollConfigurationModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onUpdateConfig: (
-    configType: string,
-    configKey: string,
-    value: number,
-    effectiveDate?: string
-  ) => Promise<void>;
-  loading?: boolean;
-}
-
-interface ConfigSection {
-  title: string;
-  description: string;
-  configs: PayrollConfig2025[];
-  icon: React.ReactNode;
-}
+import {
+  usePayrollConfigurationStore,
+  payrollConfigurationHelpers,
+} from "@/store/payrollConfigurationStore";
+import type {
+  PayrollConfiguration,
+  PayrollConfigurationModalProps,
+  PayrollConfigurationFormData,
+  PayrollConfigurationSection,
+} from "@/models/payroll-configuration-model";
 
 export function PayrollConfigurationModal({
   open,
@@ -48,64 +30,47 @@ export function PayrollConfigurationModal({
   onUpdateConfig,
   loading = false,
 }: PayrollConfigurationModalProps) {
-  const [configs, setConfigs] = useState<PayrollConfig2025[]>([]);
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  const {
+    configurations,
+    loading: configLoading,
+    error,
+    fetchConfigurations,
+    updateConfiguration,
+    clearError,
+  } = usePayrollConfigurationStore();
+
+  const [formData, setFormData] = useState<PayrollConfigurationFormData>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [loadingConfigs, setLoadingConfigs] = useState(false);
 
   // Fetch configurations when modal opens
   useEffect(() => {
     if (open) {
       fetchConfigurations();
     }
-  }, [open]);
+  }, [open, fetchConfigurations]);
 
-  const fetchConfigurations = async () => {
-    setLoadingConfigs(true);
-    try {
-      const response = await fetch("/api/payroll-config/config");
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        throw new Error(
-          `Expected JSON but received: ${contentType}. Response: ${text.substring(
-            0,
-            200
-          )}`
+  // Initialize form data when configurations load
+  useEffect(() => {
+    if (configurations.length > 0) {
+      const initialData: PayrollConfigurationFormData = {};
+      configurations.forEach((config) => {
+        initialData[`${config.config_type}.${config.config_key}`] = String(
+          config.config_value
         );
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        setConfigs(data.data.raw || []);
-        // Initialize form data
-        const initialData: Record<string, string> = {};
-        (data.data.raw || []).forEach((config: PayrollConfig2025) => {
-          initialData[`${config.config_type}.${config.config_key}`] = String(
-            config.config_value
-          );
-        });
-        setFormData(initialData);
-        setHasChanges(false);
-      } else {
-        throw new Error(data.message || "Failed to fetch configurations");
-      }
-    } catch (error) {
-      console.error("Failed to fetch configurations:", error);
-      // Show a user-friendly error message
-      if (error instanceof Error) {
-        alert(`Configuration Error: ${error.message}`);
-      }
-    } finally {
-      setLoadingConfigs(false);
+      });
+      setFormData(initialData);
+      setHasChanges(false);
     }
-  };
+  }, [configurations]);
+
+  // Clear error when modal closes
+  useEffect(() => {
+    if (!open) {
+      clearError();
+      setHasChanges(false);
+    }
+  }, [open, clearError]);
 
   const handleInputChange = (
     configType: string,
@@ -125,14 +90,21 @@ export function PayrollConfigurationModal({
     setSubmitting(true);
 
     try {
-      // Process changes
-      for (const config of configs) {
+      // Process changes using the new store method
+      for (const config of configurations) {
         const fullKey = `${config.config_type}.${config.config_key}`;
         const newValue = formData[fullKey];
         if (
           newValue !== undefined &&
           parseFloat(newValue) !== config.config_value
         ) {
+          await updateConfiguration(
+            config.config_type,
+            config.config_key,
+            parseFloat(newValue)
+          );
+
+          // Also call the parent's onUpdateConfig for backward compatibility
           await onUpdateConfig(
             config.config_type,
             config.config_key,
@@ -141,19 +113,18 @@ export function PayrollConfigurationModal({
         }
       }
 
-      // Refresh configurations
-      await fetchConfigurations();
       setHasChanges(false);
     } catch (error) {
       console.error("Failed to update configurations:", error);
+      // Error is already handled by the store
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleReset = () => {
-    const initialData: Record<string, string> = {};
-    configs.forEach((config) => {
+    const initialData: PayrollConfigurationFormData = {};
+    configurations.forEach((config) => {
       initialData[`${config.config_type}.${config.config_key}`] = String(
         config.config_value
       );
@@ -163,68 +134,72 @@ export function PayrollConfigurationModal({
   };
 
   // Group configurations by type for 2025 structure
-  const configSections: ConfigSection[] = [
+  const configSections: PayrollConfigurationSection[] = [
     {
       title: "SSS Contributions",
       description:
         "Social Security System contribution rates and limits for 2025",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "sss"),
+      configs: configurations.filter((c) => c.config_type === "sss"),
     },
     {
       title: "PhilHealth Contributions",
       description:
         "PhilHealth Universal Healthcare Act 2025 rates (5.5% total)",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "philhealth"),
+      configs: configurations.filter((c) => c.config_type === "philhealth"),
     },
     {
       title: "Pag-IBIG Contributions",
       description:
         "Housing Development Mutual Fund 2025 rates with enhanced tiers",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "pagibig"),
+      configs: configurations.filter((c) => c.config_type === "pagibig"),
     },
     {
       title: "Income Tax Brackets",
       description: "TRAIN Law 2025 tax brackets with inflation adjustments",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "income_tax"),
+      configs: configurations.filter((c) => c.config_type === "income_tax"),
     },
     {
       title: "13th Month Pay",
       description: "13th month pay calculation settings for 2025",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "thirteenth_month"),
+      configs: configurations.filter(
+        (c) => c.config_type === "thirteenth_month"
+      ),
     },
     {
       title: "Holiday Pay Rates",
       description: "Regular and special holiday pay multipliers for 2025",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "holiday_pay"),
+      configs: configurations.filter((c) => c.config_type === "holiday_pay"),
     },
     {
       title: "Overtime Rates",
       description: "Overtime pay multipliers and thresholds for 2025",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "overtime"),
+      configs: configurations.filter((c) => c.config_type === "overtime"),
     },
     {
       title: "Night Differential",
       description: "Night differential rates and time settings for 2025",
       icon: <Calendar className="h-4 w-4" />,
-      configs: configs.filter((c) => c.config_type === "night_differential"),
+      configs: configurations.filter(
+        (c) => c.config_type === "night_differential"
+      ),
     },
   ].filter((section) => section.configs.length > 0);
 
-  const renderConfigInput = (config: PayrollConfig2025) => {
+  const renderConfigInput = (config: PayrollConfiguration) => {
     const fullKey = `${config.config_type}.${config.config_key}`;
     const value = formData[fullKey] || "";
 
     return (
       <Input
         type="number"
-        step={config.config_key.includes("rate") ? "0.001" : "0.01"}
+        step={payrollConfigurationHelpers.getInputStep(config.config_key)}
         value={value}
         onChange={(e) =>
           handleInputChange(
@@ -238,24 +213,44 @@ export function PayrollConfigurationModal({
     );
   };
 
-  const formatConfigTitle = (configKey: string) => {
-    return configKey
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-  };
-
-  const formatConfigValue = (config: PayrollConfig2025) => {
-    if (config.config_key.includes("rate") && config.config_value < 1) {
-      return `${(config.config_value * 100).toFixed(2)}%`;
-    }
-    if (
-      config.config_key.includes("exemption") ||
-      config.config_key.includes("limit")
-    ) {
-      return `₱${config.config_value.toLocaleString()}`;
-    }
-    return config.config_value.toString();
-  };
+  // Show error if there's one
+  if (error) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Configuration Error</DialogTitle>
+            <DialogDescription>
+              There was an error loading the payroll configurations.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <Info className="h-5 w-5 text-red-400 flex-shrink-0" />
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Error Details
+                </h3>
+                <p className="mt-2 text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                clearError();
+                fetchConfigurations();
+              }}
+              variant="outline"
+            >
+              Retry
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -304,7 +299,7 @@ export function PayrollConfigurationModal({
           </div>
         </div>
 
-        {loadingConfigs || loading ? (
+        {configLoading || loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -355,10 +350,15 @@ export function PayrollConfigurationModal({
                       >
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">
-                            {formatConfigTitle(config.config_key)}
+                            {payrollConfigurationHelpers.formatConfigTitle(
+                              config.config_key
+                            )}
                           </Label>
                           <Badge variant="outline" className="text-xs">
-                            Current: {formatConfigValue(config)}
+                            Current:{" "}
+                            {payrollConfigurationHelpers.formatConfigValue(
+                              config
+                            )}
                           </Badge>
                         </div>
                         {renderConfigInput(config)}

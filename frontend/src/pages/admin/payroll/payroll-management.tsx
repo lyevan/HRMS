@@ -471,7 +471,7 @@ const PayrollManagement = () => {
           effectiveDate?: string
         ) => {
           try {
-            const response = await fetch("/api/payroll-config/update", {
+            const response = await fetch("/api/payroll-configuration/update", {
               method: "PUT",
               headers: {
                 "Content-Type": "application/json",
