@@ -58,6 +58,10 @@ const ManualLog = () => {
   const [isDetailsReadOnly, setIsDetailsReadOnly] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [results, setResults] = useState(null);
+
   useEffect(() => {
     fetchManualLogRequests();
   }, []);
@@ -65,6 +69,47 @@ const ManualLog = () => {
   useEffect(() => {
     filterRequests();
   }, [requests, searchTerm, statusFilter]);
+
+  const handleFileChange = (event: any) => {
+    setFile(event.target.files[0]);
+    setResults(null);
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      alert("Please select a file");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("attendanceFile", file); // Must match multer field name
+
+      const response = await axios.post("/attendance/bulk-excel", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const result = response.data;
+      setResults(result);
+
+      if (result.success) {
+        toast.success(
+          `Success! ${result.data.successful_count} records processed`
+        );
+      } else {
+        toast.warning(`Completed with ${result.data.error_count} errors`);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload file. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Template download handlers
   const handleDownloadExcelTemplate = async () => {
@@ -262,6 +307,18 @@ const ManualLog = () => {
           <p className="text-muted-foreground">
             Manage manual attendance log requests and approvals
           </p>
+        </div>
+        {/* File Upload */}
+        <div className="file-upload">
+          <Input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileChange}
+            disabled={uploading}
+          />
+          <Button onClick={handleUpload} disabled={!file || uploading}>
+            {uploading ? "Uploading..." : "Upload Attendance"}
+          </Button>
         </div>
         <div className="flex gap-2">
           <DropdownMenu>

@@ -1605,6 +1605,8 @@ const optimizedGeneratePayroll = async (req, res) => {
       end_date
     );
 
+    console.log("Attendance data fetched for employees:", attendance.rows);
+
     // Create lookup map for attendance data
     const attendanceMap = {};
     attendance.rows.forEach((att) => {

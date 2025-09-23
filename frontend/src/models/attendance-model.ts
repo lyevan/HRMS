@@ -1,5 +1,100 @@
 import axios from "axios";
 
+export interface PayrollBreakdown {
+  overtime: {
+    approved: {
+      total: number;
+      regular_overtime: number;
+      rest_day_overtime: number;
+      night_diff_overtime: number;
+      regular_holiday_overtime: number;
+      special_holiday_overtime: number;
+      regular_holiday_rest_day_overtime: number;
+      special_holiday_rest_day_overtime: number;
+    };
+    computed: {
+      total: number;
+      regular_overtime: {
+        rate: number;
+        value: number;
+      };
+      rest_day_overtime: number;
+      night_diff_overtime: number;
+      regular_holiday_overtime: number;
+      special_holiday_overtime: number;
+      regular_holiday_rest_day_overtime: number;
+      special_holiday_rest_day_overtime: number;
+    };
+  };
+  premiums: {
+    holidays: {
+      regular_holiday: {
+        total: number;
+        regular: number;
+        overtime: number;
+        rest_day: number;
+        night_diff: number;
+        pure_holiday: number;
+      };
+      special_holiday: {
+        total: number;
+        regular: number;
+        overtime: number;
+        rest_day: number;
+        night_diff: number;
+        pure_holiday: number;
+      };
+      regular_holiday_rest_day: {
+        total: number;
+        regular: number;
+        overtime: number;
+        night_diff: number;
+      };
+      special_holiday_rest_day: {
+        total: number;
+        regular: number;
+        overtime: number;
+        night_diff: number;
+      };
+    };
+    rest_day: {
+      total: number;
+      regular: number;
+      overtime: number;
+      pure_rest_day: number;
+      with_night_diff: number;
+    };
+    night_differential: {
+      total: number;
+      regular: number;
+      overtime: number;
+      with_rest_day: number;
+      with_regular_holiday: number;
+      with_special_holiday: number;
+      with_regular_holiday_rest_day: number;
+      with_special_holiday_rest_day: number;
+    };
+  };
+  deductions: {
+    late_hours: number;
+    undertime_hours: number;
+  };
+  regular_hours: number;
+  edge_case_flags: {
+    is_day_off: boolean;
+    has_overtime: boolean;
+    is_regular_holiday: boolean;
+    is_special_holiday: boolean;
+    premium_stack_count: number;
+    has_multiple_premiums: boolean;
+    has_night_differential: boolean;
+    is_ultimate_case_regular: boolean;
+    is_ultimate_case_special: boolean;
+    is_day_off_and_regular_holiday: boolean;
+    is_day_off_and_special_holiday: boolean;
+  };
+}
+
 export interface AttendanceRecord {
   attendance_id: number;
   employee_id: string;
@@ -36,6 +131,9 @@ export interface AttendanceRecord {
   last_name?: string;
   calculated_total_hours?: number;
   break_duration?: number; // From schedule
+  start_time?: string; // From schedule
+  end_time?: string; // From schedule
+  days_of_week?: string[]; // From schedule
 
   // Additional fields can be added as needed
   processed_by?: string;
@@ -44,8 +142,9 @@ export interface AttendanceRecord {
   timesheet_start_date?: string;
   timesheet_end_date?: string;
   is_timesheet_consumed?: boolean;
-}
 
+  payroll_breakdown?: PayrollBreakdown;
+}
 export interface TimesheetResponse {
   timesheet_id: number;
   start_date: string;

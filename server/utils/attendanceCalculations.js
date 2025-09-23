@@ -1,47 +1,43 @@
 import { pool } from "../config/db.js";
-
+import AdvancedPayrollCalculator from "../services/AdvancedPayrollCalculator.js";
 /**
  * Enhanced attendance calculation helper functions
  * Using native JavaScript Date objects for UTC consistency with PostgreSQL timestamptz
  */
 
 // Check if a date is a holiday and get holiday details
-export const getHolidayInfo = async (date) => {
+export const getHolidayInfo = async (clockInTime) => {
   try {
+    const clockInDate = new Date(clockInTime);
+
+    // Extract YYYY-MM-DD in local (not UTC)
+    const localDateString = clockInDate.toLocaleDateString("en-CA", {
+      timeZone: "Asia/Manila",
+    });
+    // "en-CA" => YYYY-MM-DD format
+
     const result = await pool.query(
       `SELECT holiday_id, name, holiday_type, is_active 
        FROM holidays 
        WHERE date = $1 AND is_active = true`,
-      [date]
+      [localDateString]
     );
 
-    if (result.rows.length > 0) {
-      const holiday = result.rows[0];
-      return {
-        isHoliday: true,
-        isRegularHoliday: holiday.holiday_type === "regular",
-        isSpecialHoliday: holiday.holiday_type === "special",
-        holidayName: holiday.name,
-        holidayType: holiday.holiday_type,
-      };
-    }
+    const holidayInfo = result.rows[0] || null;
+    const isRegularHoliday = holidayInfo?.holiday_type === "regular";
+    const isSpecialHoliday = holidayInfo?.holiday_type === "special";
 
     return {
-      isHoliday: false,
-      isRegularHoliday: false,
-      isSpecialHoliday: false,
-      holidayName: null,
-      holidayType: null,
+      holidayId: holidayInfo?.holiday_id || null,
+      holidayName: holidayInfo?.name || null,
+      holidayType: holidayInfo?.holiday_type || null,
+      holidayIsActive: holidayInfo?.is_active || null,
+      isRegularHoliday,
+      isSpecialHoliday,
     };
-  } catch (error) {
-    console.error("Error checking holiday status:", error);
-    return {
-      isHoliday: false,
-      isRegularHoliday: false,
-      isSpecialHoliday: false,
-      holidayName: null,
-      holidayType: null,
-    };
+  } catch (err) {
+    console.error("Error fetching holiday info:", err);
+    return null;
   }
 };
 
@@ -75,14 +71,27 @@ export const calculateLateMinutes = (clockInTime, scheduledStartTime) => {
 
   const clockIn = new Date(clockInTime);
 
-  // Parse scheduled start time for the same date as clock-in
+  // Use the same date as clock-in
   const clockInDate = clockIn.toISOString().split("T")[0];
-  const scheduledStart = new Date(`${clockInDate}T${scheduledStartTime}`);
+  let scheduledStart = new Date(`${clockInDate}T${scheduledStartTime}`);
+
+  // Handle cross-midnight shifts: adjust if the difference is too large
+  const diffHours = (clockIn - scheduledStart) / (1000 * 60 * 60);
+
+  if (diffHours > 12) {
+    // Clock-in is way after scheduled start → shift start forward 1 day
+    scheduledStart.setDate(scheduledStart.getDate() + 1);
+  } else if (diffHours < -12) {
+    // Scheduled start is way after clock-in → shift start back 1 day
+    scheduledStart.setDate(scheduledStart.getDate() - 1);
+  }
+
+  console.log("Clock In", clockIn);
+  console.log("Scheduled Start Parsed:", scheduledStart);
 
   if (clockIn > scheduledStart) {
     return diffMinutesUTC(scheduledStart, clockIn);
   }
-
   return 0;
 };
 
@@ -274,14 +283,17 @@ export const calculateHolidayEntitlement = async (
 // Enhanced clock-in calculation
 
 // ---- Clock-in ----
-// scheduleInfo should contain: { start_time, end_time }
-// TODO: Later add { break_start, break_end } for break entitlement calculations
 export const enhancedClockInCalculation = async (
   employeeId,
   clockInTime, // should be ISO string or UTC Date
   scheduleInfo,
   holidayInfo
 ) => {
+  // console.log("Employee ID:", employeeId);
+  // console.log("Clock-in Time:", clockInTime);
+  // console.log("Schedule Info:", scheduleInfo);
+  // console.log("Holiday Info:", holidayInfo);
+
   const lateMinutes = calculateLateMinutes(
     clockInTime,
     scheduleInfo.start_time
@@ -303,9 +315,28 @@ export const enhancedClockInCalculation = async (
   };
 };
 
+function buildBreakWindow(timeIn, breakStartStr, breakEndStr) {
+  // breakStartStr like "02:00:00", breakEndStr like "03:00:00"
+  const [bsHour, bsMin, bsSec] = breakStartStr.split(":").map(Number);
+  const [beHour, beMin, beSec] = breakEndStr.split(":").map(Number);
+
+  const breakStart = new Date(timeIn);
+  breakStart.setHours(bsHour, bsMin, bsSec, 0);
+
+  const breakEnd = new Date(timeIn);
+  breakEnd.setHours(beHour, beMin, beSec, 0);
+
+  // Handle overnight shifts: if break times are before timeIn, they're likely on the next day
+  if (breakStart < timeIn) {
+    // Break is on the next day for overnight shifts
+    breakStart.setDate(breakStart.getDate() + 1);
+    breakEnd.setDate(breakEnd.getDate() + 1);
+  }
+
+  return { breakStart, breakEnd };
+}
+
 // ---- Clock-out ----
-// scheduleInfo should contain: { start_time, end_time, break_duration }
-// TODO: Later add { break_start, break_end } for more precise break calculations
 export const enhancedClockOutCalculation = async (
   attendanceRecord,
   clockOutTime, // ISO string or UTC Date
@@ -336,8 +367,8 @@ export const enhancedClockOutCalculation = async (
     const breakEnd = new Date(`${workDate}T${scheduleInfo.break_end}`);
 
     // Handle overnight shifts - adjust break times if necessary
-    let adjustedBreakStart = breakStart;
-    let adjustedBreakEnd = breakEnd;
+    // let adjustedBreakStart = breakStart;
+    // let adjustedBreakEnd = breakEnd;
 
     // If break times are before timeIn, they might be on the next day for overnight shifts
     if (
@@ -349,19 +380,29 @@ export const enhancedClockOutCalculation = async (
       const scheduleEnd = new Date(`${workDate}T${scheduleInfo.end_time}`);
 
       // Check if this is an overnight shift
-      if (scheduleEnd <= scheduleStart) {
-        // This is an overnight shift, check if break should be on next day
-        if (breakStart.getHours() >= scheduleStart.getHours()) {
-          // Break is likely on the same day
-        } else {
-          // Break is likely on the next day
-          adjustedBreakStart = new Date(
-            breakStart.getTime() + 24 * 60 * 60 * 1000
-          );
-          adjustedBreakEnd = new Date(breakEnd.getTime() + 24 * 60 * 60 * 1000);
-        }
-      }
+      // if (scheduleEnd <= scheduleStart) {
+      //   // This is an overnight shift, check if break should be on next day
+      //   if (breakStart.getHours() >= scheduleStart.getHours()) {
+      //     // Break is likely on the same day
+      //   } else {
+      //     // Break is likely on the next day
+      //     adjustedBreakStart = new Date(
+      //       breakStart.getTime() + 24 * 60 * 60 * 1000
+      //     );
+      //     adjustedBreakEnd = new Date(breakEnd.getTime() + 24 * 60 * 60 * 1000);
+      //   }
+      // }
     }
+
+    const { breakStart: adjustedBreakStart, breakEnd: adjustedBreakEnd } =
+      buildBreakWindow(
+        timeIn,
+        scheduleInfo.break_start,
+        scheduleInfo.break_end
+      );
+
+    // console.log("[DEBUG] Adjusted Break Start:", adjustedBreakStart);
+    // console.log("[DEBUG] Adjusted Break End:", adjustedBreakEnd);
 
     // Only deduct break time if the employee worked through the break period
     if (timeIn <= adjustedBreakStart && timeOut >= adjustedBreakEnd) {
@@ -383,6 +424,21 @@ export const enhancedClockOutCalculation = async (
     // If no overlap, no break deduction (employee didn't work during break)
 
     totalHours -= actualBreakDeduction;
+    // console.log("[CALC 1] Actual Break Deduction Hours:", actualBreakDeduction);
+    // console.log("[CALC 1] Total Hours after Break Deduction:", totalHours);
+
+    // console.log("timeIn:", timeIn.toISOString(), timeIn.getTime());
+    // console.log("timeOut:", timeOut.toISOString(), timeOut.getTime());
+    // console.log(
+    //   "breakStart:",
+    //   adjustedBreakStart.toISOString(),
+    //   adjustedBreakStart.getTime()
+    // );
+    // console.log(
+    //   "breakEnd:",
+    //   adjustedBreakEnd.toISOString(),
+    //   adjustedBreakEnd.getTime()
+    // );
   } else if (scheduleInfo.break_duration && rawHours >= 4) {
     // Fallback to old break_duration logic for backward compatibility
     const breakHours = roundToPayrollIncrement(
@@ -390,6 +446,9 @@ export const enhancedClockOutCalculation = async (
     );
     actualBreakDeduction = breakHours;
     totalHours -= breakHours;
+
+    // console.log("[CALC 2] Actual Break Deduction Hours:", actualBreakDeduction);
+    // console.log("[CALC 2] Total Hours after Break Deduction:", totalHours);
   }
 
   if (totalHours < 0) totalHours = 0;
@@ -487,8 +546,59 @@ export const enhancedClockOutCalculation = async (
 
   const scheduledWorkHours = scheduledRawHours - scheduledBreakHours;
 
+  // === EARLY CLOCK-IN NEGLECT FEATURE ===
+  // Option to ignore early clock-in minutes from overtime calculations
+  const NEGLECT_EARLY_IN_MINUTES = true; // TODO: Move to database configuration
+
+  let adjustedTotalHours = totalHours;
+  let earlyClockInDeduction = 0;
+
+  if (NEGLECT_EARLY_IN_MINUTES && scheduleInfo.start_time) {
+    // Calculate scheduled start time for comparison using the same logic as calculateLateMinutes
+    const timeInDate = new Date(timeIn);
+
+    // Parse schedule start time on the same date as timeIn initially
+    const clockInDate = timeInDate.toISOString().split("T")[0];
+    let scheduledStart = new Date(`${clockInDate}T${scheduleInfo.start_time}`);
+
+    // Handle cross-midnight shifts: adjust if the difference is too large
+    const diffHours = (timeInDate - scheduledStart) / (1000 * 60 * 60);
+    if (diffHours > 12) {
+      // Clock-in is way after scheduled start → shift start forward 1 day
+      scheduledStart.setDate(scheduledStart.getDate() + 1);
+    } else if (diffHours < -12) {
+      // Scheduled start is way after clock-in → shift start back 1 day
+      scheduledStart.setDate(scheduledStart.getDate() - 1);
+    }
+
+    console.log("[DEBUG] TimeIn:", timeInDate.toISOString());
+    console.log(
+      "[DEBUG] Scheduled Start for Early In Check:",
+      scheduledStart.toISOString()
+    );
+
+    // Calculate early clock-in minutes
+    if (timeIn < scheduledStart) {
+      const earlyMinutes =
+        (scheduledStart.getTime() - timeIn.getTime()) / (1000 * 60);
+      earlyClockInDeduction = roundToPayrollIncrement(earlyMinutes / 60);
+      adjustedTotalHours = Math.max(0, totalHours - earlyClockInDeduction);
+
+      console.log(
+        `[DEBUG] Early clock-in detected: ${earlyMinutes.toFixed(
+          2
+        )} minutes (${earlyClockInDeduction} hours deducted)`
+      );
+      console.log(
+        `[EARLY CLOCK-IN] Original total hours: ${totalHours}, Adjusted: ${adjustedTotalHours}`
+      );
+    } else {
+      console.log("[DEBUG] No early clock-in detected");
+    }
+  }
+
   // === OVERTIME CALCULATION ===
-  // Overtime applies when total hours exceed scheduled hours
+  // Overtime applies when adjusted total hours exceed scheduled hours
   // BUT overtime calculation differs based on day type:
   // - Regular day: Standard overtime after 8 hours
   // - Day off: All hours are overtime (but also rest day premium)
@@ -506,16 +616,19 @@ export const enhancedClockOutCalculation = async (
     baseOvertimeThreshold = 8;
   }
 
-  if (totalHours > baseOvertimeThreshold) {
-    overtimeHours = totalHours - baseOvertimeThreshold;
+  if (adjustedTotalHours > baseOvertimeThreshold) {
+    overtimeHours = adjustedTotalHours - baseOvertimeThreshold;
+    console.log("[CALC] Adjusted Total Hours:", adjustedTotalHours);
+    console.log("[CALC] Base Overtime Threshold:", baseOvertimeThreshold);
+    console.log("[CALC] Overtime Hours:", overtimeHours);
   }
 
   // === COMPREHENSIVE OVERTIME BREAKDOWN ===
   // Now we need to categorize what TYPE of overtime each hour is
   // CRITICAL: Holiday overtime calculation with proper stacking
 
-  // Calculate base hours (non-overtime hours)
-  const baseHours = totalHours - overtimeHours;
+  // Calculate base hours (non-overtime hours) using adjusted total hours
+  const baseHours = adjustedTotalHours - overtimeHours;
 
   // Now break down the overtime by type with proper priority
   let regularOvertimeHours = 0;
@@ -677,31 +790,46 @@ export const enhancedClockOutCalculation = async (
 
   const isUndertime = totalHours < scheduledWorkHours - 0.5; // 30-min tolerance
   const isHalfday = totalHours < scheduledWorkHours / 2;
+  const calculator = new AdvancedPayrollCalculator(pool);
+  await calculator.loadConfiguration();
 
   // === COMPREHENSIVE PAYROLL BREAKDOWN JSON WITH ENHANCED HOLIDAY LOGIC ===
   const payrollBreakdown = {
     regular_hours: roundToPayrollIncrement(pureRegularHours),
 
     overtime: {
-      total: roundToPayrollIncrement(overtimeHours),
-      regular_overtime: roundToPayrollIncrement(regularOvertimeHours),
-      night_diff_overtime: roundToPayrollIncrement(nightDiffOvertimeHours),
-      rest_day_overtime: roundToPayrollIncrement(restDayOvertimeHours),
-      regular_holiday_overtime: roundToPayrollIncrement(
-        regularHolidayOvertimeHours
-      ),
-      special_holiday_overtime: roundToPayrollIncrement(
-        specialHolidayOvertimeHours
-      ),
-      // ULTIMATE EDGE CASES: Holiday + Rest Day overtime
-      regular_holiday_rest_day_overtime: roundToPayrollIncrement(
-        regularHolidayRestDayOvertimeHours
-      ),
-      special_holiday_rest_day_overtime: roundToPayrollIncrement(
-        specialHolidayRestDayOvertimeHours
-      ),
+      computed: {
+        total: roundToPayrollIncrement(overtimeHours),
+        regular_overtime: {
+          value: roundToPayrollIncrement(regularOvertimeHours),
+          rate: calculator.config.overtimeMultiplier,
+        },
+        night_diff_overtime: roundToPayrollIncrement(nightDiffOvertimeHours),
+        rest_day_overtime: roundToPayrollIncrement(restDayOvertimeHours),
+        regular_holiday_overtime: roundToPayrollIncrement(
+          regularHolidayOvertimeHours
+        ),
+        special_holiday_overtime: roundToPayrollIncrement(
+          specialHolidayOvertimeHours
+        ),
+        regular_holiday_rest_day_overtime: roundToPayrollIncrement(
+          regularHolidayRestDayOvertimeHours
+        ),
+        special_holiday_rest_day_overtime: roundToPayrollIncrement(
+          specialHolidayRestDayOvertimeHours
+        ),
+      },
+      approved: {
+        total: 0,
+        regular_overtime: 0,
+        night_diff_overtime: 0,
+        rest_day_overtime: 0,
+        regular_holiday_overtime: 0,
+        special_holiday_overtime: 0,
+        regular_holiday_rest_day_overtime: 0,
+        special_holiday_rest_day_overtime: 0,
+      },
     },
-
     premiums: {
       night_differential: {
         total: roundToPayrollIncrement(nightDiffHours),
@@ -849,8 +977,16 @@ export const enhancedClockOutCalculation = async (
   };
 
   return {
-    total_hours: roundToPayrollIncrement(totalHours),
+    total_hours: roundToPayrollIncrement(adjustedTotalHours), // Use adjusted hours for consistency with overtime calculation
     overtime_hours: roundToPayrollIncrement(overtimeHours),
+
+    // Early clock-in handling
+    adjusted_total_hours: roundToPayrollIncrement(adjustedTotalHours),
+    early_clockin_deduction_hours: roundToPayrollIncrement(
+      earlyClockInDeduction
+    ),
+    early_clockin_neglect_enabled: NEGLECT_EARLY_IN_MINUTES,
+
     // Enhanced overtime breakdown
     regular_overtime_hours: roundToPayrollIncrement(regularOvertimeHours),
     night_diff_overtime_hours: roundToPayrollIncrement(nightDiffOvertimeHours),

@@ -215,7 +215,7 @@ export class AdvancedPayrollCalculator {
       // Merge database config with default config using deep merge
       this.config = { ...this.config, ...dbConfig };
 
-      // console.log("📊  Final merged payroll configuration:", this.config);
+      console.log("📊  Final merged payroll configuration:", this.config);
 
       // console.log("Final payroll configuration:", this.config);
     } catch (error) {

@@ -87,6 +87,17 @@ export const viewModalContent = ({
               : "0h"}
           </p>
         </div>
+        <div>
+          <label className="text-sm font-medium text-muted-foreground">
+            Night Differential Hours
+          </label>
+          <p className="text-sm">
+            {selectedRecord.payroll_breakdown?.overtime.computed
+              .night_diff_overtime
+              ? `${selectedRecord.payroll_breakdown.overtime.computed.night_diff_overtime}h`
+              : "0h"}
+          </p>
+        </div>
       </div>
 
       {selectedRecord.notes && (
