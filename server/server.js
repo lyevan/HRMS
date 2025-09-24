@@ -40,6 +40,7 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
     "https://relyant-demo-client.vercel.app",
+    "https://relyant-demo-client-git-devfeature-lyevans-projects.vercel.app",
     "http://localhost:5173",
     "http://192.168.254.103:5173",
     process.env.FRONTEND_URL,
