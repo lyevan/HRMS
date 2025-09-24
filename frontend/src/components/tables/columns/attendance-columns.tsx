@@ -86,12 +86,11 @@ export const createAttendanceColumns = ({
   },
   {
     accessorKey: "payroll_breakdown",
+    id: "schedule",
     header: "Schedule",
     cell: ({ row }) => {
-      const breakdown = row.getValue(
-        "payroll_breakdown"
-      ) as AttendanceRecord["payroll_breakdown"];
-
+      const breakdown = row.original
+        .payroll_breakdown as AttendanceRecord["payroll_breakdown"];
       const startTime = breakdown?.schedule.start_time as string | null;
       const endTime = breakdown?.schedule.end_time as string | null;
       const daysOfWeek = breakdown?.schedule.days_of_week as string[] | null;
@@ -267,11 +266,11 @@ export const createAttendanceColumns = ({
   // },
   {
     accessorKey: "payroll_breakdown",
+    id: "hours_worked",
     header: "Hours Worked",
     cell: ({ row }) => {
-      const breakdown = row.getValue(
-        "payroll_breakdown"
-      ) as AttendanceRecord["payroll_breakdown"];
+      const breakdown = row.original
+        .payroll_breakdown as AttendanceRecord["payroll_breakdown"];
       const totalHours = breakdown?.worked_hours.total;
       if (totalHours === null || totalHours === undefined) {
         return <span className="text-muted-foreground">--</span>;
@@ -396,11 +395,12 @@ export const createAttendanceColumns = ({
   },
   {
     accessorKey: "payroll_breakdown",
+    id: "ot_hours",
     header: "OT Hours",
     cell: ({ row }) => {
-      const breakdown = row.getValue(
-        "payroll_breakdown"
-      ) as AttendanceRecord["payroll_breakdown"];
+      const breakdown = row.original
+        .payroll_breakdown as AttendanceRecord["payroll_breakdown"];
+
       const hours = breakdown?.overtime.computed.total;
       if (!hours || hours === 0)
         return <span className="text-muted-foreground">--</span>;

@@ -58,10 +58,6 @@ const ManualLog = () => {
   const [isDetailsReadOnly, setIsDetailsReadOnly] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
 
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [_results, setResults] = useState(null);
-
   useEffect(() => {
     fetchManualLogRequests();
   }, []);
@@ -69,47 +65,6 @@ const ManualLog = () => {
   useEffect(() => {
     filterRequests();
   }, [requests, searchTerm, statusFilter]);
-
-  const handleFileChange = (event: any) => {
-    setFile(event.target.files[0]);
-    setResults(null);
-  };
-
-  const handleUpload = async () => {
-    if (!file) {
-      alert("Please select a file");
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("attendanceFile", file); // Must match multer field name
-
-      const response = await axios.post("/attendance/bulk-excel", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      const result = response.data;
-      setResults(result);
-
-      if (result.success) {
-        toast.success(
-          `Success! ${result.data.successful_count} records processed`
-        );
-      } else {
-        toast.warning(`Completed with ${result.data.error_count} errors`);
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error("Failed to upload file. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   // Template download handlers
   const handleDownloadExcelTemplate = async () => {
@@ -138,28 +93,28 @@ const ManualLog = () => {
     }
   };
 
-  const handleDownloadCSVTemplate = async () => {
-    try {
-      const response = await axios.get("/bulk-upload/template/csv", {
-        responseType: "blob",
-      });
+  // const handleDownloadCSVTemplate = async () => {
+  //   try {
+  //     const response = await axios.get("/bulk-upload/template/csv", {
+  //       responseType: "blob",
+  //     });
 
-      const blob = new Blob([response.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "attendance-upload-template.csv";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+  //     const blob = new Blob([response.data], { type: "text/csv" });
+  //     const url = window.URL.createObjectURL(blob);
+  //     const link = document.createElement("a");
+  //     link.href = url;
+  //     link.download = "attendance-upload-template.csv";
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     document.body.removeChild(link);
+  //     window.URL.revokeObjectURL(url);
 
-      toast.success("CSV template downloaded successfully");
-    } catch (error) {
-      console.error("Error downloading CSV template:", error);
-      toast.error("Failed to download CSV template");
-    }
-  };
+  //     toast.success("CSV template downloaded successfully");
+  //   } catch (error) {
+  //     console.error("Error downloading CSV template:", error);
+  //     toast.error("Failed to download CSV template");
+  //   }
+  // };
 
   const handleBulkUploadSuccess = () => {
     fetchManualLogRequests();
@@ -308,18 +263,6 @@ const ManualLog = () => {
             Manage manual attendance log requests and approvals
           </p>
         </div>
-        {/* File Upload */}
-        <div className="file-upload">
-          <Input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileChange}
-            disabled={uploading}
-          />
-          <Button onClick={handleUpload} disabled={!file || uploading}>
-            {uploading ? "Uploading..." : "Upload Attendance"}
-          </Button>
-        </div>
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -329,23 +272,34 @@ const ManualLog = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
+              {/* <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 <span>Upload CSV</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                <span>Upload Excel</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
+              <div className="space-y-1">
+                <h1 className="font-bold text-muted-foreground text-xs pl-2">
+                  Uploading
+                </h1>
+                <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  <span>Upload Excel</span>
+                </DropdownMenuItem>
+              </div>
+
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleDownloadCSVTemplate}>
+              {/* <DropdownMenuItem onClick={handleDownloadCSVTemplate}>
                 <Download className="h-4 w-4 mr-2" />
                 <span>CSV Template</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownloadExcelTemplate}>
-                <Download className="h-4 w-4 mr-2" />
-                <span>Excel Template</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
+              <div className="space-y-1">
+                <h1 className="font-bold text-muted-foreground text-xs pl-2">
+                  Template
+                </h1>
+                <DropdownMenuItem onClick={handleDownloadExcelTemplate}>
+                  <Download className="h-4 w-4 mr-2" />
+                  <span>Excel Template</span>
+                </DropdownMenuItem>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button

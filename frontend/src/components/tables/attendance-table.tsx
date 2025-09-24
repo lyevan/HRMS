@@ -481,7 +481,10 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
             <Button
               variant="outline"
               className="h-8 w-8 p-0"
-              onClick={() => table.nextPage()}
+              onClick={() => {
+                table.nextPage();
+                console.log("Next Page Clicked");
+              }}
               disabled={!table.getCanNextPage() || loading}
             >
               <span className="sr-only">Go to next page</span>
