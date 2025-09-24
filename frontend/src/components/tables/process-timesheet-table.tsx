@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Input } from "../ui/input";
 import {
   DropdownMenu,
@@ -278,27 +278,29 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
     updateDateRangeFromCutoff();
   }, [cutoffType, periodSelection, selectedMonth, selectedYear]);
 
-  // Filter data based on date range and status
-  const filteredData = data.filter((record) => {
-    // Date range filter
-    if (dateRange.from || dateRange.to) {
-      const recordDate = new Date(record.date);
-      if (dateRange.from && recordDate < dateRange.from) return false;
-      if (dateRange.to && recordDate > dateRange.to) return false;
-    }
-
-    // Status filter
-    if (statusFilter.length > 0) {
-      const status = getAttendanceStatusText(record).toLowerCase();
-      if (
-        !statusFilter.some((filter) => status.includes(filter.toLowerCase()))
-      ) {
-        return false;
+  // Filter data based on date range and status - using useMemo to prevent unnecessary recalculations
+  const filteredData = useMemo(() => {
+    return data.filter((record) => {
+      // Date range filter
+      if (dateRange.from || dateRange.to) {
+        const recordDate = new Date(record.date);
+        if (dateRange.from && recordDate < dateRange.from) return false;
+        if (dateRange.to && recordDate > dateRange.to) return false;
       }
-    }
 
-    return true;
-  });
+      // Status filter
+      if (statusFilter.length > 0) {
+        const status = getAttendanceStatusText(record).toLowerCase();
+        if (
+          !statusFilter.some((filter) => status.includes(filter.toLowerCase()))
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [data, dateRange, statusFilter]);
 
   // Create columns with checkbox (only if onSelectionChange is provided)
   const columnsWithCheckbox = onSelectionChange
@@ -370,15 +372,21 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
     setStatusFilter((prev) =>
       checked ? [...prev, status] : prev.filter((s) => s !== status)
     );
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   const clearDateRange = () => {
     setDateRange({ from: undefined, to: undefined });
     setCutoffType("custom"); // Reset to custom when clearing
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   const clearStatusFilter = () => {
     setStatusFilter([]);
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   if (error) {

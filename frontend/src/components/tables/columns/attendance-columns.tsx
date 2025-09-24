@@ -346,7 +346,10 @@ export const createAttendanceColumns = ({
                         .night_diff_special_holiday_rest_day,
                   },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between">
+                  <div
+                    key={label}
+                    className={`flex justify-between ${value ? "" : "hidden"}`}
+                  >
                     <span
                       className={`font-medium ${
                         value ? "underline" : "text-muted-foreground"
@@ -486,7 +489,10 @@ export const createAttendanceColumns = ({
                         .night_diff_special_holiday_rest_day_overtime,
                   },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between">
+                  <div
+                    key={label}
+                    className={`flex justify-between ${value ? "" : "hidden"}`}
+                  >
                     <span
                       className={`font-medium ${
                         value ? "underline" : "text-muted-foreground"

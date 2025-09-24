@@ -29,7 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "../ui/input";
 import {
   DropdownMenu,
@@ -81,27 +81,29 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
   const isMobile = useIsMobile();
   const { fetchAttendanceRecords } = useAttendanceStore();
 
-  // Filter data based on date range and status
-  const filteredData = data.filter((record) => {
-    // Date range filter
-    if (dateRange.from || dateRange.to) {
-      const recordDate = new Date(record.date);
-      if (dateRange.from && recordDate < dateRange.from) return false;
-      if (dateRange.to && recordDate > dateRange.to) return false;
-    }
-
-    // Status filter
-    if (statusFilter.length > 0) {
-      const status = getAttendanceStatusText(record).toLowerCase();
-      if (
-        !statusFilter.some((filter) => status.includes(filter.toLowerCase()))
-      ) {
-        return false;
+  // Filter data based on date range and status - using useMemo to prevent unnecessary recalculations
+  const filteredData = useMemo(() => {
+    return data.filter((record) => {
+      // Date range filter
+      if (dateRange.from || dateRange.to) {
+        const recordDate = new Date(record.date);
+        if (dateRange.from && recordDate < dateRange.from) return false;
+        if (dateRange.to && recordDate > dateRange.to) return false;
       }
-    }
 
-    return true;
-  });
+      // Status filter
+      if (statusFilter.length > 0) {
+        const status = getAttendanceStatusText(record).toLowerCase();
+        if (
+          !statusFilter.some((filter) => status.includes(filter.toLowerCase()))
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [data, dateRange, statusFilter]);
 
   const table = useReactTable({
     data: filteredData,
@@ -138,14 +140,20 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
     setStatusFilter((prev) =>
       checked ? [...prev, status] : prev.filter((s) => s !== status)
     );
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   const clearDateRange = () => {
     setDateRange({ from: undefined, to: undefined });
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   const clearStatusFilter = () => {
     setStatusFilter([]);
+    // Reset to first page when filters change
+    setPageIndex(0);
   };
 
   if (error) {
@@ -440,7 +448,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
             onChange={(e) => {
               const newSize = Number(e.target.value);
               setPageSize(newSize);
-              setPageIndex(0);
+              setPageIndex(0); // Reset to first page when changing page size
               table.setPageSize(newSize);
             }}
             className="h-8 w-[70px] rounded border border-input bg-background px-3 py-1 text-sm"
@@ -481,10 +489,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
             <Button
               variant="outline"
               className="h-8 w-8 p-0"
-              onClick={() => {
-                table.nextPage();
-                console.log("Next Page Clicked");
-              }}
+              onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage() || loading}
             >
               <span className="sr-only">Go to next page</span>
