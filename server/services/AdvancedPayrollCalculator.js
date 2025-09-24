@@ -937,41 +937,26 @@ export class AdvancedPayrollCalculator {
         special_holiday_overtime: 0,
         regular_holiday_rest_day_overtime: 0,
         special_holiday_rest_day_overtime: 0,
+        night_diff_regular_holiday_overtime: 0,
+        night_diff_special_holiday_overtime: 0,
+        night_diff_rest_day_overtime: 0,
+        night_diff_regular_holiday_rest_day_overtime: 0,
+        night_diff_special_holiday_rest_day_overtime: 0,
       },
-      premiums: {
-        night_differential: {
-          total: 0,
-          regular: 0,
-          overtime: 0,
-        },
-        rest_day: {
-          total: 0,
-          regular: 0,
-          overtime: 0,
-          pure_rest_day: 0,
-        },
-        holidays: {
-          regular_holiday: {
-            total: 0,
-            regular: 0,
-            overtime: 0,
-          },
-          special_holiday: {
-            total: 0,
-            regular: 0,
-            overtime: 0,
-          },
-          regular_holiday_rest_day: {
-            total: 0,
-            regular: 0,
-            overtime: 0,
-          },
-          special_holiday_rest_day: {
-            total: 0,
-            regular: 0,
-            overtime: 0,
-          },
-        },
+      worked_hours: {
+        total: 0,
+        regular: 0,
+        rest_day: 0,
+        night_diff: 0,
+        regular_holiday: 0,
+        special_holiday: 0,
+        regular_holiday_rest_day: 0,
+        special_holiday_rest_day: 0,
+        night_diff_rest_day: 0,
+        night_diff_regular_holiday: 0,
+        night_diff_special_holiday: 0,
+        night_diff_regular_holiday_rest_day: 0,
+        night_diff_special_holiday_rest_day: 0,
       },
     };
 
@@ -989,37 +974,11 @@ export class AdvancedPayrollCalculator {
         });
       }
 
-      // Premiums breakdown
-      if (breakdown.premiums) {
-        // Night differential
-        if (breakdown.premiums.night_differential) {
-          Object.keys(aggregated.premiums.night_differential).forEach((key) => {
-            aggregated.premiums.night_differential[key] +=
-              breakdown.premiums.night_differential[key] || 0;
-          });
-        }
-
-        // Rest day
-        if (breakdown.premiums.rest_day) {
-          Object.keys(aggregated.premiums.rest_day).forEach((key) => {
-            aggregated.premiums.rest_day[key] +=
-              breakdown.premiums.rest_day[key] || 0;
-          });
-        }
-
-        // Holidays
-        if (breakdown.premiums.holidays) {
-          Object.keys(aggregated.premiums.holidays).forEach((holidayType) => {
-            if (breakdown.premiums.holidays[holidayType]) {
-              Object.keys(aggregated.premiums.holidays[holidayType]).forEach(
-                (key) => {
-                  aggregated.premiums.holidays[holidayType][key] +=
-                    breakdown.premiums.holidays[holidayType][key] || 0;
-                }
-              );
-            }
-          });
-        }
+      // Worked hours breakdown
+      if (breakdown.worked_hours) {
+        Object.keys(aggregated.worked_hours).forEach((key) => {
+          aggregated.worked_hours[key] += breakdown.worked_hours[key] || 0;
+        });
       }
     });
 

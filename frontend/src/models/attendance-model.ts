@@ -1,4 +1,5 @@
 import axios from "axios";
+import { type Schedule } from "./schedules-model";
 
 export interface PayrollBreakdown {
   overtime: {
@@ -11,6 +12,11 @@ export interface PayrollBreakdown {
       special_holiday_overtime: number;
       regular_holiday_rest_day_overtime: number;
       special_holiday_rest_day_overtime: number;
+      night_diff_rest_day_overtime: number;
+      night_diff_regular_holiday_overtime: number;
+      night_diff_special_holiday_overtime: number;
+      night_diff_regular_holiday_rest_day_overtime: number;
+      night_diff_special_holiday_rest_day_overtime: number;
     };
     computed: {
       total: number;
@@ -24,62 +30,34 @@ export interface PayrollBreakdown {
       special_holiday_overtime: number;
       regular_holiday_rest_day_overtime: number;
       special_holiday_rest_day_overtime: number;
+      night_diff_rest_day_overtime: number;
+      night_diff_regular_holiday_overtime: number;
+      night_diff_special_holiday_overtime: number;
+      night_diff_regular_holiday_rest_day_overtime: number;
+      night_diff_special_holiday_rest_day_overtime: number;
     };
   };
-  premiums: {
-    holidays: {
-      regular_holiday: {
-        total: number;
-        regular: number;
-        overtime: number;
-        rest_day: number;
-        night_diff: number;
-        pure_holiday: number;
-      };
-      special_holiday: {
-        total: number;
-        regular: number;
-        overtime: number;
-        rest_day: number;
-        night_diff: number;
-        pure_holiday: number;
-      };
-      regular_holiday_rest_day: {
-        total: number;
-        regular: number;
-        overtime: number;
-        night_diff: number;
-      };
-      special_holiday_rest_day: {
-        total: number;
-        regular: number;
-        overtime: number;
-        night_diff: number;
-      };
-    };
-    rest_day: {
-      total: number;
-      regular: number;
-      overtime: number;
-      pure_rest_day: number;
-      with_night_diff: number;
-    };
-    night_differential: {
-      total: number;
-      regular: number;
-      overtime: number;
-      with_rest_day: number;
-      with_regular_holiday: number;
-      with_special_holiday: number;
-      with_regular_holiday_rest_day: number;
-      with_special_holiday_rest_day: number;
-    };
+  worked_hours: {
+    total: number;
+    regular: number;
+    rest_day: number;
+    night_diff: number;
+    regular_holiday: number;
+    special_holiday: number;
+    regular_holiday_rest_day: number;
+    special_holiday_rest_day: number;
+    night_diff_rest_day: number;
+    night_diff_regular_holiday: number;
+    night_diff_special_holiday: number;
+    night_diff_regular_holiday_rest_day: number;
+    night_diff_special_holiday_rest_day: number;
   };
   deductions: {
     late_hours: number;
     undertime_hours: number;
   };
   regular_hours: number;
+  schedule: Schedule;
   edge_case_flags: {
     is_day_off: boolean;
     has_overtime: boolean;

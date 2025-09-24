@@ -85,11 +85,23 @@ export const createAttendanceColumns = ({
     ),
   },
   {
-    accessorKey: "schedule",
+    accessorKey: "payroll_breakdown",
     header: "Schedule",
     cell: ({ row }) => {
-      const startTime = row.original.start_time as string | null;
-      const endTime = row.original.end_time as string | null;
+      const breakdown = row.getValue(
+        "payroll_breakdown"
+      ) as AttendanceRecord["payroll_breakdown"];
+
+      const startTime = breakdown?.schedule.start_time as string | null;
+      const endTime = breakdown?.schedule.end_time as string | null;
+      const daysOfWeek = breakdown?.schedule.days_of_week as string[] | null;
+      const breakStart = breakdown?.schedule.break_start as string | null;
+      const breakEnd = breakdown?.schedule.break_end as string | null;
+      const breakDuration = breakdown?.schedule.break_duration as number | null;
+
+      if (!startTime || !endTime) {
+        return <span className="text-muted-foreground">No schedule</span>;
+      }
 
       // Format time strings like "08:00:00" to "8:00 AM"
       const formatTimeString = (timeStr: string | null): string => {
@@ -143,12 +155,10 @@ export const createAttendanceColumns = ({
                     <CalendarDays size={16} />
                     <p>Scheduled Days:</p>
                   </div>
-                  {row.original.days_of_week &&
-                    row.original.days_of_week.length > 0 && (
-                      <div className="flex flex-wrap gap-1 my-2">
-                        {getAllDaysWithScheduleStatus(
-                          row.original.days_of_week
-                        ).map(({ day, isScheduled }) => (
+                  {daysOfWeek && daysOfWeek.length > 0 && (
+                    <div className="flex flex-wrap gap-1 my-2">
+                      {getAllDaysWithScheduleStatus(daysOfWeek).map(
+                        ({ day, isScheduled }) => (
                           <Badge
                             key={day}
                             variant="outline"
@@ -160,9 +170,10 @@ export const createAttendanceColumns = ({
                           >
                             {day.charAt(0).toUpperCase() + day.slice(1, 2)}
                           </Badge>
-                        ))}
-                      </div>
-                    )}
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Separator />
                 <div className="space-y-2">
@@ -170,22 +181,19 @@ export const createAttendanceColumns = ({
                     <Coffee size={16} />
                     <p>Break Info:</p>
                   </div>
-                  {row.original.break_start && row.original.break_end ? (
+                  {breakStart && breakEnd ? (
                     <div className="flex justify-between pl-10">
                       <span className="font-medium">Time:</span>
                       <span>
-                        {formatTimeString(row.original.break_start)} -{" "}
-                        {formatTimeString(row.original.break_end)}
+                        {formatTimeString(breakStart)} -{" "}
+                        {formatTimeString(breakEnd)}
                       </span>
                     </div>
                   ) : null}
-                  {row.original.break_duration !== null &&
-                  row.original.break_duration !== undefined ? (
+                  {breakDuration !== null && breakDuration !== undefined ? (
                     <div className="flex justify-between pl-10">
                       <span className="font-medium">Duration:</span>
-                      <span>
-                        {Number(row.original.break_duration).toFixed(0)} min
-                      </span>
+                      <span>{Number(breakDuration).toFixed(0)} min</span>
                     </div>
                   ) : (
                     <div>No break assigned</div>
@@ -258,14 +266,132 @@ export const createAttendanceColumns = ({
   //   },
   // },
   {
-    accessorKey: "total_hours",
+    accessorKey: "payroll_breakdown",
     header: "Hours Worked",
     cell: ({ row }) => {
-      const hours = row.getValue("total_hours") as number | null;
-      if (hours === null || hours === undefined) {
+      const breakdown = row.getValue(
+        "payroll_breakdown"
+      ) as AttendanceRecord["payroll_breakdown"];
+      const totalHours = breakdown?.worked_hours.total;
+      if (totalHours === null || totalHours === undefined) {
         return <span className="text-muted-foreground">--</span>;
       }
-      return `${Number(hours).toFixed(1)}h`;
+      return (
+        <Popover>
+          <PopoverTrigger className="flex items-center gap-2 w-2/3 cursor-pointer">
+            <span className="text-primary w-1/2 text-start font-medium flex-1 data-[state=open]:text-accent">
+              {Number(totalHours).toFixed(1)}h
+            </span>
+            <CircleQuestionMark
+              size={12}
+              className="text-muted-foreground self-start"
+            />
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-48 bg-primary/20 backdrop-blur-3xl border border-primary"
+            side="top"
+          >
+            <div className="space-y-2">
+              <div className="text-xs space-y-2 text-card-foreground">
+                {[
+                  {
+                    label: "Regular",
+                    value: breakdown?.worked_hours.regular,
+                  },
+                  {
+                    label: "Rest Day",
+                    value: breakdown?.worked_hours.rest_day,
+                  },
+                  {
+                    label: "Night Diff",
+                    value: breakdown?.worked_hours.night_diff,
+                  },
+                  {
+                    label: "Regular Holiday",
+                    value: breakdown?.worked_hours.regular_holiday,
+                  },
+                  {
+                    label: "Special Holiday",
+                    value: breakdown?.worked_hours.special_holiday,
+                  },
+                  {
+                    label: "RH + RD",
+                    value: breakdown?.worked_hours.regular_holiday_rest_day,
+                  },
+                  {
+                    label: "SH + RD",
+                    value: breakdown?.worked_hours.special_holiday_rest_day,
+                  },
+                  {
+                    label: "ND + RD",
+                    value: breakdown?.worked_hours.night_diff_rest_day,
+                  },
+                  {
+                    label: "ND + RH",
+                    value: breakdown?.worked_hours.night_diff_regular_holiday,
+                  },
+                  {
+                    label: "ND + SH",
+                    value: breakdown?.worked_hours.night_diff_special_holiday,
+                  },
+                  {
+                    label: "ND + RH + RD",
+                    value:
+                      breakdown?.worked_hours
+                        .night_diff_regular_holiday_rest_day,
+                  },
+                  {
+                    label: "ND + SH + RD",
+                    value:
+                      breakdown?.worked_hours
+                        .night_diff_special_holiday_rest_day,
+                  },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex justify-between">
+                    <span
+                      className={`font-medium ${
+                        value ? "underline" : "text-muted-foreground"
+                      }`}
+                    >
+                      {label}:
+                    </span>
+                    <span
+                      className={
+                        !value ? "text-muted-foreground" : "font-bold underline"
+                      }
+                    >
+                      {value || "-- "}h
+                    </span>
+                  </div>
+                ))}
+
+                <div className="flex justify-between">
+                  <span
+                    className={`font-medium ${
+                      row.original.payroll_breakdown?.overtime.computed.total
+                        ? "underline text-destructive"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    Total Overtime:
+                  </span>
+                  <span
+                    className={
+                      !row.original.payroll_breakdown?.overtime.computed.total
+                        ? "text-muted-foreground"
+                        : "font-bold underline text-destructive"
+                    }
+                  >
+                    {row.original.payroll_breakdown?.overtime.computed.total ||
+                      "-- "}
+                    h
+                  </span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
     },
   },
   {
@@ -295,28 +421,88 @@ export const createAttendanceColumns = ({
           >
             <div className="space-y-2">
               <div className="text-xs space-y-2 text-card-foreground">
-                <div className="flex justify-between">
-                  <span className="font-medium">Regular OT:</span>
-                  <span>
-                    {breakdown?.overtime.computed.regular_overtime.value || 0}h
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Rest Day OT:</span>
-                  {breakdown?.overtime.computed.rest_day_overtime || 0}h
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Night Differential OT:</span>{" "}
-                  {breakdown?.overtime.computed.night_diff_overtime || 0}h
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Special Holiday OT:</span>{" "}
-                  {breakdown?.overtime.computed.special_holiday_overtime || 0}h
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Regular Holiday OT:</span>{" "}
-                  {breakdown?.overtime.computed.regular_holiday_overtime || 0}h
-                </div>
+                {[
+                  {
+                    label: "Regular OT",
+                    value: breakdown?.overtime.computed.regular_overtime.value,
+                  },
+                  {
+                    label: "Rest Day OT",
+                    value: breakdown?.overtime.computed.rest_day_overtime,
+                  },
+                  {
+                    label: "Night Diff OT",
+                    value: breakdown?.overtime.computed.night_diff_overtime,
+                  },
+                  {
+                    label: "Regular Holiday OT",
+                    value:
+                      breakdown?.overtime.computed.regular_holiday_overtime,
+                  },
+                  {
+                    label: "Special Holiday OT",
+                    value:
+                      breakdown?.overtime.computed.special_holiday_overtime,
+                  },
+                  {
+                    label: "RH + RD OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .regular_holiday_rest_day_overtime,
+                  },
+                  {
+                    label: "SH + RD OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .special_holiday_rest_day_overtime,
+                  },
+                  {
+                    label: "ND + RD OT",
+                    value:
+                      breakdown?.overtime.computed.night_diff_rest_day_overtime,
+                  },
+                  {
+                    label: "ND + RH OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .night_diff_regular_holiday_overtime,
+                  },
+                  {
+                    label: "ND + SH OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .night_diff_special_holiday_overtime,
+                  },
+                  {
+                    label: "ND + RH + RD OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .night_diff_regular_holiday_rest_day_overtime,
+                  },
+                  {
+                    label: "ND + SH + RD OT",
+                    value:
+                      breakdown?.overtime.computed
+                        .night_diff_special_holiday_rest_day_overtime,
+                  },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex justify-between">
+                    <span
+                      className={`font-medium ${
+                        value ? "underline" : "text-muted-foreground"
+                      }`}
+                    >
+                      {label}:
+                    </span>
+                    <span
+                      className={
+                        !value ? "text-muted-foreground" : "font-bold underline"
+                      }
+                    >
+                      {value || "-- "}h
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </PopoverContent>

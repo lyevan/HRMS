@@ -469,7 +469,7 @@ export const clockOut = async (req, res) => {
 
     // Get employee schedule information
     const scheduleQuery = await pool.query(
-      `SELECT s.break_duration, s.break_start, s.break_end, s.start_time, s.end_time
+      `SELECT s.break_duration, s.break_start, s.break_end, s.start_time, s.end_time, s.days_of_week
        FROM employees e 
        JOIN schedules s ON e.schedule_id = s.schedule_id 
        WHERE e.employee_id = $1`,
@@ -485,6 +485,14 @@ export const clockOut = async (req, res) => {
             break_end: "13:00:00", // Default lunch break end
             start_time: "08:00:00",
             end_time: "17:00:00",
+            days_of_week: [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+            ],
           };
 
     // Use enhanced clock-out calculations
@@ -791,6 +799,7 @@ export const bulkExcelAttendance = async (req, res) => {
             break_end: employee.break_end,
             start_time: employee.start_time,
             end_time: employee.end_time,
+            days_of_week: employee.days_of_week,
           };
 
           const enhancedClockOutCalcs = await enhancedClockOutCalculation(

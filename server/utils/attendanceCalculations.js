@@ -466,11 +466,62 @@ export const enhancedClockOutCalculation = async (
     scheduleInfo
   );
 
+  // === EARLY CLOCK-IN NEGLECT FEATURE ===
+  // Option to ignore early clock-in minutes from overtime calculations
+  const NEGLECT_EARLY_IN_MINUTES = true; // TODO: Move to database configuration
+
+  let adjustedTotalHours = totalHours;
+  let earlyClockInDeduction = 0;
+
+  if (NEGLECT_EARLY_IN_MINUTES && scheduleInfo.start_time) {
+    // Calculate scheduled start time for comparison using the same logic as calculateLateMinutes
+    const timeInDate = new Date(timeIn);
+
+    // Parse schedule start time on the same date as timeIn initially
+    const clockInDate = timeInDate.toISOString().split("T")[0];
+    let scheduledStart = new Date(`${clockInDate}T${scheduleInfo.start_time}`);
+
+    // Handle cross-midnight shifts: adjust if the difference is too large
+    const diffHours = (timeInDate - scheduledStart) / (1000 * 60 * 60);
+    if (diffHours > 12) {
+      // Clock-in is way after scheduled start → shift start forward 1 day
+      scheduledStart.setDate(scheduledStart.getDate() + 1);
+    } else if (diffHours < -12) {
+      // Scheduled start is way after clock-in → shift start back 1 day
+      scheduledStart.setDate(scheduledStart.getDate() - 1);
+    }
+
+    console.log("[DEBUG] TimeIn:", timeInDate.toISOString());
+    console.log(
+      "[DEBUG] Scheduled Start for Early In Check:",
+      scheduledStart.toISOString()
+    );
+
+    // Calculate early clock-in minutes
+    if (timeIn < scheduledStart) {
+      const earlyMinutes =
+        (scheduledStart.getTime() - timeIn.getTime()) / (1000 * 60);
+      earlyClockInDeduction = earlyMinutes / 60;
+      adjustedTotalHours = Math.max(0, totalHours - earlyClockInDeduction);
+
+      console.log(
+        `[DEBUG] Early clock-in detected: ${earlyMinutes.toFixed(2)} minutes (${
+          earlyMinutes / 60
+        } hours deducted)`
+      );
+      console.log(
+        `[EARLY CLOCK-IN] Original total hours: ${totalHours}, Adjusted: ${adjustedTotalHours}`
+      );
+    } else {
+      console.log("[DEBUG] No early clock-in detected");
+    }
+  }
+
   // Rest day hours (if it's a day off, all hours are rest day hours)
   const restDayHours = calculateRestDayHours(
     time_in,
     clockOutTime,
-    totalHours,
+    adjustedTotalHours,
     is_dayoff
   );
 
@@ -482,22 +533,22 @@ export const enhancedClockOutCalculation = async (
   let specialHolidayRestDayHours = 0; // Day off + special holiday
 
   if (is_regular_holiday) {
-    regularHolidayHours = totalHours; // All hours worked on regular holiday
+    regularHolidayHours = adjustedTotalHours; // All hours worked on regular holiday
 
     // EDGE CASE: Regular Holiday + Day Off (Double Holiday Premium)
     if (is_dayoff) {
-      regularHolidayRestDayHours = totalHours;
+      regularHolidayRestDayHours = adjustedTotalHours;
       // Keep regularHolidayHours for proper payroll breakdown
       // This allows separate tracking of both premiums for stacking calculation
     }
   }
 
   if (is_special_holiday) {
-    specialHolidayHours = totalHours; // All hours worked on special holiday
+    specialHolidayHours = adjustedTotalHours; // All hours worked on special holiday
 
     // EDGE CASE: Special Holiday + Day Off (Holiday + Rest Day Premium)
     if (is_dayoff) {
-      specialHolidayRestDayHours = totalHours;
+      specialHolidayRestDayHours = adjustedTotalHours;
       // Keep specialHolidayHours for proper payroll breakdown
       // This allows separate tracking of both premiums for stacking calculation
     }
@@ -546,61 +597,10 @@ export const enhancedClockOutCalculation = async (
 
   const scheduledWorkHours = scheduledRawHours - scheduledBreakHours;
 
-  // === EARLY CLOCK-IN NEGLECT FEATURE ===
-  // Option to ignore early clock-in minutes from overtime calculations
-  const NEGLECT_EARLY_IN_MINUTES = true; // TODO: Move to database configuration
-
-  let adjustedTotalHours = totalHours;
-  let earlyClockInDeduction = 0;
-
-  if (NEGLECT_EARLY_IN_MINUTES && scheduleInfo.start_time) {
-    // Calculate scheduled start time for comparison using the same logic as calculateLateMinutes
-    const timeInDate = new Date(timeIn);
-
-    // Parse schedule start time on the same date as timeIn initially
-    const clockInDate = timeInDate.toISOString().split("T")[0];
-    let scheduledStart = new Date(`${clockInDate}T${scheduleInfo.start_time}`);
-
-    // Handle cross-midnight shifts: adjust if the difference is too large
-    const diffHours = (timeInDate - scheduledStart) / (1000 * 60 * 60);
-    if (diffHours > 12) {
-      // Clock-in is way after scheduled start → shift start forward 1 day
-      scheduledStart.setDate(scheduledStart.getDate() + 1);
-    } else if (diffHours < -12) {
-      // Scheduled start is way after clock-in → shift start back 1 day
-      scheduledStart.setDate(scheduledStart.getDate() - 1);
-    }
-
-    console.log("[DEBUG] TimeIn:", timeInDate.toISOString());
-    console.log(
-      "[DEBUG] Scheduled Start for Early In Check:",
-      scheduledStart.toISOString()
-    );
-
-    // Calculate early clock-in minutes
-    if (timeIn < scheduledStart) {
-      const earlyMinutes =
-        (scheduledStart.getTime() - timeIn.getTime()) / (1000 * 60);
-      earlyClockInDeduction = roundToPayrollIncrement(earlyMinutes / 60);
-      adjustedTotalHours = Math.max(0, totalHours - earlyClockInDeduction);
-
-      console.log(
-        `[DEBUG] Early clock-in detected: ${earlyMinutes.toFixed(
-          2
-        )} minutes (${earlyClockInDeduction} hours deducted)`
-      );
-      console.log(
-        `[EARLY CLOCK-IN] Original total hours: ${totalHours}, Adjusted: ${adjustedTotalHours}`
-      );
-    } else {
-      console.log("[DEBUG] No early clock-in detected");
-    }
-  }
-
   // === OVERTIME CALCULATION ===
   // Overtime applies when adjusted total hours exceed scheduled hours
   // BUT overtime calculation differs based on day type:
-  // - Regular day: Standard overtime after 8 hours
+  // - Regular day: Standard overtime after scheduled work hours
   // - Day off: All hours are overtime (but also rest day premium)
   // - Holiday: Depends on company policy, but usually overtime after 8 hours
 
@@ -639,22 +639,63 @@ export const enhancedClockOutCalculation = async (
   let regularHolidayRestDayOvertimeHours = 0; // Ultimate case: Holiday + Rest Day OT
   let specialHolidayRestDayOvertimeHours = 0; // Ultimate case: Holiday + Rest Day OT
 
+  // Combined OT types for stacked premiums
+  let nightDiffRegularHolidayOvertimeHours = 0;
+  let nightDiffSpecialHolidayOvertimeHours = 0;
+  let nightDiffRestDayOvertimeHours = 0;
+  // Ultimate 3-stack combinations
+  let nightDiffRegularHolidayRestDayOvertimeHours = 0;
+  let nightDiffSpecialHolidayRestDayOvertimeHours = 0;
+
   if (overtimeHours > 0) {
     // IMPROVED OVERTIME ALLOCATION LOGIC WITH HOLIDAY STACKING
     // Priority order for overtime classification:
-    // 1. Holiday + Rest Day overtime (highest premium)
-    // 2. Holiday overtime (regular or special)
-    // 3. Rest day overtime
-    // 4. Night differential overtime
-    // 5. Regular overtime
+    // 1. ND + Holiday + Rest Day overtime (ultimate 3-stack)
+    // 2. Holiday + Rest Day overtime
+    // 3. ND + Holiday overtime
+    // 4. ND + Rest Day overtime
+    // 5. Night differential overtime
+    // 6. Holiday overtime
+    // 7. Rest day overtime
+    // 8. Regular overtime
 
     let remainingOvertimeToAllocate = overtimeHours;
 
-    // 1. ULTIMATE EDGE CASE: Holiday + Rest Day overtime
+    // 1. ULTIMATE 3-STACK: ND + Holiday + Rest Day overtime
+    if (
+      nightDiffHours > 0 &&
+      is_regular_holiday &&
+      is_dayoff &&
+      remainingOvertimeToAllocate > 0
+    ) {
+      nightDiffRegularHolidayRestDayOvertimeHours = Math.min(
+        nightDiffHours,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -=
+        nightDiffRegularHolidayRestDayOvertimeHours;
+    } else if (
+      nightDiffHours > 0 &&
+      is_special_holiday &&
+      is_dayoff &&
+      remainingOvertimeToAllocate > 0
+    ) {
+      nightDiffSpecialHolidayRestDayOvertimeHours = Math.min(
+        nightDiffHours,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -=
+        nightDiffSpecialHolidayRestDayOvertimeHours;
+    }
+
+    // 2. Holiday + Rest Day overtime
     if (is_regular_holiday && is_dayoff && remainingOvertimeToAllocate > 0) {
+      const remainingHolidayRestDay =
+        regularHolidayRestDayHours -
+        nightDiffRegularHolidayRestDayOvertimeHours;
       regularHolidayRestDayOvertimeHours = Math.min(
-        remainingOvertimeToAllocate,
-        overtimeHours
+        remainingHolidayRestDay,
+        remainingOvertimeToAllocate
       );
       remainingOvertimeToAllocate -= regularHolidayRestDayOvertimeHours;
     } else if (
@@ -662,14 +703,81 @@ export const enhancedClockOutCalculation = async (
       is_dayoff &&
       remainingOvertimeToAllocate > 0
     ) {
+      const remainingHolidayRestDay =
+        specialHolidayRestDayHours -
+        nightDiffSpecialHolidayRestDayOvertimeHours;
       specialHolidayRestDayOvertimeHours = Math.min(
-        remainingOvertimeToAllocate,
-        overtimeHours
+        remainingHolidayRestDay,
+        remainingOvertimeToAllocate
       );
       remainingOvertimeToAllocate -= specialHolidayRestDayOvertimeHours;
     }
 
-    // 2. Holiday overtime (if not already allocated above)
+    // 3. Night Diff + Holiday overtime
+    if (
+      nightDiffHours > 0 &&
+      is_regular_holiday &&
+      !is_dayoff &&
+      remainingOvertimeToAllocate > 0
+    ) {
+      const remainingNightDiff =
+        nightDiffHours - nightDiffRegularHolidayRestDayOvertimeHours;
+      nightDiffRegularHolidayOvertimeHours = Math.min(
+        remainingNightDiff,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -= nightDiffRegularHolidayOvertimeHours;
+    } else if (
+      nightDiffHours > 0 &&
+      is_special_holiday &&
+      !is_dayoff &&
+      remainingOvertimeToAllocate > 0
+    ) {
+      const remainingNightDiff =
+        nightDiffHours - nightDiffSpecialHolidayRestDayOvertimeHours;
+      nightDiffSpecialHolidayOvertimeHours = Math.min(
+        remainingNightDiff,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -= nightDiffSpecialHolidayOvertimeHours;
+    }
+
+    // 4. Night Diff + Rest Day overtime
+    if (
+      nightDiffHours > 0 &&
+      is_dayoff &&
+      !is_regular_holiday &&
+      !is_special_holiday &&
+      remainingOvertimeToAllocate > 0
+    ) {
+      const remainingNightDiff =
+        nightDiffHours -
+        nightDiffRegularHolidayRestDayOvertimeHours -
+        nightDiffSpecialHolidayRestDayOvertimeHours;
+      nightDiffRestDayOvertimeHours = Math.min(
+        remainingNightDiff,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -= nightDiffRestDayOvertimeHours;
+    }
+
+    // 5. Night differential overtime (remaining night diff)
+    if (nightDiffHours > 0 && remainingOvertimeToAllocate > 0) {
+      const remainingNightDiff =
+        nightDiffHours -
+        nightDiffRegularHolidayRestDayOvertimeHours -
+        nightDiffSpecialHolidayRestDayOvertimeHours -
+        nightDiffRegularHolidayOvertimeHours -
+        nightDiffSpecialHolidayOvertimeHours -
+        nightDiffRestDayOvertimeHours;
+      nightDiffOvertimeHours = Math.min(
+        remainingNightDiff,
+        remainingOvertimeToAllocate
+      );
+      remainingOvertimeToAllocate -= nightDiffOvertimeHours;
+    }
+
+    // 6. Holiday overtime (if not already allocated above)
     if (is_regular_holiday && !is_dayoff && remainingOvertimeToAllocate > 0) {
       regularHolidayOvertimeHours = Math.min(
         remainingOvertimeToAllocate,
@@ -686,7 +794,7 @@ export const enhancedClockOutCalculation = async (
       remainingOvertimeToAllocate -= specialHolidayOvertimeHours;
     }
 
-    // 3. Rest day overtime (if working on day off but not holiday)
+    // 7. Rest day overtime (if working on day off but not holiday)
     if (
       is_dayoff &&
       !is_regular_holiday &&
@@ -700,25 +808,7 @@ export const enhancedClockOutCalculation = async (
       remainingOvertimeToAllocate -= restDayOvertimeHours;
     }
 
-    // 4. Night differential overtime
-    // Calculate proportional allocation based on night hours overlap
-    if (nightDiffHours > 0 && remainingOvertimeToAllocate > 0) {
-      // Method: Proportional allocation based on overlap
-      // If we have 8 ND hours out of 11 total hours, and 3 overtime hours,
-      // then proportionally: (8/11) * 3 = 2.18 hours of ND overtime
-
-      const nightDiffProportion = nightDiffHours / totalHours;
-      const proportionalNightDiffOvertimeHours =
-        remainingOvertimeToAllocate * nightDiffProportion;
-
-      nightDiffOvertimeHours = Math.min(
-        remainingOvertimeToAllocate,
-        Math.round(proportionalNightDiffOvertimeHours * 100) / 100
-      );
-      remainingOvertimeToAllocate -= nightDiffOvertimeHours;
-    }
-
-    // 5. Regular overtime (whatever remains)
+    // 8. Regular overtime (whatever remains)
     if (remainingOvertimeToAllocate > 0) {
       regularOvertimeHours = remainingOvertimeToAllocate;
     }
@@ -778,15 +868,176 @@ export const enhancedClockOutCalculation = async (
 
   // Calculate pure regular hours (no premiums, no overtime)
   // CRITICAL: Must account for all premium types including holiday + rest day stacking
-  let pureRegularHours = totalHours;
-  pureRegularHours -= nightDiffHours;
-  pureRegularHours -= pureRestDayHours; // Only pure rest day hours (not holiday + rest day)
-  pureRegularHours -= pureRegularHolidayHours; // Only pure holiday hours (not holiday + rest day)
-  pureRegularHours -= pureSpecialHolidayHours; // Only pure holiday hours (not holiday + rest day)
-  pureRegularHours -= regularHolidayRestDayHours; // Holiday + rest day stacked hours
-  pureRegularHours -= specialHolidayRestDayHours; // Holiday + rest day stacked hours
-  pureRegularHours -= regularOvertimeHours;
+  let pureRegularHours =
+    adjustedTotalHours -
+    nightDiffHours -
+    restDayHours -
+    regularHolidayHours -
+    specialHolidayHours -
+    regularOvertimeHours;
   pureRegularHours = Math.max(0, pureRegularHours);
+
+  // Calculate night diff regular hours available for allocation
+  const nightDiffRegHours = Math.max(
+    0,
+    nightDiffHours -
+      nightDiffOvertimeHours -
+      nightDiffRegularHolidayOvertimeHours -
+      nightDiffSpecialHolidayOvertimeHours -
+      nightDiffRestDayOvertimeHours -
+      nightDiffRegularHolidayRestDayOvertimeHours -
+      nightDiffSpecialHolidayRestDayOvertimeHours
+  );
+
+  // Calculate total regular time for each combination
+  const totalRegularTime_regularHolidayRestDay = Math.max(
+    0,
+    regularHolidayRestDayHours -
+      regularHolidayRestDayOvertimeHours -
+      nightDiffRegularHolidayRestDayOvertimeHours
+  );
+
+  const totalRegularTime_specialHolidayRestDay = Math.max(
+    0,
+    specialHolidayRestDayHours -
+      specialHolidayRestDayOvertimeHours -
+      nightDiffSpecialHolidayRestDayOvertimeHours
+  );
+
+  // 1. THREE-WAY: Allocate night diff portion first (priority allocation)
+  const regularTime_nightDiffRegularHolidayRestDay = Math.min(
+    nightDiffRegHours,
+    totalRegularTime_regularHolidayRestDay
+  );
+
+  const regularTime_nightDiffSpecialHolidayRestDay = Math.min(
+    Math.max(0, nightDiffRegHours - regularTime_nightDiffRegularHolidayRestDay),
+    totalRegularTime_specialHolidayRestDay
+  );
+
+  // 2. TWO-WAY: Remaining holiday + rest day hours (after night diff removed)
+  const regularTime_regularHolidayRestDay = Math.max(
+    0,
+    totalRegularTime_regularHolidayRestDay -
+      regularTime_nightDiffRegularHolidayRestDay
+  );
+
+  const regularTime_specialHolidayRestDay = Math.max(
+    0,
+    totalRegularTime_specialHolidayRestDay -
+      regularTime_nightDiffSpecialHolidayRestDay
+  );
+
+  // 3. TWO-WAY: NIGHT DIFF + HOLIDAY (without rest day portion) - FIXED
+  const regularTime_nightDiffRegularHoliday = Math.max(
+    0,
+    nightDiffHours - // Start with total night diff hours
+      nightDiffOvertimeHours - // Remove pure night diff OT
+      nightDiffRestDayOvertimeHours - // Remove night diff + rest day OT
+      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
+      nightDiffSpecialHolidayRestDayOvertimeHours - // Remove other 3-way OT
+      nightDiffSpecialHolidayOvertimeHours - // Remove night diff + special holiday OT
+      nightDiffRegularHolidayOvertimeHours // Remove night diff + regular holiday OT
+  );
+
+  const regularTime_nightDiffSpecialHoliday = Math.max(
+    0,
+    nightDiffHours - // Start with total night diff hours
+      nightDiffOvertimeHours - // Remove pure night diff OT
+      nightDiffRestDayOvertimeHours - // Remove night diff + rest day OT
+      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
+      nightDiffSpecialHolidayRestDayOvertimeHours - // Remove 3-way OT
+      nightDiffRegularHolidayOvertimeHours - // Remove night diff + regular holiday OT
+      nightDiffSpecialHolidayOvertimeHours // Remove night diff + special holiday OT
+  );
+
+  // 4. TWO-WAY: NIGHT DIFF + REST DAY (without holiday portion) - FIXED
+  const regularTime_nightDiffRestDay = Math.max(
+    0,
+    nightDiffHours - // Start with total night diff hours
+      nightDiffOvertimeHours - // Remove pure night diff OT
+      nightDiffRegularHolidayOvertimeHours - // Remove night diff + regular holiday OT
+      nightDiffSpecialHolidayOvertimeHours - // Remove night diff + special holiday OT
+      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
+      nightDiffSpecialHolidayRestDayOvertimeHours // Remove 3-way OT
+  );
+
+  // 5. SINGLE PREMIUMS - COMPLETELY REWRITTEN FOR ACCURACY
+
+  // Pure rest day (no holiday, no night diff overlap)
+  const regularTime_restDay = Math.max(
+    0,
+    pureRestDayHours -
+      restDayOvertimeHours -
+      nightDiffRestDayOvertimeHours -
+      regularHolidayRestDayOvertimeHours -
+      specialHolidayRestDayOvertimeHours -
+      nightDiffRegularHolidayRestDayOvertimeHours -
+      nightDiffSpecialHolidayRestDayOvertimeHours
+  );
+
+  // Pure regular holiday (no rest day, no night diff overlap)
+  const regularTime_regularHoliday = Math.max(
+    0,
+    pureRegularHolidayHours -
+      regularHolidayOvertimeHours -
+      nightDiffRegularHolidayOvertimeHours -
+      regularHolidayRestDayOvertimeHours -
+      nightDiffRegularHolidayRestDayOvertimeHours
+  );
+
+  // Pure special holiday (no rest day, no night diff overlap)
+  const regularTime_specialHoliday = Math.max(
+    0,
+    pureSpecialHolidayHours -
+      specialHolidayOvertimeHours -
+      nightDiffSpecialHolidayOvertimeHours -
+      specialHolidayRestDayOvertimeHours -
+      nightDiffSpecialHolidayRestDayOvertimeHours
+  );
+
+  // Pure night diff (no rest day, no holiday overlap)
+  const regularTime_nightDiff = Math.max(
+    0,
+    nightDiffHours -
+      nightDiffOvertimeHours -
+      nightDiffRegularHolidayOvertimeHours -
+      nightDiffSpecialHolidayOvertimeHours -
+      nightDiffRestDayOvertimeHours -
+      nightDiffRegularHolidayRestDayOvertimeHours -
+      nightDiffSpecialHolidayRestDayOvertimeHours
+  );
+
+  // === VERIFICATION CHECK ===
+  // The sum of all regularTime_* values should equal baseHours (adjustedTotalHours - overtimeHours)
+  const totalRegularTimeCalculated =
+    pureRegularHours +
+    regularTime_restDay +
+    regularTime_nightDiff +
+    regularTime_regularHoliday +
+    regularTime_specialHoliday +
+    regularTime_nightDiffRestDay +
+    regularTime_nightDiffRegularHoliday +
+    regularTime_nightDiffSpecialHoliday +
+    regularTime_regularHolidayRestDay +
+    regularTime_specialHolidayRestDay +
+    regularTime_nightDiffRegularHolidayRestDay +
+    regularTime_nightDiffSpecialHolidayRestDay;
+
+  // This should equal: adjustedTotalHours - overtimeHours
+  // Add this validation in your code:
+  console.log(
+    "[VALIDATION] Total regular time calculated:",
+    totalRegularTimeCalculated
+  );
+  console.log(
+    "[VALIDATION] Expected base hours:",
+    adjustedTotalHours - overtimeHours
+  );
+  console.log(
+    "[VALIDATION] Difference:",
+    Math.abs(totalRegularTimeCalculated - (adjustedTotalHours - overtimeHours))
+  );
 
   const isUndertime = totalHours < scheduledWorkHours - 0.5; // 30-min tolerance
   const isHalfday = totalHours < scheduledWorkHours / 2;
@@ -795,11 +1046,24 @@ export const enhancedClockOutCalculation = async (
 
   // === COMPREHENSIVE PAYROLL BREAKDOWN JSON WITH ENHANCED HOLIDAY LOGIC ===
   const payrollBreakdown = {
-    regular_hours: roundToPayrollIncrement(pureRegularHours),
+    schedule: scheduleInfo,
+    regular_hours: roundToPayrollIncrement(baseHours),
 
     overtime: {
       computed: {
-        total: roundToPayrollIncrement(overtimeHours),
+        total:
+          roundToPayrollIncrement(regularOvertimeHours) +
+          roundToPayrollIncrement(nightDiffOvertimeHours) +
+          roundToPayrollIncrement(restDayOvertimeHours) +
+          roundToPayrollIncrement(regularHolidayOvertimeHours) +
+          roundToPayrollIncrement(specialHolidayOvertimeHours) +
+          roundToPayrollIncrement(regularHolidayRestDayOvertimeHours) +
+          roundToPayrollIncrement(specialHolidayRestDayOvertimeHours) +
+          roundToPayrollIncrement(nightDiffRegularHolidayOvertimeHours) +
+          roundToPayrollIncrement(nightDiffSpecialHolidayOvertimeHours) +
+          roundToPayrollIncrement(nightDiffRestDayOvertimeHours) +
+          roundToPayrollIncrement(nightDiffRegularHolidayRestDayOvertimeHours) +
+          roundToPayrollIncrement(nightDiffSpecialHolidayRestDayOvertimeHours),
         regular_overtime: {
           value: roundToPayrollIncrement(regularOvertimeHours),
           rate: calculator.config.overtimeMultiplier,
@@ -818,6 +1082,21 @@ export const enhancedClockOutCalculation = async (
         special_holiday_rest_day_overtime: roundToPayrollIncrement(
           specialHolidayRestDayOvertimeHours
         ),
+        night_diff_regular_holiday_overtime: roundToPayrollIncrement(
+          nightDiffRegularHolidayOvertimeHours
+        ),
+        night_diff_special_holiday_overtime: roundToPayrollIncrement(
+          nightDiffSpecialHolidayOvertimeHours
+        ),
+        night_diff_rest_day_overtime: roundToPayrollIncrement(
+          nightDiffRestDayOvertimeHours
+        ),
+        night_diff_regular_holiday_rest_day_overtime: roundToPayrollIncrement(
+          nightDiffRegularHolidayRestDayOvertimeHours
+        ),
+        night_diff_special_holiday_rest_day_overtime: roundToPayrollIncrement(
+          nightDiffSpecialHolidayRestDayOvertimeHours
+        ),
       },
       approved: {
         total: 0,
@@ -828,106 +1107,51 @@ export const enhancedClockOutCalculation = async (
         special_holiday_overtime: 0,
         regular_holiday_rest_day_overtime: 0,
         special_holiday_rest_day_overtime: 0,
+        night_diff_regular_holiday_overtime: 0,
+        night_diff_special_holiday_overtime: 0,
+        night_diff_rest_day_overtime: 0,
+        night_diff_regular_holiday_rest_day_overtime: 0,
+        night_diff_special_holiday_rest_day_overtime: 0,
       },
     },
-    premiums: {
-      night_differential: {
-        total: roundToPayrollIncrement(nightDiffHours),
-        regular: roundToPayrollIncrement(nightDiffRegularHours),
-        overtime: roundToPayrollIncrement(nightDiffOvertimeHours),
-        // Enhanced breakdown for holiday combinations
-        with_regular_holiday: roundToPayrollIncrement(
-          is_regular_holiday ? Math.min(nightDiffHours, regularHolidayHours) : 0
-        ),
-        with_special_holiday: roundToPayrollIncrement(
-          is_special_holiday ? Math.min(nightDiffHours, specialHolidayHours) : 0
-        ),
-        with_rest_day: roundToPayrollIncrement(
-          is_dayoff ? Math.min(nightDiffHours, restDayHours) : 0
-        ),
-        // ULTIMATE COMBINATIONS: Night Diff + Holiday + Rest Day
-        with_regular_holiday_rest_day: roundToPayrollIncrement(
-          is_regular_holiday && is_dayoff
-            ? Math.min(nightDiffHours, regularHolidayRestDayHours)
-            : 0
-        ),
-        with_special_holiday_rest_day: roundToPayrollIncrement(
-          is_special_holiday && is_dayoff
-            ? Math.min(nightDiffHours, specialHolidayRestDayHours)
-            : 0
-        ),
-      },
+    worked_hours: {
+      total: roundToPayrollIncrement(adjustedTotalHours),
 
-      rest_day: {
-        total: roundToPayrollIncrement(restDayHours),
-        regular: roundToPayrollIncrement(restDayRegularHours),
-        overtime: roundToPayrollIncrement(restDayOvertimeHours),
-        // Pure rest day (no holiday stacking)
-        pure_rest_day: roundToPayrollIncrement(pureRestDayHours),
-        // Night differential combinations
-        with_night_diff: roundToPayrollIncrement(
-          is_dayoff ? Math.min(nightDiffHours, restDayHours) : 0
-        ),
-      },
+      // MUTUALLY EXCLUSIVE CATEGORIZATION - Each hour appears exactly once
 
-      holidays: {
-        regular_holiday: {
-          total: roundToPayrollIncrement(regularHolidayHours),
-          regular: roundToPayrollIncrement(regularHolidayRegularHours),
-          overtime: roundToPayrollIncrement(regularHolidayOvertimeHours),
-          // Pure holiday (no rest day stacking)
-          pure_holiday: roundToPayrollIncrement(pureRegularHolidayHours),
-          night_diff: roundToPayrollIncrement(
-            is_regular_holiday
-              ? Math.min(nightDiffHours, regularHolidayHours)
-              : 0
-          ),
-          // CRITICAL: This is just for backward compatibility
-          rest_day: roundToPayrollIncrement(
-            is_dayoff && is_regular_holiday ? regularHolidayHours : 0
-          ),
-        },
+      // Pure regular hours (no premiums)
+      regular: roundToPayrollIncrement(pureRegularHours),
 
-        special_holiday: {
-          total: roundToPayrollIncrement(specialHolidayHours),
-          regular: roundToPayrollIncrement(specialHolidayRegularHours),
-          overtime: roundToPayrollIncrement(specialHolidayOvertimeHours),
-          // Pure holiday (no rest day stacking)
-          pure_holiday: roundToPayrollIncrement(pureSpecialHolidayHours),
-          night_diff: roundToPayrollIncrement(
-            is_special_holiday
-              ? Math.min(nightDiffHours, specialHolidayHours)
-              : 0
-          ),
-          // CRITICAL: This is just for backward compatibility
-          rest_day: roundToPayrollIncrement(
-            is_dayoff && is_special_holiday ? specialHolidayHours : 0
-          ),
-        },
+      // Single premium types
+      rest_day: roundToPayrollIncrement(regularTime_restDay),
+      night_diff: roundToPayrollIncrement(regularTime_nightDiff),
+      regular_holiday: roundToPayrollIncrement(regularTime_regularHoliday),
+      special_holiday: roundToPayrollIncrement(regularTime_specialHoliday),
 
-        // ULTIMATE EDGE CASES: Holiday + Rest Day stacking
-        regular_holiday_rest_day: {
-          total: roundToPayrollIncrement(regularHolidayRestDayHours),
-          regular: roundToPayrollIncrement(regularHolidayRestDayRegularHours),
-          overtime: roundToPayrollIncrement(regularHolidayRestDayOvertimeHours),
-          night_diff: roundToPayrollIncrement(
-            is_regular_holiday && is_dayoff
-              ? Math.min(nightDiffHours, regularHolidayRestDayHours)
-              : 0
-          ),
-        },
+      // 2-way premium combinations
+      night_diff_rest_day: roundToPayrollIncrement(
+        regularTime_nightDiffRestDay
+      ),
+      night_diff_regular_holiday: roundToPayrollIncrement(
+        regularTime_nightDiffRegularHoliday
+      ),
+      night_diff_special_holiday: roundToPayrollIncrement(
+        regularTime_nightDiffSpecialHoliday
+      ),
+      regular_holiday_rest_day: roundToPayrollIncrement(
+        regularTime_regularHolidayRestDay
+      ),
+      special_holiday_rest_day: roundToPayrollIncrement(
+        regularTime_specialHolidayRestDay
+      ),
 
-        special_holiday_rest_day: {
-          total: roundToPayrollIncrement(specialHolidayRestDayHours),
-          regular: roundToPayrollIncrement(specialHolidayRestDayRegularHours),
-          overtime: roundToPayrollIncrement(specialHolidayRestDayOvertimeHours),
-          night_diff: roundToPayrollIncrement(
-            is_special_holiday && is_dayoff
-              ? Math.min(nightDiffHours, specialHolidayRestDayHours)
-              : 0
-          ),
-        },
-      },
+      // 3-way premium combinations (ultimate cases)
+      night_diff_regular_holiday_rest_day: roundToPayrollIncrement(
+        regularTime_nightDiffRegularHolidayRestDay
+      ),
+      night_diff_special_holiday_rest_day: roundToPayrollIncrement(
+        regularTime_nightDiffSpecialHolidayRestDay
+      ),
     },
 
     deductions: {
@@ -1004,6 +1228,23 @@ export const enhancedClockOutCalculation = async (
     special_holiday_rest_day_overtime_hours: roundToPayrollIncrement(
       specialHolidayRestDayOvertimeHours
     ),
+    // Combined OT types
+    night_diff_regular_holiday_overtime_hours: roundToPayrollIncrement(
+      nightDiffRegularHolidayOvertimeHours
+    ),
+    night_diff_special_holiday_overtime_hours: roundToPayrollIncrement(
+      nightDiffSpecialHolidayOvertimeHours
+    ),
+    night_diff_rest_day_overtime_hours: roundToPayrollIncrement(
+      nightDiffRestDayOvertimeHours
+    ),
+    // Ultimate 3-stack OT types
+    night_diff_regular_holiday_rest_day_overtime_hours: roundToPayrollIncrement(
+      nightDiffRegularHolidayRestDayOvertimeHours
+    ),
+    night_diff_special_holiday_rest_day_overtime_hours: roundToPayrollIncrement(
+      nightDiffSpecialHolidayRestDayOvertimeHours
+    ),
 
     // Basic deductions
     undertime_minutes: undertimeMinutes,
@@ -1065,20 +1306,35 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
 
   try {
     // 1. Validate total hours consistency
-    const calculatedTotal =
-      breakdown.regular_hours +
-      breakdown.overtime.total +
-      breakdown.premiums.night_differential.total +
-      breakdown.premiums.rest_day.total +
-      breakdown.premiums.holidays.regular_holiday.total +
-      breakdown.premiums.holidays.special_holiday.total +
-      breakdown.premiums.holidays.regular_holiday_rest_day.total +
-      breakdown.premiums.holidays.special_holiday_rest_day.total;
+    const calculatedTotal = breakdown.worked_hours.total;
 
     // Allow small rounding differences
     if (Math.abs(calculatedTotal - totalHours) > 0.1) {
       errors.push(
         `Total hours mismatch: calculated ${calculatedTotal} vs expected ${totalHours}`
+      );
+    }
+
+    // 1b. Validate worked hours breakdown consistency
+    const totalWorkedHoursBreakdown =
+      breakdown.worked_hours.regular +
+      breakdown.worked_hours.rest_day +
+      breakdown.worked_hours.night_diff +
+      breakdown.worked_hours.regular_holiday +
+      breakdown.worked_hours.special_holiday +
+      breakdown.worked_hours.regular_holiday_rest_day +
+      breakdown.worked_hours.special_holiday_rest_day +
+      breakdown.worked_hours.night_diff_rest_day +
+      breakdown.worked_hours.night_diff_regular_holiday +
+      breakdown.worked_hours.night_diff_special_holiday +
+      breakdown.worked_hours.night_diff_regular_holiday_rest_day +
+      breakdown.worked_hours.night_diff_special_holiday_rest_day;
+
+    if (
+      Math.abs(totalWorkedHoursBreakdown - breakdown.worked_hours.total) > 0.01
+    ) {
+      errors.push(
+        `Worked hours breakdown mismatch: ${totalWorkedHoursBreakdown} vs ${breakdown.worked_hours.total}`
       );
     }
 
@@ -1090,7 +1346,12 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
       breakdown.overtime.regular_holiday_overtime +
       breakdown.overtime.special_holiday_overtime +
       breakdown.overtime.regular_holiday_rest_day_overtime +
-      breakdown.overtime.special_holiday_rest_day_overtime;
+      breakdown.overtime.special_holiday_rest_day_overtime +
+      breakdown.overtime.night_diff_regular_holiday_overtime +
+      breakdown.overtime.night_diff_special_holiday_overtime +
+      breakdown.overtime.night_diff_rest_day_overtime +
+      breakdown.overtime.night_diff_regular_holiday_rest_day_overtime +
+      breakdown.overtime.night_diff_special_holiday_rest_day_overtime;
 
     if (Math.abs(totalOvertimeBreakdown - breakdown.overtime.total) > 0.01) {
       errors.push(
@@ -1103,7 +1364,7 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
 
     if (
       flags.is_day_off_and_regular_holiday &&
-      breakdown.premiums.holidays.regular_holiday_rest_day.total === 0
+      breakdown.worked_hours.regular_holiday_rest_day === 0
     ) {
       warnings.push(
         "Regular holiday + rest day detected but no stacked hours calculated"
@@ -1112,7 +1373,7 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
 
     if (
       flags.is_day_off_and_special_holiday &&
-      breakdown.premiums.holidays.special_holiday_rest_day.total === 0
+      breakdown.worked_hours.special_holiday_rest_day === 0
     ) {
       warnings.push(
         "Special holiday + rest day detected but no stacked hours calculated"
@@ -1128,26 +1389,13 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
       }
     }
 
-    // 5. Validate night differential combinations
-    const ndTotal = breakdown.premiums.night_differential.total;
-    const ndRegular = breakdown.premiums.night_differential.regular;
-    const ndOvertime = breakdown.premiums.night_differential.overtime;
-
-    if (Math.abs(ndTotal - (ndRegular + ndOvertime)) > 0.01) {
-      errors.push(
-        `Night differential breakdown mismatch: ${ndTotal} vs ${
-          ndRegular + ndOvertime
-        }`
-      );
-    }
-
     return {
       isValid: errors.length === 0,
       errors,
       warnings,
       summary: {
         total_hours: totalHours,
-        calculated_total: calculatedTotal,
+        worked_hours_total: calculatedTotal,
         premium_types: flags.premium_stack_count,
         is_ultimate_case:
           flags.is_ultimate_case_regular || flags.is_ultimate_case_special,
