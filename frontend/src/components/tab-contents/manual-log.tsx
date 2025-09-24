@@ -60,7 +60,7 @@ const ManualLog = () => {
 
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [results, setResults] = useState(null);
+  const [_results, setResults] = useState(null);
 
   useEffect(() => {
     fetchManualLogRequests();
