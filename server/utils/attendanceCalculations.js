@@ -5,6 +5,13 @@ import AdvancedPayrollCalculator from "../services/AdvancedPayrollCalculator.js"
  * Using native JavaScript Date objects for UTC consistency with PostgreSQL timestamptz
  */
 
+// TODO: Move to database configuration table
+const PAYROLL_CONFIG = {
+  double_holiday_policy: "highest_only", // 'highest_only' | 'stacked'
+  early_clockin_neglect_enabled: true,
+  // Add more configuration options here as needed
+};
+
 // Check if a date is a holiday and get holiday details
 export const getHolidayInfo = async (clockInTime) => {
   try {
@@ -17,12 +24,19 @@ export const getHolidayInfo = async (clockInTime) => {
     // "en-CA" => YYYY-MM-DD format
 
     const result = await pool.query(
-      `SELECT holiday_id, name, holiday_type, is_active 
-       FROM holidays 
-       WHERE date = $1 AND is_active = true`,
+      `SELECT holiday_id, name, holiday_type, is_active
+       FROM holidays
+       WHERE date = $1 AND is_active = true
+       ORDER BY
+         CASE holiday_type
+           WHEN 'regular' THEN 1
+           WHEN 'special' THEN 2
+           ELSE 3
+         END`,
       [localDateString]
     );
 
+    // If multiple holidays on same date, prioritize regular over special
     const holidayInfo = result.rows[0] || null;
     const isRegularHoliday = holidayInfo?.holiday_type === "regular";
     const isSpecialHoliday = holidayInfo?.holiday_type === "special";
@@ -468,7 +482,7 @@ export const enhancedClockOutCalculation = async (
 
   // === EARLY CLOCK-IN NEGLECT FEATURE ===
   // Option to ignore early clock-in minutes from overtime calculations
-  const NEGLECT_EARLY_IN_MINUTES = true; // TODO: Move to database configuration
+  const NEGLECT_EARLY_IN_MINUTES = PAYROLL_CONFIG.early_clockin_neglect_enabled;
 
   let adjustedTotalHours = totalHours;
   let earlyClockInDeduction = 0;
@@ -532,25 +546,37 @@ export const enhancedClockOutCalculation = async (
   let regularHolidayRestDayHours = 0; // Day off + regular holiday
   let specialHolidayRestDayHours = 0; // Day off + special holiday
 
-  if (is_regular_holiday) {
-    regularHolidayHours = adjustedTotalHours; // All hours worked on regular holiday
-
-    // EDGE CASE: Regular Holiday + Day Off (Double Holiday Premium)
-    if (is_dayoff) {
-      regularHolidayRestDayHours = adjustedTotalHours;
-      // Keep regularHolidayHours for proper payroll breakdown
-      // This allows separate tracking of both premiums for stacking calculation
+  // Apply double holiday policy
+  if (PAYROLL_CONFIG.double_holiday_policy === "stacked") {
+    // STACKED: Allow both regular and special holidays to be applied simultaneously
+    // This means employee gets BOTH regular holiday pay (200%) AND special holiday pay (130%)
+    // Resulting in higher total compensation but more complex calculations
+    if (is_regular_holiday) {
+      regularHolidayHours = adjustedTotalHours; // All hours worked on regular holiday
+      if (is_dayoff) {
+        regularHolidayRestDayHours = adjustedTotalHours;
+      }
     }
-  }
 
-  if (is_special_holiday) {
-    specialHolidayHours = adjustedTotalHours; // All hours worked on special holiday
-
-    // EDGE CASE: Special Holiday + Day Off (Holiday + Rest Day Premium)
-    if (is_dayoff) {
-      specialHolidayRestDayHours = adjustedTotalHours;
-      // Keep specialHolidayHours for proper payroll breakdown
-      // This allows separate tracking of both premiums for stacking calculation
+    if (is_special_holiday) {
+      specialHolidayHours = adjustedTotalHours; // All hours worked on special holiday
+      if (is_dayoff) {
+        specialHolidayRestDayHours = adjustedTotalHours;
+      }
+    }
+  } else {
+    // HIGHEST_ONLY (default): Regular holidays take precedence over special holidays
+    // When both occur on the same day, only regular holiday pay applies
+    if (is_regular_holiday) {
+      regularHolidayHours = adjustedTotalHours; // All hours worked on regular holiday
+      if (is_dayoff) {
+        regularHolidayRestDayHours = adjustedTotalHours;
+      }
+    } else if (is_special_holiday) {
+      specialHolidayHours = adjustedTotalHours; // All hours worked on special holiday
+      if (is_dayoff) {
+        specialHolidayRestDayHours = adjustedTotalHours;
+      }
     }
   }
 
@@ -1197,6 +1223,8 @@ export const enhancedClockOutCalculation = async (
         (is_regular_holiday ? 1 : 0) +
         (is_special_holiday ? 1 : 0) +
         (overtimeHours > 0 ? 1 : 0),
+      // Policy information
+      double_holiday_policy: PAYROLL_CONFIG.double_holiday_policy,
     },
   };
 
