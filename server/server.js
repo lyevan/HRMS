@@ -49,6 +49,7 @@ app.use((req, res, next) => {
 
   // console.log(`🔍 Request from origin: ${origin}`);
   // console.log(`📋 Allowed origins: ${allowedOrigins.join(", ")}`);
+
   // Set CORS headers for allowed origins only
   if (allowedOrigins.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
@@ -70,6 +71,7 @@ app.use((req, res, next) => {
     // Don't set CORS headers for blocked origins
   }
 
+  // Always set these headers regardless of origin
   res.header("Access-Control-Allow-Credentials", "true");
   res.header(
     "Access-Control-Allow-Methods",
