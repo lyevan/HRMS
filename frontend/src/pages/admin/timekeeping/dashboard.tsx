@@ -424,7 +424,10 @@ const TimekeepingPage = () => {
                           Break Duration:
                         </span>
                         <span className="text-sm font-medium">
-                          {schedule.break_duration} min
+                          {schedule.break_duration
+                            ? Number(schedule.break_duration).toFixed(0)
+                            : 0}{" "}
+                          min
                         </span>
                       </div>
                       <div className="flex flex-col gap-1">

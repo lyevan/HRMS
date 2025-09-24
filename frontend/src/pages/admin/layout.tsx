@@ -25,7 +25,7 @@ export default function AdminLayout({
       <AppAdminSidebar />
       <main className="flex h-screen w-full flex-col relative">
         <div className="flex flex-col h-full">
-          <header className="sticky px-0 top-0 z-30 py-2 flex h-18 items-center gap-4 border-b bg-background sm:py-0 sm:static sm:border-0 sm:bg-transparent sm:px-6">
+          <header className="sticky px-0 top-0 z-30 py-2 flex h-18 items-center gap-4 border-b border-muted bg-background sm:py-0 sm:static sm:bg-transparent sm:px-6 flex-shrink-0">
             <SidebarTrigger className="ml-2 sm:-ml-3" />
             <div className="relative ml-auto flex-1 flex items-center gap-2 md:grow-0">
               <div className="flex flex-col mr-2 items-end w-50">
@@ -72,7 +72,9 @@ export default function AdminLayout({
               <ModeToggle />
             </div>
           </header>
-          <main className="flex-9 items-start p-4 py-0 sm:p-2">{children}</main>
+          <main className="flex-1 items-start p-4 py-0 sm:p-2 overflow-auto">
+            {children}
+          </main>
         </div>
       </main>
     </SidebarProvider>

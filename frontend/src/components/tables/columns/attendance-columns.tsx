@@ -295,55 +295,59 @@ export const createAttendanceColumns = ({
                 {[
                   {
                     label: "Regular",
-                    value: breakdown?.worked_hours.regular,
+                    value: breakdown?.worked_hours.regular.value,
                   },
                   {
                     label: "Rest Day",
-                    value: breakdown?.worked_hours.rest_day,
+                    value: breakdown?.worked_hours.rest_day.value,
                   },
                   {
                     label: "Night Diff",
-                    value: breakdown?.worked_hours.night_diff,
+                    value: breakdown?.worked_hours.night_diff.value,
                   },
                   {
                     label: "Regular Holiday",
-                    value: breakdown?.worked_hours.regular_holiday,
+                    value: breakdown?.worked_hours.regular_holiday.value,
                   },
                   {
                     label: "Special Holiday",
-                    value: breakdown?.worked_hours.special_holiday,
+                    value: breakdown?.worked_hours.special_holiday.value,
                   },
                   {
                     label: "RH + RD",
-                    value: breakdown?.worked_hours.regular_holiday_rest_day,
+                    value:
+                      breakdown?.worked_hours.regular_holiday_rest_day.value,
                   },
                   {
                     label: "SH + RD",
-                    value: breakdown?.worked_hours.special_holiday_rest_day,
+                    value:
+                      breakdown?.worked_hours.special_holiday_rest_day.value,
                   },
                   {
                     label: "ND + RD",
-                    value: breakdown?.worked_hours.night_diff_rest_day,
+                    value: breakdown?.worked_hours.night_diff_rest_day.value,
                   },
                   {
                     label: "ND + RH",
-                    value: breakdown?.worked_hours.night_diff_regular_holiday,
+                    value:
+                      breakdown?.worked_hours.night_diff_regular_holiday.value,
                   },
                   {
                     label: "ND + SH",
-                    value: breakdown?.worked_hours.night_diff_special_holiday,
+                    value:
+                      breakdown?.worked_hours.night_diff_special_holiday.value,
                   },
                   {
                     label: "ND + RH + RD",
                     value:
                       breakdown?.worked_hours
-                        .night_diff_regular_holiday_rest_day,
+                        .night_diff_regular_holiday_rest_day.value,
                   },
                   {
                     label: "ND + SH + RD",
                     value:
                       breakdown?.worked_hours
-                        .night_diff_special_holiday_rest_day,
+                        .night_diff_special_holiday_rest_day.value,
                   },
                 ].map(({ label, value }) => (
                   <div
@@ -431,62 +435,66 @@ export const createAttendanceColumns = ({
                   },
                   {
                     label: "Rest Day OT",
-                    value: breakdown?.overtime.computed.rest_day_overtime,
+                    value: breakdown?.overtime.computed.rest_day_overtime.value,
                   },
                   {
                     label: "Night Diff OT",
-                    value: breakdown?.overtime.computed.night_diff_overtime,
+                    value:
+                      breakdown?.overtime.computed.night_diff_overtime.value,
                   },
                   {
                     label: "Regular Holiday OT",
                     value:
-                      breakdown?.overtime.computed.regular_holiday_overtime,
+                      breakdown?.overtime.computed.regular_holiday_overtime
+                        .value,
                   },
                   {
                     label: "Special Holiday OT",
                     value:
-                      breakdown?.overtime.computed.special_holiday_overtime,
+                      breakdown?.overtime.computed.special_holiday_overtime
+                        .value,
                   },
                   {
                     label: "RH + RD OT",
                     value:
                       breakdown?.overtime.computed
-                        .regular_holiday_rest_day_overtime,
+                        .regular_holiday_rest_day_overtime.value,
                   },
                   {
                     label: "SH + RD OT",
                     value:
                       breakdown?.overtime.computed
-                        .special_holiday_rest_day_overtime,
+                        .special_holiday_rest_day_overtime.value,
                   },
                   {
                     label: "ND + RD OT",
                     value:
-                      breakdown?.overtime.computed.night_diff_rest_day_overtime,
+                      breakdown?.overtime.computed.night_diff_rest_day_overtime
+                        .value,
                   },
                   {
                     label: "ND + RH OT",
                     value:
                       breakdown?.overtime.computed
-                        .night_diff_regular_holiday_overtime,
+                        .night_diff_regular_holiday_overtime.value,
                   },
                   {
                     label: "ND + SH OT",
                     value:
                       breakdown?.overtime.computed
-                        .night_diff_special_holiday_overtime,
+                        .night_diff_special_holiday_overtime.value,
                   },
                   {
                     label: "ND + RH + RD OT",
                     value:
                       breakdown?.overtime.computed
-                        .night_diff_regular_holiday_rest_day_overtime,
+                        .night_diff_regular_holiday_rest_day_overtime.value,
                   },
                   {
                     label: "ND + SH + RD OT",
                     value:
                       breakdown?.overtime.computed
-                        .night_diff_special_holiday_rest_day_overtime,
+                        .night_diff_special_holiday_rest_day_overtime.value,
                   },
                 ].map(({ label, value }) => (
                   <div

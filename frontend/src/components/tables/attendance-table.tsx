@@ -169,7 +169,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
 
   return (
     <div>
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between w-full gap-4 py-4 font-[Nunito]">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center mb-2 justify-between w-full gap-4 font-[Nunito]">
         {/* Search and Filter Controls */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <div className="flex items-center gap-2">
@@ -302,10 +302,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
         {/* Action Controls */}
         <div className="flex items-center gap-2">
           {/* Date Range Picker */}
-          <Button onClick={() => fetchAttendanceRecords(true)}>
-            <RefreshCcw />
-            Refresh View
-          </Button>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -372,6 +369,10 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
           >
             <Download />
             {!isMobile && "Export"}
+          </Button>
+          <Button size={"icon"} onClick={() => fetchAttendanceRecords(true)}>
+            <RefreshCcw />
+            {/* Refresh View */}
           </Button>
         </div>
       </div>

@@ -21,36 +21,229 @@ export interface PayrollBreakdown {
     computed: {
       total: number;
       regular_overtime: {
-        rate: number;
         value: number;
+        rate: {
+          base: number;
+          overtime: number;
+          total: number;
+        };
       };
-      rest_day_overtime: number;
-      night_diff_overtime: number;
-      regular_holiday_overtime: number;
-      special_holiday_overtime: number;
-      regular_holiday_rest_day_overtime: number;
-      special_holiday_rest_day_overtime: number;
-      night_diff_rest_day_overtime: number;
-      night_diff_regular_holiday_overtime: number;
-      night_diff_special_holiday_overtime: number;
-      night_diff_regular_holiday_rest_day_overtime: number;
-      night_diff_special_holiday_rest_day_overtime: number;
+      rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      regular_holiday_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          regular_holiday: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      special_holiday_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          special_holiday: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      regular_holiday_rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          regular_holiday: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      special_holiday_rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          special_holiday: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_regular_holiday_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          regular_holiday: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_special_holiday_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          special_holiday: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_regular_holiday_rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          regular_holiday: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
+      night_diff_special_holiday_rest_day_overtime: {
+        value: number;
+        rate: {
+          base: number;
+          night_diff: number;
+          special_holiday: number;
+          rest_day: number;
+          overtime: number;
+          total: number;
+        };
+      };
     };
   };
   worked_hours: {
     total: number;
-    regular: number;
-    rest_day: number;
-    night_diff: number;
-    regular_holiday: number;
-    special_holiday: number;
-    regular_holiday_rest_day: number;
-    special_holiday_rest_day: number;
-    night_diff_rest_day: number;
-    night_diff_regular_holiday: number;
-    night_diff_special_holiday: number;
-    night_diff_regular_holiday_rest_day: number;
-    night_diff_special_holiday_rest_day: number;
+    regular: {
+      value: number;
+      rate: {
+        base: number;
+        total: number;
+      };
+    };
+    rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        rest_day: number;
+        total: number;
+      };
+    };
+    night_diff: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        total: number;
+      };
+    };
+    regular_holiday: {
+      value: number;
+      rate: {
+        base: number;
+        regular_holiday: number;
+        total: number;
+      };
+    };
+    special_holiday: {
+      value: number;
+      rate: {
+        base: number;
+        special_holiday: number;
+        total: number;
+      };
+    };
+    regular_holiday_rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        regular_holiday: number;
+        rest_day: number;
+        total: number;
+      };
+    };
+    special_holiday_rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        special_holiday: number;
+        rest_day: number;
+        total: number;
+      };
+    };
+    night_diff_rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        rest_day: number;
+        total: number;
+      };
+    };
+    night_diff_regular_holiday: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        regular_holiday: number;
+        total: number;
+      };
+    };
+    night_diff_special_holiday: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        special_holiday: number;
+        total: number;
+      };
+    };
+    night_diff_regular_holiday_rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        regular_holiday: number;
+        rest_day: number;
+        total: number;
+      };
+    };
+    night_diff_special_holiday_rest_day: {
+      value: number;
+      rate: {
+        base: number;
+        night_diff: number;
+        special_holiday: number;
+        rest_day: number;
+        total: number;
+      };
+    };
   };
   deductions: {
     late_hours: number;

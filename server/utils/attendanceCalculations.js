@@ -1092,37 +1092,156 @@ export const enhancedClockOutCalculation = async (
           roundToPayrollIncrement(nightDiffSpecialHolidayRestDayOvertimeHours),
         regular_overtime: {
           value: roundToPayrollIncrement(regularOvertimeHours),
-          rate: calculator.config.overtimeMultiplier,
+          rate: {
+            base: 1.0,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total: calculator.config.overtimeMultiplier || 1.25,
+          },
         },
-        night_diff_overtime: roundToPayrollIncrement(nightDiffOvertimeHours),
-        rest_day_overtime: roundToPayrollIncrement(restDayOvertimeHours),
-        regular_holiday_overtime: roundToPayrollIncrement(
-          regularHolidayOvertimeHours
-        ),
-        special_holiday_overtime: roundToPayrollIncrement(
-          specialHolidayOvertimeHours
-        ),
-        regular_holiday_rest_day_overtime: roundToPayrollIncrement(
-          regularHolidayRestDayOvertimeHours
-        ),
-        special_holiday_rest_day_overtime: roundToPayrollIncrement(
-          specialHolidayRestDayOvertimeHours
-        ),
-        night_diff_regular_holiday_overtime: roundToPayrollIncrement(
-          nightDiffRegularHolidayOvertimeHours
-        ),
-        night_diff_special_holiday_overtime: roundToPayrollIncrement(
-          nightDiffSpecialHolidayOvertimeHours
-        ),
-        night_diff_rest_day_overtime: roundToPayrollIncrement(
-          nightDiffRestDayOvertimeHours
-        ),
-        night_diff_regular_holiday_rest_day_overtime: roundToPayrollIncrement(
-          nightDiffRegularHolidayRestDayOvertimeHours
-        ),
-        night_diff_special_holiday_rest_day_overtime: roundToPayrollIncrement(
-          nightDiffSpecialHolidayRestDayOvertimeHours
-        ),
+        night_diff_overtime: {
+          value: roundToPayrollIncrement(nightDiffOvertimeHours),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        rest_day_overtime: {
+          value: roundToPayrollIncrement(restDayOvertimeHours),
+          rate: {
+            base: 1.0,
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+
+        regular_holiday_overtime: {
+          value: roundToPayrollIncrement(regularHolidayOvertimeHours),
+          rate: {
+            base: 1.0,
+            regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (calculator.config.regularHolidayMultiplier || 2.0) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        special_holiday_overtime: {
+          value: roundToPayrollIncrement(specialHolidayOvertimeHours),
+          rate: {
+            base: 1.0,
+            special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (calculator.config.specialHolidayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        regular_holiday_rest_day_overtime: {
+          value: roundToPayrollIncrement(regularHolidayRestDayOvertimeHours),
+          rate: {
+            base: 1.0,
+            regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (calculator.config.regularHolidayMultiplier || 2.0) *
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        special_holiday_rest_day_overtime: {
+          value: roundToPayrollIncrement(specialHolidayRestDayOvertimeHours),
+          rate: {
+            base: 1.0,
+            special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (calculator.config.specialHolidayMultiplier || 1.3) *
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        night_diff_regular_holiday_overtime: {
+          value: roundToPayrollIncrement(nightDiffRegularHolidayOvertimeHours),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.regularHolidayMultiplier || 2.0) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        night_diff_special_holiday_overtime: {
+          value: roundToPayrollIncrement(nightDiffSpecialHolidayOvertimeHours),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.specialHolidayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        night_diff_rest_day_overtime: {
+          value: roundToPayrollIncrement(nightDiffRestDayOvertimeHours),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        night_diff_regular_holiday_rest_day_overtime: {
+          value: roundToPayrollIncrement(
+            nightDiffRegularHolidayRestDayOvertimeHours
+          ),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.regularHolidayMultiplier || 2.0) *
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
+        night_diff_special_holiday_rest_day_overtime: {
+          value: roundToPayrollIncrement(
+            nightDiffSpecialHolidayRestDayOvertimeHours
+          ),
+          rate: {
+            base: 1.0,
+            night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+            special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+            rest_day: calculator.config.restDayMultiplier || 1.3,
+            overtime: calculator.config.overtimeMultiplier || 1.25,
+            total:
+              (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+              (calculator.config.specialHolidayMultiplier || 1.3) *
+              (calculator.config.restDayMultiplier || 1.3) *
+              (calculator.config.overtimeMultiplier || 1.25),
+          },
+        },
       },
       approved: {
         total: 0,
@@ -1146,38 +1265,136 @@ export const enhancedClockOutCalculation = async (
       // MUTUALLY EXCLUSIVE CATEGORIZATION - Each hour appears exactly once
 
       // Pure regular hours (no premiums)
-      regular: roundToPayrollIncrement(pureRegularHours),
+      regular: {
+        value: roundToPayrollIncrement(pureRegularHours),
+        rate: {
+          base: 1.0,
+          total: 1.0,
+        },
+      },
 
       // Single premium types
-      rest_day: roundToPayrollIncrement(regularTime_restDay),
-      night_diff: roundToPayrollIncrement(regularTime_nightDiff),
-      regular_holiday: roundToPayrollIncrement(regularTime_regularHoliday),
-      special_holiday: roundToPayrollIncrement(regularTime_specialHoliday),
+      rest_day: {
+        value: roundToPayrollIncrement(regularTime_restDay),
+        rate: {
+          base: 1.0,
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total: calculator.config.restDayMultiplier || 1.3,
+        },
+      },
+      night_diff: {
+        value: roundToPayrollIncrement(regularTime_nightDiff),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          total: 1 + (calculator.config.nightDifferentialRate || 0.1),
+        },
+      },
+      regular_holiday: {
+        value: roundToPayrollIncrement(regularTime_regularHoliday),
+        rate: {
+          base: 1.0,
+          regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+          total: calculator.config.regularHolidayMultiplier || 2.0,
+        },
+      },
+      special_holiday: {
+        value: roundToPayrollIncrement(regularTime_specialHoliday),
+        rate: {
+          base: 1.0,
+          special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+          total: calculator.config.specialHolidayMultiplier || 1.3,
+        },
+      },
 
       // 2-way premium combinations
-      night_diff_rest_day: roundToPayrollIncrement(
-        regularTime_nightDiffRestDay
-      ),
-      night_diff_regular_holiday: roundToPayrollIncrement(
-        regularTime_nightDiffRegularHoliday
-      ),
-      night_diff_special_holiday: roundToPayrollIncrement(
-        regularTime_nightDiffSpecialHoliday
-      ),
-      regular_holiday_rest_day: roundToPayrollIncrement(
-        regularTime_regularHolidayRestDay
-      ),
-      special_holiday_rest_day: roundToPayrollIncrement(
-        regularTime_specialHolidayRestDay
-      ),
+      night_diff_rest_day: {
+        value: roundToPayrollIncrement(regularTime_nightDiffRestDay),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total:
+            (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+            (calculator.config.restDayMultiplier || 1.3),
+        },
+      },
+      night_diff_regular_holiday: {
+        value: roundToPayrollIncrement(regularTime_nightDiffRegularHoliday),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+          total:
+            (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+            (calculator.config.regularHolidayMultiplier || 2.0),
+        },
+      },
+      night_diff_special_holiday: {
+        value: roundToPayrollIncrement(regularTime_nightDiffSpecialHoliday),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+          total:
+            (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+            (calculator.config.specialHolidayMultiplier || 1.3),
+        },
+      },
+      regular_holiday_rest_day: {
+        value: roundToPayrollIncrement(regularTime_regularHolidayRestDay),
+        rate: {
+          base: 1.0,
+          regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total:
+            (calculator.config.regularHolidayMultiplier || 2.0) *
+            (calculator.config.restDayMultiplier || 1.3),
+        },
+      },
+      special_holiday_rest_day: {
+        value: roundToPayrollIncrement(regularTime_specialHolidayRestDay),
+        rate: {
+          base: 1.0,
+          special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total:
+            (calculator.config.specialHolidayMultiplier || 1.3) *
+            (calculator.config.restDayMultiplier || 1.3),
+        },
+      },
 
       // 3-way premium combinations (ultimate cases)
-      night_diff_regular_holiday_rest_day: roundToPayrollIncrement(
-        regularTime_nightDiffRegularHolidayRestDay
-      ),
-      night_diff_special_holiday_rest_day: roundToPayrollIncrement(
-        regularTime_nightDiffSpecialHolidayRestDay
-      ),
+      night_diff_regular_holiday_rest_day: {
+        value: roundToPayrollIncrement(
+          regularTime_nightDiffRegularHolidayRestDay
+        ),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          regular_holiday: calculator.config.regularHolidayMultiplier || 2.0,
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total:
+            (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+            (calculator.config.regularHolidayMultiplier || 2.0) *
+            (calculator.config.restDayMultiplier || 1.3),
+        },
+      },
+      night_diff_special_holiday_rest_day: {
+        value: roundToPayrollIncrement(
+          regularTime_nightDiffSpecialHolidayRestDay
+        ),
+        rate: {
+          base: 1.0,
+          night_diff: 1 + (calculator.config.nightDifferentialRate || 0.1),
+          special_holiday: calculator.config.specialHolidayMultiplier || 1.3,
+          rest_day: calculator.config.restDayMultiplier || 1.3,
+          total:
+            (1 + (calculator.config.nightDifferentialRate || 0.1)) *
+            (calculator.config.specialHolidayMultiplier || 1.3) *
+            (calculator.config.restDayMultiplier || 1.3),
+        },
+      },
     },
 
     deductions: {
@@ -1345,18 +1562,18 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
 
     // 1b. Validate worked hours breakdown consistency
     const totalWorkedHoursBreakdown =
-      breakdown.worked_hours.regular +
-      breakdown.worked_hours.rest_day +
-      breakdown.worked_hours.night_diff +
-      breakdown.worked_hours.regular_holiday +
-      breakdown.worked_hours.special_holiday +
-      breakdown.worked_hours.regular_holiday_rest_day +
-      breakdown.worked_hours.special_holiday_rest_day +
-      breakdown.worked_hours.night_diff_rest_day +
-      breakdown.worked_hours.night_diff_regular_holiday +
-      breakdown.worked_hours.night_diff_special_holiday +
-      breakdown.worked_hours.night_diff_regular_holiday_rest_day +
-      breakdown.worked_hours.night_diff_special_holiday_rest_day;
+      breakdown.worked_hours.regular.value +
+      breakdown.worked_hours.rest_day.value +
+      breakdown.worked_hours.night_diff.value +
+      breakdown.worked_hours.regular_holiday.value +
+      breakdown.worked_hours.special_holiday.value +
+      breakdown.worked_hours.regular_holiday_rest_day.value +
+      breakdown.worked_hours.special_holiday_rest_day.value +
+      breakdown.worked_hours.night_diff_rest_day.value +
+      breakdown.worked_hours.night_diff_regular_holiday.value +
+      breakdown.worked_hours.night_diff_special_holiday.value +
+      breakdown.worked_hours.night_diff_regular_holiday_rest_day.value +
+      breakdown.worked_hours.night_diff_special_holiday_rest_day.value;
 
     if (
       Math.abs(totalWorkedHoursBreakdown - breakdown.worked_hours.total) > 0.01
@@ -1368,22 +1585,27 @@ export const validatePayrollBreakdown = (payrollBreakdown, totalHours) => {
 
     // 2. Validate overtime breakdown consistency
     const totalOvertimeBreakdown =
-      breakdown.overtime.regular_overtime +
-      breakdown.overtime.night_diff_overtime +
-      breakdown.overtime.rest_day_overtime +
-      breakdown.overtime.regular_holiday_overtime +
-      breakdown.overtime.special_holiday_overtime +
-      breakdown.overtime.regular_holiday_rest_day_overtime +
-      breakdown.overtime.special_holiday_rest_day_overtime +
-      breakdown.overtime.night_diff_regular_holiday_overtime +
-      breakdown.overtime.night_diff_special_holiday_overtime +
-      breakdown.overtime.night_diff_rest_day_overtime +
-      breakdown.overtime.night_diff_regular_holiday_rest_day_overtime +
-      breakdown.overtime.night_diff_special_holiday_rest_day_overtime;
+      breakdown.overtime.computed.regular_overtime.value +
+      breakdown.overtime.computed.night_diff_overtime.value +
+      breakdown.overtime.computed.rest_day_overtime.value +
+      breakdown.overtime.computed.regular_holiday_overtime.value +
+      breakdown.overtime.computed.special_holiday_overtime.value +
+      breakdown.overtime.computed.regular_holiday_rest_day_overtime.value +
+      breakdown.overtime.computed.special_holiday_rest_day_overtime.value +
+      breakdown.overtime.computed.night_diff_regular_holiday_overtime.value +
+      breakdown.overtime.computed.night_diff_special_holiday_overtime.value +
+      breakdown.overtime.computed.night_diff_rest_day_overtime.value +
+      breakdown.overtime.computed.night_diff_regular_holiday_rest_day_overtime
+        .value +
+      breakdown.overtime.computed.night_diff_special_holiday_rest_day_overtime
+        .value;
 
-    if (Math.abs(totalOvertimeBreakdown - breakdown.overtime.total) > 0.01) {
+    if (
+      Math.abs(totalOvertimeBreakdown - breakdown.overtime.computed.total) >
+      0.01
+    ) {
       errors.push(
-        `Overtime breakdown mismatch: ${totalOvertimeBreakdown} vs ${breakdown.overtime.total}`
+        `Overtime breakdown mismatch: ${totalOvertimeBreakdown} vs ${breakdown.overtime.computed.total}`
       );
     }
 

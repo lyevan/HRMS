@@ -196,12 +196,54 @@ export class AdvancedPayrollCalculator {
       }
 
       if (configGroups.holiday) {
-        // Handle holiday multipliers
+        // Handle holiday multipliers with proper key mapping
+        const holidayConfig = configGroups.holiday;
+
+        // Map database keys to expected property names
+        if (holidayConfig.regular_holiday_rate !== undefined) {
+          dbConfig.regularHolidayMultiplier =
+            holidayConfig.regular_holiday_rate;
+        }
+        if (holidayConfig.special_holiday_rate !== undefined) {
+          dbConfig.specialHolidayMultiplier =
+            holidayConfig.special_holiday_rate;
+        }
+
+        // Also assign the raw values for reference
         Object.assign(dbConfig, configGroups.holiday);
       }
 
+      if (configGroups.night_differential) {
+        // Handle night differential configurations
+        const nightDiffConfig = configGroups.night_differential;
+
+        // Map database keys to expected property names
+        if (nightDiffConfig.rate !== undefined) {
+          dbConfig.nightDifferentialRate = nightDiffConfig.rate;
+        }
+
+        // Also assign the raw values for reference
+        Object.assign(dbConfig, configGroups.night_differential);
+      }
+
       if (configGroups.overtime) {
-        // Handle overtime configurations
+        // Handle overtime configurations with proper key mapping
+        const overtimeConfig = configGroups.overtime;
+
+        // Map database keys to expected property names
+        if (overtimeConfig.regular_overtime_rate !== undefined) {
+          dbConfig.overtimeMultiplier = overtimeConfig.regular_overtime_rate;
+        }
+        if (overtimeConfig.holiday_overtime_rate !== undefined) {
+          dbConfig.holidayOvertimeMultiplier =
+            overtimeConfig.holiday_overtime_rate;
+        }
+        if (overtimeConfig.rest_day_overtime_rate !== undefined) {
+          dbConfig.restDayOvertimeMultiplier =
+            overtimeConfig.rest_day_overtime_rate;
+        }
+
+        // Also assign the raw values for reference
         Object.assign(dbConfig, configGroups.overtime);
       }
 
@@ -210,12 +252,12 @@ export class AdvancedPayrollCalculator {
         Object.assign(dbConfig, configGroups.penalties);
       }
 
-      // console.log("📊  Loaded payroll configuration from database:", dbConfig);
+      console.log("📊  Loaded payroll configuration from database:", dbConfig);
 
       // Merge database config with default config using deep merge
       this.config = { ...this.config, ...dbConfig };
 
-      console.log("📊  Final merged payroll configuration:", this.config);
+      // console.log("📊  Final merged payroll configuration:", this.config);
 
       // console.log("Final payroll configuration:", this.config);
     } catch (error) {
