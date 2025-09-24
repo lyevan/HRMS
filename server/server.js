@@ -43,6 +43,7 @@ app.use((req, res, next) => {
     "http://localhost:5173",
     "http://192.168.254.103:5173",
     process.env.FRONTEND_URL,
+    process.env.FRONTEND_PREVIEW_URL,
   ].filter(Boolean);
 
   // console.log(`🔍 Request from origin: ${origin}`);
