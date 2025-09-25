@@ -4,3 +4,6 @@ client/node_modules/
 client/package-lock.json
 /generated/prisma
 .env
+build
+*.csv
+*.md

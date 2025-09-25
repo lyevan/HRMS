@@ -266,6 +266,8 @@ export const getPayslipsByHeaderId = async (req, res) => {
       `
       SELECT 
         p.*,
+        ph.start_date,
+        ph.end_date,
         e.first_name,
         e.last_name,
         e.employee_id as emp_id,
@@ -275,6 +277,7 @@ export const getPayslipsByHeaderId = async (req, res) => {
         c.rate_type,
         et.name as employment_type
       FROM payslip p
+      JOIN payroll_header ph ON p.payroll_header_id = ph.payroll_header_id
       JOIN employees e ON p.employee_id = e.employee_id
       JOIN contracts c ON e.contract_id = c.contract_id
       JOIN positions pos ON c.position_id = pos.position_id
@@ -298,7 +301,7 @@ export const getPayslipsByHeaderId = async (req, res) => {
         regular_holiday_days: 0,
         special_holiday_days: 0,
       };
-
+      const calculator = new AdvancedPayrollCalculator(pool);
       return {
         ...payslip,
         // Attendance data
@@ -321,6 +324,20 @@ export const getPayslipsByHeaderId = async (req, res) => {
         // Allowances (placeholder)
         allowances: 0,
 
+        hourly_rate:
+          payslip.rate_type === "hourly"
+            ? payslip.rate
+            : payslip.rate_type === "daily"
+            ? payslip.rate / calculator.config.standardWorkingHours
+            : payslip.rate_type === "weekly"
+            ? payslip.rate /
+              calculator.config.standardWorkingDaysInWeek /
+              calculator.config.standardWorkingHours
+            : payslip.rate_type === "monthly"
+            ? payslip.rate /
+              calculator.config.standardWorkingDays /
+              calculator.config.standardWorkingHours
+            : 0,
         // Deduction fields set to 0 for now
         sss_contribution: 0,
         philhealth_contribution: 0,
@@ -1096,6 +1113,8 @@ const calculateEmployeePayrollSync = async (
       paid_leave_days: attendanceForCalculator.paid_leave_days,
       total_hours: payrollData.attendance.total_regular_hours,
       overtime_hours: payrollData.attendance.total_overtime_hours,
+
+      earnings_breakdown: payrollData.earnings.breakdown || null,
       late_days: 0, // Legacy field
       gross_pay: Math.round(payrollData.earnings.gross_pay * 100) / 100,
       overtime_pay: Math.round(payrollData.earnings.overtime_pay * 100) / 100,
@@ -1171,10 +1190,10 @@ const calculateEmployeePayrollSync = async (
       // Raw attendance breakdown for debugging and audit trails
       comprehensive_breakdown: attendanceForCalculator.payroll_breakdowns,
     };
-    console.log(
-      `✅ [CALC DEBUG] Payroll calculated for ${emp.employee_id}:`,
-      result
-    );
+    // console.log(
+    //   `✅ [CALC DEBUG] Payroll calculated for ${emp.employee_id}:`,
+    //   result.earnings_breakdown
+    // );
     return result;
   } catch (error) {
     console.error(
@@ -1698,6 +1717,10 @@ const optimizedGeneratePayroll = async (req, res) => {
       payroll.income_tax || 0,
       payroll.other_deductions || 0,
       payroll.net_pay,
+      // Store breakdown object as jsonb
+      payroll.earnings_breakdown
+        ? JSON.stringify(payroll.earnings_breakdown)
+        : JSON.stringify({ value: "Not provided" }),
     ]);
 
     const payslipQuery = `
@@ -1705,11 +1728,11 @@ const optimizedGeneratePayroll = async (req, res) => {
     payroll_header_id, employee_id, gross_pay, overtime_pay, 
     night_diff_pay, leave_pay, bonuses, deductions,
     sss_contribution, philhealth_contribution, pagibig_contribution,
-    income_tax, other_deductions, net_pay
+    income_tax, other_deductions, net_pay, earnings_breakdown
   ) VALUES ${payslipValues
     .map(
       (_, i) =>
-        `(${Array.from({ length: 14 }, (_, j) => `$${i * 14 + j + 1}`).join(
+        `(${Array.from({ length: 15 }, (_, j) => `$${i * 15 + j + 1}`).join(
           ","
         )})`
     )

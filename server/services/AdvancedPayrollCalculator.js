@@ -12,7 +12,8 @@ export class AdvancedPayrollCalculator {
     this.config = {
       // Working time configuration
       standardWorkingHours: 8,
-      standardWorkingDays: 22,
+      standardWorkingDays: 26,
+      standardWorkingDaysInWeek: 6,
       weekendDays: [0, 6], // Sunday = 0, Saturday = 6
 
       // Overtime configuration
@@ -119,6 +120,13 @@ export class AdvancedPayrollCalculator {
       late_penalty_rate: 0.00462, // 1/216 of daily rate per minute (per DOLE)
       undertime_deduction_rate: 1.0, // 100% deduction for undertime
       holiday_regular_not_worked_multiplier: 1.0, // 100% pay for regular holidays not worked
+
+      // TODO: Add database configuration for enabling/disabling deductions
+      // Currently hardcoded - should be moved to database config table
+      enable_late_deductions: false, // Set to true to enable late deductions
+      enable_undertime_deductions: false, // Set to true to enable undertime deductions
+      enable_auto_approve_overtime: true, // Set to true to auto-approve OT if within limits
+      auto_approve_overtime_hours_limit: Infinity, // Maximum OT hours that can be auto-approved
 
       // Rounding configuration
       payrollRounding: "nearest", // 'up', 'down', 'nearest'
@@ -332,7 +340,9 @@ export class AdvancedPayrollCalculator {
       const earnings = await this.calculateEarnings(
         employee,
         attendance,
-        scheduleInfo
+        scheduleInfo,
+        startDate,
+        endDate
       );
 
       // Calculate deductions
@@ -344,6 +354,8 @@ export class AdvancedPayrollCalculator {
 
       // Calculate net pay
       const netPay = earnings.grossPay - deductions.totalDeductions;
+
+      console.log("DEBUG: ======", earnings.breakdown);
 
       return {
         employee_id: employeeId,
@@ -385,6 +397,8 @@ export class AdvancedPayrollCalculator {
           undertime_deductions: earnings.undertimeDeductions,
           other_earnings: earnings.otherEarnings,
           gross_pay: earnings.grossPay,
+
+          breakdown: earnings.breakdown || {},
         },
 
         // Deductions breakdown
@@ -417,43 +431,42 @@ export class AdvancedPayrollCalculator {
   /**
    * Calculate earnings for an employee with enhanced payroll breakdown support
    */
-  async calculateEarnings(employee, attendance, scheduleInfo = null) {
+  async calculateEarnings(
+    employee,
+    attendance,
+    scheduleInfo = null,
+    startDate = null,
+    endDate = null
+  ) {
     // console.log(
     //   `💵 [DEBUG] Starting earnings calculation for ${employee.first_name} ${employee.last_name}`
     // );
 
     const rate = parseFloat(employee.rate);
-    let basePay = 0;
-    let overtimePay = 0;
-    let holidayPay = 0;
-    let nightDifferential = 0;
-    let leavePay = 0;
-    let lateDeductions = 0;
-    let undertimeDeductions = 0;
 
-    // Enhanced break time calculations if schedule info is available
-    if (scheduleInfo && scheduleInfo.break_start && scheduleInfo.break_end) {
-      // console.log(
-      //   `⏰ [DEBUG] Using enhanced break calculations: ${scheduleInfo.break_start} - ${scheduleInfo.break_end}`
-      // );
-    }
+    // ===== CHECK FOR PAYROLL_BREAKDOWN DATA FROM ATTENDANCE RECORDS =====
+    // If we have individual attendance records with payroll_breakdown, use those for precise calculation
+    try {
+      const attendanceRecords =
+        await this.getAttendanceRecordsWithPayrollBreakdown(
+          employee.employee_id,
+          startDate,
+          endDate
+        );
 
-    // ===== ENHANCED PAYROLL BREAKDOWN LOGIC =====
-    // Check if we have enhanced payroll breakdown data (from attendanceCalculations.js)
-    // This includes ultimate edge cases like Day Off + Holiday + Night Diff + Overtime
-    if (
-      attendance.payroll_breakdowns &&
-      attendance.payroll_breakdowns.length > 0
-    ) {
-      console.log(
-        `🚀 [CALC DEBUG] Using enhanced payroll breakdowns for ultimate edge cases...`
-      );
-
-      // Process comprehensive breakdown from attendance calculations
-      return await this.calculateEarningsFromBreakdown(
-        employee,
-        attendance,
-        scheduleInfo
+      if (attendanceRecords && attendanceRecords.length > 0) {
+        console.log(
+          `🚀 [CALC DEBUG] Using payroll_breakdown data from ${attendanceRecords.length} attendance records...`
+        );
+        return await this.calculateEarningsFromPayrollBreakdown(
+          employee,
+          attendanceRecords
+        );
+      }
+    } catch (error) {
+      console.warn(
+        `⚠️ [CALC DEBUG] Could not fetch payroll_breakdown data, falling back to aggregated calculation:`,
+        error.message
       );
     }
 
@@ -500,7 +513,7 @@ export class AdvancedPayrollCalculator {
         // console.log(`🏖️ [DEBUG] Leave pay: ₱${leavePay}`);
 
         // Calculate late deductions (per DOLE: 1/216 of daily rate per minute)
-        if (attendance.late_minutes > 0) {
+        if (attendance.late_minutes > 0 && this.config.enable_late_deductions) {
           const lateRatePerMinute = rate * this.config.late_penalty_rate;
           lateDeductions = attendance.late_minutes * lateRatePerMinute;
           // console.log(
@@ -513,7 +526,10 @@ export class AdvancedPayrollCalculator {
         }
 
         // Calculate undertime deductions (proportional to daily rate)
-        if (attendance.undertime_minutes > 0) {
+        if (
+          attendance.undertime_minutes > 0 &&
+          this.config.enable_undertime_deductions
+        ) {
           const dailyRatePerMinute =
             rate / (this.config.standardWorkingHours * 60);
           undertimeDeductions =
@@ -556,7 +572,7 @@ export class AdvancedPayrollCalculator {
         // );
 
         // Calculate late deductions for monthly employees
-        if (attendance.late_minutes > 0) {
+        if (attendance.late_minutes > 0 && this.config.enable_late_deductions) {
           const monthlyRatePerMinute =
             rate /
             (workingDaysInPeriod * this.config.standardWorkingHours * 60);
@@ -571,7 +587,10 @@ export class AdvancedPayrollCalculator {
         }
 
         // Calculate undertime deductions for monthly employees
-        if (attendance.undertime_minutes > 0) {
+        if (
+          attendance.undertime_minutes > 0 &&
+          this.config.enable_undertime_deductions
+        ) {
           const monthlyRatePerMinute =
             rate /
             (workingDaysInPeriod * this.config.standardWorkingHours * 60);
@@ -889,12 +908,15 @@ export class AdvancedPayrollCalculator {
     // Calculate based on rate type
     switch (employee.rate_type) {
       case "daily":
-        if (attendance.late_minutes > 0) {
+        if (attendance.late_minutes > 0 && this.config.enable_late_deductions) {
           const lateRatePerMinute = rate * this.config.late_penalty_rate;
           lateDeductions = attendance.late_minutes * lateRatePerMinute;
         }
 
-        if (attendance.undertime_minutes > 0) {
+        if (
+          attendance.undertime_minutes > 0 &&
+          this.config.enable_undertime_deductions
+        ) {
           const dailyRatePerMinute =
             rate / (this.config.standardWorkingHours * 60);
           undertimeDeductions =
@@ -907,14 +929,17 @@ export class AdvancedPayrollCalculator {
       case "monthly":
         const workingDaysInPeriod = this.config.standardWorkingDays;
 
-        if (attendance.late_minutes > 0) {
+        if (attendance.late_minutes > 0 && this.config.enable_late_deductions) {
           const monthlyRatePerMinute =
             rate /
             (workingDaysInPeriod * this.config.standardWorkingHours * 60);
           lateDeductions = attendance.late_minutes * monthlyRatePerMinute;
         }
 
-        if (attendance.undertime_minutes > 0) {
+        if (
+          attendance.undertime_minutes > 0 &&
+          this.config.enable_undertime_deductions
+        ) {
           const monthlyRatePerMinute =
             rate /
             (workingDaysInPeriod * this.config.standardWorkingHours * 60);
@@ -2272,6 +2297,454 @@ export class AdvancedPayrollCalculator {
     );
 
     return attendanceData;
+  }
+
+  /**
+   * Get attendance records with payroll_breakdown data for precise earnings calculation
+   */
+  async getAttendanceRecordsWithPayrollBreakdown(
+    employeeId,
+    startDate,
+    endDate
+  ) {
+    console.log(
+      `📊 [DEBUG] Fetching attendance records with payroll_breakdown for employee: ${employeeId}, period: ${startDate} to ${endDate}`
+    );
+
+    const result = await pool.query(
+      `
+      SELECT
+        a.attendance_id,
+        a.date,
+        a.payroll_breakdown,
+        a.late_minutes,
+        a.undertime_minutes,
+        a.on_leave,
+        lt.is_paid as leave_is_paid
+      FROM attendance a
+      LEFT JOIN leave_types lt ON a.leave_type_id = lt.leave_type_id
+      WHERE a.employee_id = $1
+        AND a.date BETWEEN $2 AND $3
+        AND a.payroll_breakdown IS NOT NULL
+      ORDER BY a.date
+    `,
+      [employeeId, startDate, endDate]
+    );
+
+    console.log(
+      `📊 [DEBUG] Found ${result.rows.length} attendance records with payroll_breakdown data`
+    );
+
+    return result.rows;
+  }
+
+  /**
+   * Calculate earnings using payroll_breakdown data from attendance records
+   * Formula: hourly_rate * value * rate.total for all worked_hours and overtime fields
+   */
+  async calculateEarningsFromPayrollBreakdown(employee, attendanceRecords) {
+    console.log(
+      `💰 [CALC DEBUG] Calculating earnings from payroll_breakdown data for ${employee.first_name} ${employee.last_name}`
+    );
+
+    const hourlyRate = this.getHourlyRate(employee);
+
+    let totalEarnings = 0;
+    let totalOvertime = 0;
+
+    // For "regular", "rest_day", "night_diff", "regular_holiday", "special_holiday"
+    let totalRegularPay = { hours: 0, rate: 0, amount: 0 };
+    let totalRestDayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffPay = { hours: 0, rate: 0, amount: 0 };
+    let totalRegularHolidayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalSpecialHolidayPay = { hours: 0, rate: 0, amount: 0 };
+
+    // For overtime pay types
+    let totalRegularPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalRestDayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalRegularHolidayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalSpecialHolidayPayOT = { hours: 0, rate: 0, amount: 0 };
+
+    // For multiple premiums pay types - individual fields
+    let totalRegularHolidayRestDayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalSpecialHolidayRestDayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRestDayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRegularHolidayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffSpecialHolidayPay = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRegularHolidayRestDayPay = {
+      hours: 0,
+      rate: 0,
+      amount: 0,
+    };
+    let totalNightDiffSpecialHolidayRestDayPay = {
+      hours: 0,
+      rate: 0,
+      amount: 0,
+    };
+
+    // For multiple premiums overtime pay types - individual fields
+    let totalRegularHolidayRestDayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalSpecialHolidayRestDayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRestDayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRegularHolidayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffSpecialHolidayPayOT = { hours: 0, rate: 0, amount: 0 };
+    let totalNightDiffRegularHolidayRestDayPayOT = {
+      hours: 0,
+      rate: 0,
+      amount: 0,
+    };
+    let totalNightDiffSpecialHolidayRestDayPayOT = {
+      hours: 0,
+      rate: 0,
+      amount: 0,
+    };
+
+    let lateDeductions = 0;
+    let undertimeDeductions = 0;
+    let leavePay = 0;
+
+    // Process each attendance record
+    for (const record of attendanceRecords) {
+      const breakdown = record.payroll_breakdown;
+
+      if (!breakdown) continue;
+
+      // Calculate earnings from worked_hours
+      if (breakdown.worked_hours) {
+        const workedHours = breakdown.worked_hours;
+
+        // Sum all worked hours: hourly_rate * value * rate.total
+        const workedHoursFields = [
+          "regular",
+          "rest_day",
+          "night_diff",
+          "regular_holiday",
+          "special_holiday",
+          "regular_holiday_rest_day",
+          "special_holiday_rest_day",
+          "night_diff_rest_day",
+          "night_diff_regular_holiday",
+          "night_diff_special_holiday",
+          "night_diff_regular_holiday_rest_day",
+          "night_diff_special_holiday_rest_day",
+        ];
+
+        for (const field of workedHoursFields) {
+          if (workedHours[field] && workedHours[field].value > 0) {
+            const earnings =
+              hourlyRate *
+              workedHours[field].value *
+              workedHours[field].rate.total;
+            totalEarnings += earnings;
+
+            // Accumulate into specific pay type variables
+            switch (field) {
+              case "regular":
+                totalRegularPay.hours += workedHours[field].value;
+                totalRegularPay.rate = workedHours[field].rate.total;
+                totalRegularPay.amount += earnings;
+                break;
+              case "rest_day":
+                totalRestDayPay.hours += workedHours[field].value;
+                totalRestDayPay.rate = workedHours[field].rate.total;
+                totalRestDayPay.amount += earnings;
+                break;
+              case "night_diff":
+                totalNightDiffPay.hours += workedHours[field].value;
+                totalNightDiffPay.rate = workedHours[field].rate.total;
+                totalNightDiffPay.amount += earnings;
+                break;
+              case "regular_holiday":
+                totalRegularHolidayPay.hours += workedHours[field].value;
+                totalRegularHolidayPay.rate = workedHours[field].rate.total;
+                totalRegularHolidayPay.amount += earnings;
+                break;
+              case "special_holiday":
+                totalSpecialHolidayPay.hours += workedHours[field].value;
+                totalSpecialHolidayPay.rate = workedHours[field].rate.total;
+                totalSpecialHolidayPay.amount += earnings;
+                break;
+              case "regular_holiday_rest_day":
+                totalRegularHolidayRestDayPay.hours += workedHours[field].value;
+                totalRegularHolidayRestDayPay.rate =
+                  workedHours[field].rate.total;
+                totalRegularHolidayRestDayPay.amount += earnings;
+                break;
+              case "special_holiday_rest_day":
+                totalSpecialHolidayRestDayPay.hours += workedHours[field].value;
+                totalSpecialHolidayRestDayPay.rate =
+                  workedHours[field].rate.total;
+                totalSpecialHolidayRestDayPay.amount += earnings;
+                break;
+              case "night_diff_rest_day":
+                totalNightDiffRestDayPay.hours += workedHours[field].value;
+                totalNightDiffRestDayPay.rate = workedHours[field].rate.total;
+                totalNightDiffRestDayPay.amount += earnings;
+                break;
+              case "night_diff_regular_holiday":
+                totalNightDiffRegularHolidayPay.hours +=
+                  workedHours[field].value;
+                totalNightDiffRegularHolidayPay.rate =
+                  workedHours[field].rate.total;
+                totalNightDiffRegularHolidayPay.amount += earnings;
+                break;
+              case "night_diff_special_holiday":
+                totalNightDiffSpecialHolidayPay.hours +=
+                  workedHours[field].value;
+                totalNightDiffSpecialHolidayPay.rate =
+                  workedHours[field].rate.total;
+                totalNightDiffSpecialHolidayPay.amount += earnings;
+                break;
+              case "night_diff_regular_holiday_rest_day":
+                totalNightDiffRegularHolidayRestDayPay.hours +=
+                  workedHours[field].value;
+                totalNightDiffRegularHolidayRestDayPay.rate =
+                  workedHours[field].rate.total;
+                totalNightDiffRegularHolidayRestDayPay.amount += earnings;
+                break;
+              case "night_diff_special_holiday_rest_day":
+                totalNightDiffSpecialHolidayRestDayPay.hours +=
+                  workedHours[field].value;
+                totalNightDiffSpecialHolidayRestDayPay.rate =
+                  workedHours[field].rate.total;
+                totalNightDiffSpecialHolidayRestDayPay.amount += earnings;
+                break;
+            }
+
+            console.log(
+              `  ${field}: ${workedHours[field].value}h × ₱${hourlyRate} × ${
+                workedHours[field].rate.total
+              } = ₱${earnings.toFixed(2)}`
+            );
+          }
+        }
+      }
+
+      let breakdownOTField;
+      if (this.config.enable_auto_approve_overtime) {
+        breakdownOTField = breakdown.overtime.computed;
+      } else {
+        breakdownOTField = breakdown.overtime.approved;
+      }
+
+      // Calculate earnings from overtime
+      if (breakdown.overtime && breakdownOTField) {
+        const overtime = breakdownOTField;
+
+        // Sum all overtime hours: hourly_rate * value * rate.total
+        const overtimeFields = [
+          "regular_overtime",
+          "rest_day_overtime",
+          "night_diff_overtime",
+          "regular_holiday_overtime",
+          "special_holiday_overtime",
+          "regular_holiday_rest_day_overtime",
+          "special_holiday_rest_day_overtime",
+          "night_diff_rest_day_overtime",
+          "night_diff_regular_holiday_overtime",
+          "night_diff_special_holiday_overtime",
+          "night_diff_regular_holiday_rest_day_overtime",
+          "night_diff_special_holiday_rest_day_overtime",
+        ];
+
+        for (const field of overtimeFields) {
+          // Only count overtime if below auto-approve threshold
+          if (
+            this.config.enable_auto_approve_overtime &&
+            this.config.auto_approve_overtime_hours_limit
+          ) {
+            if (
+              overtime[field] &&
+              overtime[field].value >
+                this.config.auto_approve_overtime_hours_limit
+            ) {
+              // Cap overtime at the approved limit
+              overtime[field].value =
+                this.config.auto_approve_overtime_hours_limit;
+            }
+          }
+          if (overtime[field] && overtime[field].value > 0) {
+            const earnings =
+              hourlyRate * overtime[field].value * overtime[field].rate.total;
+            totalEarnings += earnings;
+            totalOvertime += earnings;
+
+            // Accumulate into specific overtime pay type variables
+            switch (field) {
+              case "regular_overtime":
+                totalRegularPayOT.hours += overtime[field].value;
+                totalRegularPayOT.rate = overtime[field].rate.total;
+                totalRegularPayOT.amount += earnings;
+                break;
+              case "rest_day_overtime":
+                totalRestDayPayOT.hours += overtime[field].value;
+                totalRestDayPayOT.rate = overtime[field].rate.total;
+                totalRestDayPayOT.amount += earnings;
+                break;
+              case "night_diff_overtime":
+                totalNightDiffPayOT.hours += overtime[field].value;
+                totalNightDiffPayOT.rate = overtime[field].rate.total;
+                totalNightDiffPayOT.amount += earnings;
+                break;
+              case "regular_holiday_overtime":
+                totalRegularHolidayPayOT.hours += overtime[field].value;
+                totalRegularHolidayPayOT.rate = overtime[field].rate.total;
+                totalRegularHolidayPayOT.amount += earnings;
+                break;
+              case "special_holiday_overtime":
+                totalSpecialHolidayPayOT.hours += overtime[field].value;
+                totalSpecialHolidayPayOT.rate = overtime[field].rate.total;
+                totalSpecialHolidayPayOT.amount += earnings;
+                break;
+              case "regular_holiday_rest_day_overtime":
+                totalRegularHolidayRestDayPayOT.hours += overtime[field].value;
+                totalRegularHolidayRestDayPayOT.rate =
+                  overtime[field].rate.total;
+                totalRegularHolidayRestDayPayOT.amount += earnings;
+                break;
+              case "special_holiday_rest_day_overtime":
+                totalSpecialHolidayRestDayPayOT.hours += overtime[field].value;
+                totalSpecialHolidayRestDayPayOT.rate =
+                  overtime[field].rate.total;
+                totalSpecialHolidayRestDayPayOT.amount += earnings;
+                break;
+              case "night_diff_rest_day_overtime":
+                totalNightDiffRestDayPayOT.hours += overtime[field].value;
+                totalNightDiffRestDayPayOT.rate = overtime[field].rate.total;
+                totalNightDiffRestDayPayOT.amount += earnings;
+                break;
+              case "night_diff_regular_holiday_overtime":
+                totalNightDiffRegularHolidayPayOT.hours +=
+                  overtime[field].value;
+                totalNightDiffRegularHolidayPayOT.rate =
+                  overtime[field].rate.total;
+                totalNightDiffRegularHolidayPayOT.amount += earnings;
+                break;
+              case "night_diff_special_holiday_overtime":
+                totalNightDiffSpecialHolidayPayOT.hours +=
+                  overtime[field].value;
+                totalNightDiffSpecialHolidayPayOT.rate =
+                  overtime[field].rate.total;
+                totalNightDiffSpecialHolidayPayOT.amount += earnings;
+                break;
+              case "night_diff_regular_holiday_rest_day_overtime":
+                totalNightDiffRegularHolidayRestDayPayOT.hours +=
+                  overtime[field].value;
+                totalNightDiffRegularHolidayRestDayPayOT.rate =
+                  overtime[field].rate.total;
+                totalNightDiffRegularHolidayRestDayPayOT.amount += earnings;
+                break;
+              case "night_diff_special_holiday_rest_day_overtime":
+                totalNightDiffSpecialHolidayRestDayPayOT.hours +=
+                  overtime[field].value;
+                totalNightDiffSpecialHolidayRestDayPayOT.rate =
+                  overtime[field].rate.total;
+                totalNightDiffSpecialHolidayRestDayPayOT.amount += earnings;
+                break;
+            }
+
+            console.log(
+              `  ${field}: ${overtime[field].value}h × ₱${hourlyRate} × ${
+                overtime[field].rate.total
+              } = ₱${earnings.toFixed(2)}`
+            );
+          }
+        }
+      }
+
+      // Calculate late deductions
+      if (record.late_minutes > 0 && this.config.enable_late_deductions) {
+        const lateRatePerMinute =
+          (hourlyRate / 60) * this.config.late_penalty_rate;
+        lateDeductions += record.late_minutes * lateRatePerMinute;
+      }
+
+      // Calculate undertime deductions
+      if (
+        record.undertime_minutes > 0 &&
+        this.config.enable_undertime_deductions
+      ) {
+        const undertimeRatePerMinute =
+          (hourlyRate / 60) * this.config.undertime_deduction_rate;
+        undertimeDeductions +=
+          record.undertime_minutes * undertimeRatePerMinute;
+      }
+
+      // Calculate leave pay if applicable
+      // TODO - leave_is_paid is not yet implemented in payroll_breakdown
+      if (record.on_leave && record.leave_is_paid) {
+        // For leave days, assume 8 hours at regular rate
+        leavePay += hourlyRate * 8;
+      }
+    }
+
+    console.log(
+      `💰 [CALC DEBUG] Total earnings from payroll_breakdown: ₱${totalEarnings.toFixed(
+        2
+      )}`
+    );
+    console.log(
+      `💸 [CALC DEBUG] Late deductions: ₱${lateDeductions.toFixed(2)}`
+    );
+    console.log(
+      `💸 [CALC DEBUG] Undertime deductions: ₱${undertimeDeductions.toFixed(2)}`
+    );
+    console.log(`🏖️ [CALC DEBUG] Leave pay: ₱${leavePay.toFixed(2)}`);
+
+    const grossPay =
+      totalEarnings + leavePay - lateDeductions - undertimeDeductions;
+
+    const result = {
+      basePay: totalEarnings, // All earnings are now calculated precisely
+      overtimePay: totalOvertime, // Overtime is already included in totalEarnings
+      holidayPay: 0, // Holiday pay is already included in totalEarnings
+      nightDifferential: 0, // Night diff is already included in totalEarnings
+      leavePay: leavePay,
+      lateDeductions: lateDeductions,
+      undertimeDeductions: undertimeDeductions,
+      otherEarnings: 0,
+      grossPay: grossPay,
+      // Comprehensive breakdown of all pay types
+      breakdown: {
+        regularPay: totalRegularPay,
+        restDayPay: totalRestDayPay,
+        nightDiffPay: totalNightDiffPay,
+        regularHolidayPay: totalRegularHolidayPay,
+        specialHolidayPay: totalSpecialHolidayPay,
+        // Individual multiple premium fields
+        regularHolidayRestDayPay: totalRegularHolidayRestDayPay,
+        specialHolidayRestDayPay: totalSpecialHolidayRestDayPay,
+        nightDiffRestDayPay: totalNightDiffRestDayPay,
+        nightDiffRegularHolidayPay: totalNightDiffRegularHolidayPay,
+        nightDiffSpecialHolidayPay: totalNightDiffSpecialHolidayPay,
+        nightDiffRegularHolidayRestDayPay:
+          totalNightDiffRegularHolidayRestDayPay,
+        nightDiffSpecialHolidayRestDayPay:
+          totalNightDiffSpecialHolidayRestDayPay,
+        regularOvertimePay: totalRegularPayOT,
+        restDayOvertimePay: totalRestDayPayOT,
+        nightDiffOvertimePay: totalNightDiffPayOT,
+        regularHolidayOvertimePay: totalRegularHolidayPayOT,
+        specialHolidayOvertimePay: totalSpecialHolidayPayOT,
+        // Individual multiple premium overtime fields
+        regularHolidayRestDayOvertimePay: totalRegularHolidayRestDayPayOT,
+        specialHolidayRestDayOvertimePay: totalSpecialHolidayRestDayPayOT,
+        nightDiffRestDayOvertimePay: totalNightDiffRestDayPayOT,
+        nightDiffRegularHolidayOvertimePay: totalNightDiffRegularHolidayPayOT,
+        nightDiffSpecialHolidayOvertimePay: totalNightDiffSpecialHolidayPayOT,
+        nightDiffRegularHolidayRestDayOvertimePay:
+          totalNightDiffRegularHolidayRestDayPayOT,
+        nightDiffSpecialHolidayRestDayOvertimePay:
+          totalNightDiffSpecialHolidayRestDayPayOT,
+      },
+    };
+
+    console.log(
+      `✅ [CALC DEBUG] calculateEarningsFromPayrollBreakdown result:`,
+      result
+    );
+    return result;
   }
 
   /**

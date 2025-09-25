@@ -38,7 +38,10 @@ import {
   User,
   Building,
   ChevronDown,
+  ChevronRight,
   Printer,
+  CopyPlus,
+  CopyMinus,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Payslip } from "@/models/payroll-model";
@@ -50,7 +53,13 @@ interface PayslipViewModalProps {
   payslip: Payslip | null;
 }
 
-interface EarningsBreakdown {
+interface EarningsCategory {
+  category: string;
+  items: EarningsBreakdownItem[];
+  total: number;
+}
+
+interface EarningsBreakdownItem {
   type: string;
   description: string;
   hours?: number;
@@ -80,35 +89,302 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
   payslip,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
+    new Set([0, 1, 2, 3, 4, 5])
+  ); // All categories expanded by default
+
+  const toggleCategory = (categoryIndex: number) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryIndex)) {
+      newExpanded.delete(categoryIndex);
+    } else {
+      newExpanded.add(categoryIndex);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  // Check if any categories are expanded
+  const hasExpandedCategories = expandedCategories.size > 0;
+
+  const toggleAllCategories = () => {
+    if (hasExpandedCategories) {
+      // Collapse all
+      setExpandedCategories(new Set());
+    } else {
+      // Expand all
+      const allCategoryIndices = earningsCategories.map((_, index) => index);
+      setExpandedCategories(new Set(allCategoryIndices));
+    }
+  };
 
   if (!payslip) return null;
   console.log(payslip);
 
-  // Mock data - in real implementation, these would come from the payslip data
-  const earningsBreakdown: EarningsBreakdown[] = [
-    {
-      type: "basic",
-      description: "Basic Salary",
-      amount: payslip.basic_salary || 0,
-    },
-    {
-      type: "overtime",
-      description: "Overtime Pay",
-      hours: 10,
-      rate: 25.0,
-      amount: payslip.overtime_pay || 0,
-    },
-    {
-      type: "allowance",
-      description: "Allowances",
-      amount: payslip.allowances || 0,
-    },
-    {
-      type: "bonus",
-      description: "Performance Bonus",
-      amount: payslip.bonus || 0,
-    },
-  ].filter((item) => item.amount > 0);
+  // Function to map earnings breakdown data to categorized display items
+  const getEarningsBreakdown = (): EarningsCategory[] => {
+    const breakdown = payslip.earnings_breakdown;
+    if (!breakdown) {
+      // Fallback to mock data if no breakdown available
+      return [
+        {
+          category: "Basic Pay",
+          items: [
+            {
+              type: "basic",
+              description: "Basic Salary",
+              amount: payslip.basic_salary || 0,
+            },
+          ],
+          total: payslip.basic_salary || 0,
+        },
+        {
+          category: "Overtime",
+          items: [
+            {
+              type: "overtime",
+              description: "Overtime Pay",
+              hours: 10,
+              rate: 25.0,
+              amount: payslip.overtime_pay || 0,
+            },
+          ],
+          total: payslip.overtime_pay || 0,
+        },
+        {
+          category: "Other Earnings",
+          items: [
+            {
+              type: "allowance",
+              description: "Allowances",
+              amount: payslip.allowances || 0,
+            },
+            {
+              type: "bonus",
+              description: "Performance Bonus",
+              amount: payslip.bonus || 0,
+            },
+          ].filter((item) => item.amount > 0),
+          total: (payslip.allowances || 0) + (payslip.bonus || 0),
+        },
+      ].filter((category) => category.total > 0);
+    }
+
+    // Map the real breakdown data to categorized display items
+    const categories: EarningsCategory[] = [];
+
+    // Regular category - always include
+    const regularItems: EarningsBreakdownItem[] = [];
+    // Always include Regular Hours
+    regularItems.push({
+      type: "regular",
+      description: "Regular Hours",
+      hours: breakdown.regularPay?.hours || 0,
+      rate: breakdown.regularPay?.rate || 0,
+      amount: breakdown.regularPay?.amount || 0,
+    });
+    // Always include Regular Overtime
+    regularItems.push({
+      type: "regular_ot",
+      description: "Regular Overtime",
+      hours: breakdown.regularOvertimePay?.hours || 0,
+      rate: breakdown.regularOvertimePay?.rate || 0,
+      amount: breakdown.regularOvertimePay?.amount || 0,
+    });
+    categories.push({
+      category: "Regular",
+      items: regularItems,
+      total: regularItems.reduce((sum, item) => sum + item.amount, 0),
+    });
+
+    // Rest Day category - always include
+    const restDayItems: EarningsBreakdownItem[] = [];
+    // Always include Rest Day Hours
+    restDayItems.push({
+      type: "rest_day",
+      description: "Rest Day Hours",
+      hours: breakdown.restDayPay?.hours || 0,
+      rate: breakdown.restDayPay?.rate || 0,
+      amount: breakdown.restDayPay?.amount || 0,
+    });
+    // Always include Rest Day Overtime
+    restDayItems.push({
+      type: "rest_day_ot",
+      description: "Rest Day Overtime",
+      hours: breakdown.restDayOvertimePay?.hours || 0,
+      rate: breakdown.restDayOvertimePay?.rate || 0,
+      amount: breakdown.restDayOvertimePay?.amount || 0,
+    });
+    categories.push({
+      category: "Rest Day",
+      items: restDayItems,
+      total: restDayItems.reduce((sum, item) => sum + item.amount, 0),
+    });
+
+    // Night Differential category - always include
+    const nightDiffItems: EarningsBreakdownItem[] = [];
+    // Always include Night Differential Hours
+    nightDiffItems.push({
+      type: "night_diff",
+      description: "Night Differential Hours",
+      hours: breakdown.nightDiffPay?.hours || 0,
+      rate: breakdown.nightDiffPay?.rate || 0,
+      amount: breakdown.nightDiffPay?.amount || 0,
+    });
+    // Always include Night Differential Overtime
+    nightDiffItems.push({
+      type: "night_diff_ot",
+      description: "Night Differential Overtime",
+      hours: breakdown.nightDiffOvertimePay?.hours || 0,
+      rate: breakdown.nightDiffOvertimePay?.rate || 0,
+      amount: breakdown.nightDiffOvertimePay?.amount || 0,
+    });
+    categories.push({
+      category: "Night Differential",
+      items: nightDiffItems,
+      total: nightDiffItems.reduce((sum, item) => sum + item.amount, 0),
+    });
+
+    // Regular Holiday category - always include
+    const regularHolidayItems: EarningsBreakdownItem[] = [];
+    // Always include Regular Holiday Hours
+    regularHolidayItems.push({
+      type: "regular_holiday",
+      description: "Regular Holiday Hours",
+      hours: breakdown.regularHolidayPay?.hours || 0,
+      rate: breakdown.regularHolidayPay?.rate || 0,
+      amount: breakdown.regularHolidayPay?.amount || 0,
+    });
+    // Always include Regular Holiday Overtime
+    regularHolidayItems.push({
+      type: "regular_holiday_ot",
+      description: "Regular Holiday Overtime",
+      hours: breakdown.regularHolidayOvertimePay?.hours || 0,
+      rate: breakdown.regularHolidayOvertimePay?.rate || 0,
+      amount: breakdown.regularHolidayOvertimePay?.amount || 0,
+    });
+    categories.push({
+      category: "Regular Holiday",
+      items: regularHolidayItems,
+      total: regularHolidayItems.reduce((sum, item) => sum + item.amount, 0),
+    });
+
+    // Special Holiday category - always include
+    const specialHolidayItems: EarningsBreakdownItem[] = [];
+    // Always include Special Holiday Hours
+    specialHolidayItems.push({
+      type: "special_holiday",
+      description: "Special Holiday Hours",
+      hours: breakdown.specialHolidayPay?.hours || 0,
+      rate: breakdown.specialHolidayPay?.rate || 0,
+      amount: breakdown.specialHolidayPay?.amount || 0,
+    });
+    // Always include Special Holiday Overtime
+    specialHolidayItems.push({
+      type: "special_holiday_ot",
+      description: "Special Holiday Overtime",
+      hours: breakdown.specialHolidayOvertimePay?.hours || 0,
+      rate: breakdown.specialHolidayOvertimePay?.rate || 0,
+      amount: breakdown.specialHolidayOvertimePay?.amount || 0,
+    });
+    categories.push({
+      category: "Special Holiday",
+      items: specialHolidayItems,
+      total: specialHolidayItems.reduce((sum, item) => sum + item.amount, 0),
+    });
+
+    // Multiple Premium categories - only show if they have values
+    const multiplePremiumCategories = [
+      {
+        key: "nightDiffRestDayPay",
+        category: "Night Differential + Rest Day",
+        regularField: "nightDiffRestDayPay",
+        overtimeField: "nightDiffRestDayOvertimePay",
+      },
+      {
+        key: "regularHolidayRestDayPay",
+        category: "Regular Holiday + Rest Day",
+        regularField: "regularHolidayRestDayPay",
+        overtimeField: "regularHolidayRestDayOvertimePay",
+      },
+      {
+        key: "specialHolidayRestDayPay",
+        category: "Special Holiday + Rest Day",
+        regularField: "specialHolidayRestDayPay",
+        overtimeField: "specialHolidayRestDayOvertimePay",
+      },
+      {
+        key: "nightDiffRegularHolidayPay",
+        category: "Night Differential + Regular Holiday",
+        regularField: "nightDiffRegularHolidayPay",
+        overtimeField: "nightDiffRegularHolidayOvertimePay",
+      },
+      {
+        key: "nightDiffSpecialHolidayPay",
+        category: "Night Differential + Special Holiday",
+        regularField: "nightDiffSpecialHolidayPay",
+        overtimeField: "nightDiffSpecialHolidayOvertimePay",
+      },
+      {
+        key: "nightDiffRegularHolidayRestDayPay",
+        category: "Night Differential + Regular Holiday + Rest Day",
+        regularField: "nightDiffRegularHolidayRestDayPay",
+        overtimeField: "nightDiffRegularHolidayRestDayOvertimePay",
+      },
+      {
+        key: "nightDiffSpecialHolidayRestDayPay",
+        category: "Night Differential + Special Holiday + Rest Day",
+        regularField: "nightDiffSpecialHolidayRestDayPay",
+        overtimeField: "nightDiffSpecialHolidayRestDayOvertimePay",
+      },
+    ];
+
+    // Add multiple premium categories that have values
+    multiplePremiumCategories.forEach((mpCategory) => {
+      const regularData = (breakdown as any)[mpCategory.regularField];
+      const overtimeData = (breakdown as any)[mpCategory.overtimeField];
+
+      if (
+        regularData?.amount > 0 ||
+        regularData?.hours > 0 ||
+        overtimeData?.amount > 0 ||
+        overtimeData?.hours > 0
+      ) {
+        const mpItems: EarningsBreakdownItem[] = [];
+
+        // Add regular hours if they exist
+        if (regularData?.amount > 0 || regularData?.hours > 0) {
+          mpItems.push({
+            type: mpCategory.regularField,
+            description: mpCategory.category,
+            hours: regularData.hours || 0,
+            rate: regularData.rate || 0,
+            amount: regularData.amount || 0,
+          });
+        }
+
+        // Add overtime if it exists
+        if (overtimeData?.amount > 0 || overtimeData?.hours > 0) {
+          mpItems.push({
+            type: mpCategory.overtimeField,
+            description: `${mpCategory.category} Overtime`,
+            hours: overtimeData.hours || 0,
+            rate: overtimeData.rate || 0,
+            amount: overtimeData.amount || 0,
+          });
+        }
+
+        categories.push({
+          category: mpCategory.category,
+          items: mpItems,
+          total: mpItems.reduce((sum, item) => sum + item.amount, 0),
+        });
+      }
+    });
+
+    return categories;
+  };
+
+  const earningsCategories = getEarningsBreakdown();
 
   const deductionsBreakdown: DeductionsBreakdown[] = [
     {
@@ -202,16 +478,16 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-lg">
-                    Employee Information
+                    Employee Payslip Information
                   </CardTitle>
                   <CardDescription>
                     Pay Period:{" "}
-                    {payslip.payroll_header?.start_date
-                      ? formatDate(payslip.payroll_header.start_date)
+                    {payslip.start_date
+                      ? new Date(payslip.start_date).toLocaleDateString()
                       : "N/A"}{" "}
                     -{" "}
-                    {payslip.payroll_header?.end_date
-                      ? formatDate(payslip.payroll_header.end_date)
+                    {payslip.end_date
+                      ? new Date(payslip.end_date).toLocaleDateString()
                       : "N/A"}
                   </CardDescription>
                 </div>
@@ -266,12 +542,9 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
                   <div className="text-sm text-muted-foreground">
                     <div>ID: {payslip.employee_id}</div>
                     <div>
-                      Name: {payslip.employee?.first_name}{" "}
-                      {payslip.employee?.last_name}
+                      Name: {payslip.first_name} {payslip.last_name}
                     </div>
-                    <div>
-                      Position: {payslip.employee?.position?.title || "N/A"}
-                    </div>
+                    <div>Employee Type: {payslip.employment_type || "N/A"}</div>
                   </div>
                 </div>
 
@@ -281,11 +554,8 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
                     Department
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    <div>{payslip.employee?.department?.name || "N/A"}</div>
-                    <div>
-                      Employee Type:{" "}
-                      {payslip.employee?.employment_type?.name || "N/A"}
-                    </div>
+                    <div>{payslip.department_name || "N/A"}</div>
+                    <div>Position: {payslip.position_title || "N/A"}</div>
                   </div>
                 </div>
 
@@ -297,20 +567,18 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
                   <div className="text-sm text-muted-foreground">
                     <div>
                       From:{" "}
-                      {payslip.payroll_header?.start_date
-                        ? formatDate(payslip.payroll_header.start_date)
+                      {payslip.start_date
+                        ? formatDate(payslip.start_date)
                         : "N/A"}
                     </div>
                     <div>
                       To:{" "}
-                      {payslip.payroll_header?.end_date
-                        ? formatDate(payslip.payroll_header.end_date)
-                        : "N/A"}
+                      {payslip.end_date ? formatDate(payslip.end_date) : "N/A"}
                     </div>
                     <div>
                       Generated:{" "}
-                      {payslip.payroll_header?.created_at
-                        ? formatDate(payslip.payroll_header.created_at)
+                      {payslip.created_at
+                        ? formatDate(payslip.created_at)
                         : "N/A"}
                     </div>
                   </div>
@@ -375,39 +643,97 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
             {/* Earnings */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg text-green-600">
-                  Earnings
-                </CardTitle>
-                <CardDescription>
-                  Breakdown of all earnings components
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg text-green-600">
+                      Earnings
+                    </CardTitle>
+                    <CardDescription>
+                      Breakdown of all earnings components
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      title={
+                        hasExpandedCategories ? "Collapse All" : "Expand All"
+                      }
+                      variant="outline"
+                      size="icon"
+                      onClick={toggleAllCategories}
+                      className="text-xs flex items-center hover:text-accent cursor-pointer"
+                    >
+                      {hasExpandedCategories ? (
+                        <>
+                          <CopyMinus className="h-3 w-3" />
+                        </>
+                      ) : (
+                        <>
+                          <CopyPlus className="h-3 w-3" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Hours/Rate</TableHead>
+                      <TableHead className="text-left">
+                        {hasExpandedCategories ? "Computation" : ""}
+                      </TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {earningsBreakdown.map((earning, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">
-                          {earning.description}
-                        </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {earning.hours && earning.rate
-                            ? `${earning.hours}h @ ${formatCurrency(
-                                earning.rate
-                              )}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(earning.amount)}
-                        </TableCell>
-                      </TableRow>
+                    {earningsCategories.map((category, categoryIndex) => (
+                      <React.Fragment key={categoryIndex}>
+                        {/* Category Header */}
+                        <TableRow
+                          className="bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                          onClick={() => toggleCategory(categoryIndex)}
+                        >
+                          <TableCell className="font-semibold text-sm">
+                            <div className="flex items-center gap-2">
+                              {expandedCategories.has(categoryIndex) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                              {category.category}
+                            </div>
+                          </TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className="text-right font-semibold text-sm">
+                            {formatCurrency(category.total)}
+                          </TableCell>
+                        </TableRow>
+                        {/* Category Items */}
+                        {expandedCategories.has(categoryIndex) &&
+                          category.items.map((earning, itemIndex) => (
+                            <TableRow
+                              key={`${categoryIndex}-${itemIndex}`}
+                              className="pl-4"
+                            >
+                              <TableCell className="font-medium pl-8">
+                                {earning.description}
+                              </TableCell>
+                              <TableCell className="text-left text-xs text-muted-foreground">
+                                {earning.hours && earning.rate
+                                  ? `${earning.hours}h * ${
+                                      earning.rate
+                                    } * ${formatCurrency(
+                                      payslip.hourly_rate || 0
+                                    )}`
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(earning.amount)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </React.Fragment>
                     ))}
                     <TableRow className="border-t-2">
                       <TableCell className="font-bold">
@@ -505,7 +831,7 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
                     {attendanceSummary.absentDays}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Absent Days
+                    No Record Days
                   </div>
                 </div>
                 <div className="text-center">
@@ -516,7 +842,7 @@ export const PayslipViewModal: React.FC<PayslipViewModalProps> = ({
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {attendanceSummary.overtimeHours}
+                    {payslip.overtime_hours || 0}
                   </div>
                   <div className="text-sm text-muted-foreground">OT Hours</div>
                 </div>

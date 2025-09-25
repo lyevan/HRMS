@@ -1569,6 +1569,10 @@ export const manualUpdate = async (req, res) => {
 export const processTimesheet = async (req, res) => {
   try {
     const { startDate, endDate, attendanceIds, approverId } = req.body;
+    console.log("Start Date:", startDate);
+    console.log("End Date:", endDate);
+    console.log("Attendance IDs:", attendanceIds);
+    console.log("Approver ID:", approverId);
 
     if (!startDate || !endDate || !approverId) {
       return res.status(400).json({

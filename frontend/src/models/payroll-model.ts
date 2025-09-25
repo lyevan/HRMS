@@ -64,6 +64,27 @@ export interface CreatePayrollHeader {
 }
 
 // Payslip Models
+export interface EarningsBreakdownItem {
+  hours: number;
+  rate: number;
+  amount: number;
+}
+
+export interface EarningsBreakdown {
+  regularPay: EarningsBreakdownItem;
+  restDayPay: EarningsBreakdownItem;
+  nightDiffPay: EarningsBreakdownItem;
+  regularHolidayPay: EarningsBreakdownItem;
+  specialHolidayPay: EarningsBreakdownItem;
+  multiplePremiumsPay: EarningsBreakdownItem;
+  regularOvertimePay: EarningsBreakdownItem;
+  restDayOvertimePay: EarningsBreakdownItem;
+  nightDiffOvertimePay: EarningsBreakdownItem;
+  regularHolidayOvertimePay: EarningsBreakdownItem;
+  specialHolidayOvertimePay: EarningsBreakdownItem;
+  multiplePremiumsOvertimePay: EarningsBreakdownItem;
+}
+
 export interface Payslip {
   payslip_id: number;
   employee_id: string;
@@ -96,16 +117,23 @@ export interface Payslip {
   overtime_hours?: number;
   late_days?: number;
 
+  // Earnings breakdown from backend calculation
+  earnings_breakdown?: EarningsBreakdown;
+  hourly_rate?: number;
+
   // Joined employee data
   first_name?: string;
   last_name?: string;
   position_title?: string;
   department_name?: string;
+  employment_type?: string;
   rate?: number;
   rate_type?: string;
 
   // Joined payroll header data
   payroll_header?: PayrollHeader;
+  start_date?: string;
+  end_date?: string;
 
   // Joined employee data with nested relations
   employee?: {
@@ -302,15 +330,133 @@ export interface EmployeeDetails {
 }
 
 export interface EarningsBreakdown {
-  basePay: number;
-  overtimePay: number;
-  holidayPay: number;
-  nightDifferential: number;
-  weekendPay?: number;
-  leavePay: number;
-  bonuses?: number;
-  otherEarnings: number;
-  grossPay: number;
+  // Basic pay types with detailed breakdown
+  regularPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  restDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  regularHolidayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  specialHolidayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+
+  // Individual multiple premium fields
+  regularHolidayRestDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  specialHolidayRestDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRestDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRegularHolidayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffSpecialHolidayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRegularHolidayRestDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffSpecialHolidayRestDayPay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+
+  // Overtime pay types with detailed breakdown
+  regularOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  restDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  regularHolidayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  specialHolidayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+
+  // Individual multiple premium overtime fields
+  regularHolidayRestDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  specialHolidayRestDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRestDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRegularHolidayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffSpecialHolidayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffRegularHolidayRestDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
+  nightDiffSpecialHolidayRestDayOvertimePay: {
+    hours: number;
+    rate: number;
+    amount: number;
+  };
 }
 
 export interface DeductionsBreakdown {
