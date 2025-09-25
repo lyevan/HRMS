@@ -74,7 +74,7 @@ const RawTimesheet = () => {
     try {
       await deleteAttendanceRecord(record.attendance_id);
       toast.success("Attendance record deleted successfully");
-      fetchAttendanceRecords(); // Refresh data
+      fetchAttendanceRecords(true); // Refresh data
     } catch (error: any) {
       console.error("Error deleting attendance:", error);
       toast.error(

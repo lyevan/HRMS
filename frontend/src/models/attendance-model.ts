@@ -566,6 +566,23 @@ export const deleteAttendanceRecord = async (
   }
 };
 
+export const bulkDeleteAttendanceRecords = async (
+  attendanceIds: number[]
+): Promise<void> => {
+  try {
+    await axios.delete(`/attendance/bulk-delete`, {
+      data: { attendance_ids: attendanceIds },
+    });
+  } catch (error) {
+    console.error("Error bulk deleting attendance:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "Failed to delete attendance records"
+    );
+  }
+};
+
 // Helper functions for data processing
 export const calculateAttendanceStats = (records: AttendanceRecord[]) => {
   const totalRecords = records.length;

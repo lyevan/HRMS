@@ -15,6 +15,7 @@ import {
   canTakeBreak,
   manualUpdate,
   deleteAttendanceRecord,
+  bulkDeleteAttendanceRecords,
   createManualAttendance,
   getEmployeeAttendance,
   processTimesheet,
@@ -33,22 +34,8 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Configure multer for bulk attendance file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../uploads/attendance/");
-
-    // Ensure directory exists
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "attendance-" + uniqueSuffix + path.extname(file.originalname));
-  },
-});
+// Use memory storage for Vercel compatibility (no local filesystem access)
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
@@ -96,6 +83,14 @@ router.put(
   verifyToken,
   verifyAdmin,
   manualUpdate
+);
+
+// Only admin can bulk delete attendance records
+router.delete(
+  "/bulk-delete",
+  verifyToken,
+  verifyAdmin,
+  bulkDeleteAttendanceRecords
 );
 
 // Only admin can delete attendance records

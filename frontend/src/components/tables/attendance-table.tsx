@@ -7,6 +7,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
+  type RowSelectionState,
 } from "@tanstack/react-table";
 
 import {
@@ -19,6 +20,7 @@ import {
   CalendarDays,
   Filter,
   RefreshCcw,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -51,7 +53,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { AttendanceRecord } from "@/models/attendance-model";
 import { getAttendanceStatusText } from "@/models/attendance-model";
+import { bulkDeleteAttendanceRecords } from "@/models/attendance-model";
 import { useAttendanceStore } from "@/store/attendanceStore";
+import { Checkbox } from "../ui/checkbox";
 
 interface AttendanceTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -78,6 +82,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
     from: undefined,
     to: undefined,
   });
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const isMobile = useIsMobile();
   const { fetchAttendanceRecords } = useAttendanceStore();
 
@@ -107,12 +112,39 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
 
   const table = useReactTable({
     data: filteredData,
-    columns,
+    columns: [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      ...columns,
+    ],
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setColumnFilters,
+    onRowSelectionChange: setRowSelection,
     initialState: {
       pagination: {
         pageSize: 10,
@@ -125,6 +157,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
         pageIndex,
         pageSize,
       },
+      rowSelection,
     },
     onPaginationChange: (updater) => {
       if (typeof updater === "function") {
@@ -370,6 +403,49 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
             <Download />
             {!isMobile && "Export"}
           </Button>
+          {table.getFilteredSelectedRowModel().rows.length > 0 && (
+            <Button
+              variant="destructive"
+              size={isMobile ? "icon" : "default"}
+              onClick={async () => {
+                const selectedRows = table.getFilteredSelectedRowModel().rows;
+                const count = selectedRows.length;
+                const attendanceIds = selectedRows.map(
+                  (row) => row.original.attendance_id
+                );
+
+                if (
+                  confirm(
+                    `Are you sure you want to delete ${count} attendance record${
+                      count > 1 ? "s" : ""
+                    }?`
+                  )
+                ) {
+                  try {
+                    await bulkDeleteAttendanceRecords(attendanceIds);
+                    toast.success(
+                      `${count} attendance record${
+                        count > 1 ? "s" : ""
+                      } deleted successfully`
+                    );
+                    table.toggleAllPageRowsSelected(false); // Clear selection
+                    fetchAttendanceRecords(true); // Refresh data
+                  } catch (error: any) {
+                    console.error("Error bulk deleting attendance:", error);
+                    toast.error(
+                      error.response?.data?.message ||
+                        "Failed to delete attendance records"
+                    );
+                  }
+                }
+              }}
+              disabled={loading}
+            >
+              <Trash2 className="h-4 w-4" />
+              {!isMobile &&
+                `Delete ${table.getFilteredSelectedRowModel().rows.length}`}
+            </Button>
+          )}
           <Button size={"icon"} onClick={() => fetchAttendanceRecords(true)}>
             <RefreshCcw />
             {/* Refresh View */}

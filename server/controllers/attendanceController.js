@@ -615,30 +615,39 @@ export const bulkExcelAttendance = async (req, res) => {
       });
     }
 
-    // console.log(
-    //   `🚀 [BULK] Processing attendance file: ${req.file.originalname}`
-    // );
-
-    const filePath = req.file.path;
+    console.log(
+      `🚀 [BULK] Processing attendance file: ${req.file.originalname}`
+    );
+    // For memory storage, we work with the buffer directly
+    const fileBuffer = req.file.buffer;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
     let attendanceData = [];
 
     try {
       // Parse the file based on extension
       if (fileExtension === ".xlsx" || fileExtension === ".xls") {
-        attendanceData = await parseExcelAttendanceFile(filePath);
+        attendanceData = await parseExcelAttendanceFileFromBuffer(fileBuffer);
       } else if (fileExtension === ".csv") {
-        attendanceData = await parseCSVAttendanceFile(filePath);
+        attendanceData = await parseCSVAttendanceFileFromBuffer(fileBuffer);
       } else {
         throw new Error(
           "Invalid file format. Please upload .xlsx, .xls, or .csv files only."
         );
       }
 
-      console.log(`� [BULK] Parsed ${attendanceData.length} records from file`);
+      console.log(
+        `📊 [BULK] Parsed ${attendanceData.length} records from file`
+      );
 
       if (attendanceData.length === 0) {
         throw new Error("No valid attendance data found in the file");
+      }
+
+      // Limit file size to prevent timeout
+      if (attendanceData.length > 500) {
+        throw new Error(
+          "File too large. Maximum 500 records allowed for bulk upload."
+        );
       }
 
       // Batch fetch all employees with their schedules
@@ -646,11 +655,15 @@ export const bulkExcelAttendance = async (req, res) => {
         ...new Set(attendanceData.map((record) => record.employee_id)),
       ];
 
+      console.log(
+        `👥 [BULK] Fetching data for ${employeeIds.length} employees`
+      );
+
       const employeesResult = await pool.query(
         `SELECT e.*, s.start_time, s.end_time, s.days_of_week, s.schedule_name,
                 s.break_duration, s.break_start, s.break_end
-         FROM employees e 
-         LEFT JOIN schedules s ON e.schedule_id = s.schedule_id 
+         FROM employees e
+         LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
          WHERE e.employee_id = ANY($1::text[]) AND e.status = 'active'`,
         [employeeIds]
       );
@@ -660,233 +673,287 @@ export const bulkExcelAttendance = async (req, res) => {
         employeeMap.set(emp.employee_id, emp);
       });
 
+      // Pre-fetch all existing attendance records for the date range
+      const dates = [...new Set(attendanceData.map((record) => record.date))];
+      const existingAttendance = await pool.query(
+        `SELECT employee_id, date FROM attendance
+         WHERE employee_id = ANY($1::text[]) AND date = ANY($2::date[])`,
+        [employeeIds, dates]
+      );
+
+      const existingAttendanceMap = new Map();
+      existingAttendance.rows.forEach((record) => {
+        const key = `${record.employee_id}-${record.date}`;
+        existingAttendanceMap.set(key, record);
+      });
+
+      // Pre-fetch all approved leaves for the date range
+      const leaveRecords = await pool.query(
+        `SELECT lr.employee_id, lr.start_date, lr.end_date, lt.name as leave_type_name
+         FROM leave_requests lr
+         JOIN leave_types lt ON lr.leave_type_id = lt.leave_type_id
+         WHERE lr.employee_id = ANY($1::text[]) AND lr.status = 'approved'
+         AND (lr.start_date <= ANY($2::date[]) OR lr.end_date >= ANY($2::date[]))`,
+        [employeeIds, dates]
+      );
+
+      const leaveMap = new Map();
+      leaveRecords.rows.forEach((leave) => {
+        if (!leaveMap.has(leave.employee_id)) {
+          leaveMap.set(leave.employee_id, []);
+        }
+        leaveMap.get(leave.employee_id).push(leave);
+      });
+
       // Process results and errors
       const results = [];
       const errors = [];
       const successful = [];
 
-      // Process each record
-      for (let i = 0; i < attendanceData.length; i++) {
-        const record = attendanceData[i];
-        const { employee_id, date, time_in, time_out } = record;
+      console.log(
+        `⚡ [BULK] Starting batch processing of ${attendanceData.length} records`
+      );
 
-        try {
-          // Validate required fields
-          if (!employee_id || !date || !time_in || !time_out) {
-            throw new Error(
-              `Row ${
-                i + 2
-              }: Missing required fields (employee_id, date, time_in, time_out)`
+      // Process records in smaller batches to prevent memory issues
+      const batchSize = 50;
+      for (
+        let batchStart = 0;
+        batchStart < attendanceData.length;
+        batchStart += batchSize
+      ) {
+        const batchEnd = Math.min(
+          batchStart + batchSize,
+          attendanceData.length
+        );
+        const batch = attendanceData.slice(batchStart, batchEnd);
+
+        console.log(
+          `📦 [BULK] Processing batch ${
+            Math.floor(batchStart / batchSize) + 1
+          }/${Math.ceil(attendanceData.length / batchSize)} (${
+            batch.length
+          } records)`
+        );
+
+        // Process batch records
+        for (let i = 0; i < batch.length; i++) {
+          const record = batch[i];
+          const globalIndex = batchStart + i;
+          const { employee_id, date, time_in, time_out } = record;
+
+          try {
+            // Validate required fields
+            if (!employee_id || !date || !time_in || !time_out) {
+              throw new Error(
+                `Row ${
+                  globalIndex + 2
+                }: Missing required fields (employee_id, date, time_in, time_out)`
+              );
+            }
+
+            // Get employee data
+            const employee = employeeMap.get(employee_id);
+            if (!employee) {
+              throw new Error(
+                `Row ${
+                  globalIndex + 2
+                }: Employee ${employee_id} not found or inactive`
+              );
+            }
+
+            // Check if employee has schedule
+            if (!employee.schedule_id) {
+              throw new Error(
+                `Row ${
+                  globalIndex + 2
+                }: Employee ${employee_id} has no assigned schedule`
+              );
+            }
+
+            // Check for existing attendance record
+            const attendanceKey = `${employee_id}-${date}`;
+            if (existingAttendanceMap.has(attendanceKey)) {
+              throw new Error(
+                `Row ${
+                  globalIndex + 2
+                }: Attendance already exists for ${employee_id} on ${date}`
+              );
+            }
+
+            // Check for approved leave
+            const employeeLeaves = leaveMap.get(employee_id) || [];
+            const hasApprovedLeave = employeeLeaves.some(
+              (leave) => date >= leave.start_date && date <= leave.end_date
             );
-          }
 
-          // Get employee data
-          const employee = employeeMap.get(employee_id);
-          if (!employee) {
-            throw new Error(
-              `Row ${i + 2}: Employee ${employee_id} not found or inactive`
+            if (hasApprovedLeave) {
+              const leave = employeeLeaves.find(
+                (leave) => date >= leave.start_date && date <= leave.end_date
+              );
+              throw new Error(
+                `Row ${globalIndex + 2}: Employee has approved leave: ${
+                  leave.leave_type_name
+                } (${leave.start_date} to ${leave.end_date})`
+              );
+            }
+
+            // Construct full datetime strings - Convert Manila time to UTC
+            const clockInTime = convertManilaTimeToUTC(date, time_in);
+            const clockOutTime = convertManilaTimeToUTC(date, time_out);
+
+            if (!clockInTime || !clockOutTime) {
+              throw new Error(
+                `Row ${
+                  globalIndex + 2
+                }: Invalid date/time format for Manila timezone conversion`
+              );
+            }
+
+            // Calculate day of week for the given date
+            const workDate = new Date(date);
+            const dayOfWeek = workDate
+              .toLocaleDateString("en-US", {
+                weekday: "long",
+                timeZone: "Asia/Manila",
+              })
+              .toLowerCase();
+
+            // Check if it's a scheduled day off
+            const workingDays = employee.days_of_week || [];
+            const isScheduledDayOff = !workingDays.includes(dayOfWeek);
+
+            // Get holiday information
+            const holidayInfo = await getHolidayInfo(clockInTime);
+
+            // Calculate enhanced clock-in data
+            const enhancedClockInCalcs = await enhancedClockInCalculation(
+              employee_id,
+              clockInTime,
+              {
+                start_time: employee.start_time,
+                end_time: employee.end_time,
+              },
+              holidayInfo
             );
-          }
 
-          // Check if employee has schedule
-          if (!employee.schedule_id) {
-            throw new Error(
-              `Row ${i + 2}: Employee ${employee_id} has no assigned schedule`
+            // Create attendance record (clock-in simulation)
+            const clockInResult = await pool.query(
+              `INSERT INTO attendance (
+                employee_id, date, time_in, is_present, is_late, is_absent,
+                is_dayoff, is_regular_holiday, is_special_holiday, late_minutes, is_entitled_holiday
+              )
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+              [
+                employee_id,
+                date,
+                clockInTime,
+                true,
+                enhancedClockInCalcs.is_late,
+                false,
+                isScheduledDayOff,
+                enhancedClockInCalcs.is_regular_holiday,
+                enhancedClockInCalcs.is_special_holiday,
+                enhancedClockInCalcs.late_minutes,
+                enhancedClockInCalcs.is_entitled_holiday,
+              ]
             );
-          }
 
-          // Construct full datetime strings - Convert Manila time to UTC
-          const clockInTime = convertManilaTimeToUTC(date, time_in);
-          const clockOutTime = convertManilaTimeToUTC(date, time_out);
+            const attendanceRecord = clockInResult.rows[0];
 
-          if (!clockInTime || !clockOutTime) {
-            throw new Error(
-              `Row ${
-                i + 2
-              }: Invalid date/time format for Manila timezone conversion`
-            );
-          }
-
-          // Calculate day of week for the given date
-          const workDate = new Date(date);
-          const dayOfWeek = workDate
-            .toLocaleDateString("en-US", {
-              weekday: "long",
-              timeZone: "Asia/Manila",
-            })
-            .toLowerCase();
-
-          // Check if it's a scheduled day off
-          const workingDays = employee.days_of_week || [];
-          const isScheduledDayOff = !workingDays.includes(dayOfWeek);
-
-          // Check for existing attendance record
-          const existingRecord = await pool.query(
-            "SELECT attendance_id FROM attendance WHERE employee_id = $1 AND date = $2",
-            [employee_id, date]
-          );
-
-          if (existingRecord.rows.length > 0) {
-            throw new Error(
-              `Row ${
-                i + 2
-              }: Attendance already exists for ${employee_id} on ${date}`
-            );
-          }
-
-          // Check for approved leave
-          const leaveCheck = await pool.query(
-            `SELECT lr.*, lt.name as leave_type_name 
-             FROM leave_requests lr 
-             JOIN leave_types lt ON lr.leave_type_id = lt.leave_type_id
-             WHERE lr.employee_id = $1 
-             AND lr.status = 'approved' 
-             AND $2 BETWEEN lr.start_date AND lr.end_date`,
-            [employee_id, date]
-          );
-
-          if (leaveCheck.rows.length > 0) {
-            const leave = leaveCheck.rows[0];
-            throw new Error(
-              `Row ${i + 2}: Employee has approved leave: ${
-                leave.leave_type_name
-              } (${leave.start_date} to ${leave.end_date})`
-            );
-          }
-
-          // Get holiday information
-          const holidayInfo = await getHolidayInfo(clockInTime);
-
-          // Calculate enhanced clock-in data
-          const enhancedClockInCalcs = await enhancedClockInCalculation(
-            employee_id,
-            clockInTime,
-            {
+            // Calculate enhanced clock-out data
+            const scheduleInfo = {
+              break_duration: employee.break_duration,
+              break_start: employee.break_start,
+              break_end: employee.break_end,
               start_time: employee.start_time,
               end_time: employee.end_time,
-            },
-            holidayInfo
-          );
+              days_of_week: employee.days_of_week,
+            };
 
-          // Create attendance record (clock-in simulation)
-          const clockInResult = await pool.query(
-            `INSERT INTO attendance (
-              employee_id, date, time_in, is_present, is_late, is_absent, 
-              is_dayoff, is_regular_holiday, is_special_holiday, late_minutes, is_entitled_holiday
-            ) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-            [
-              employee_id,
-              date,
-              clockInTime,
-              true,
-              enhancedClockInCalcs.is_late,
-              false,
-              isScheduledDayOff,
-              enhancedClockInCalcs.is_regular_holiday,
-              enhancedClockInCalcs.is_special_holiday,
-              enhancedClockInCalcs.late_minutes,
-              enhancedClockInCalcs.is_entitled_holiday,
-            ]
-          );
-
-          const attendanceRecord = clockInResult.rows[0];
-
-          // Calculate enhanced clock-out data
-          const scheduleInfo = {
-            break_duration: employee.break_duration,
-            break_start: employee.break_start,
-            break_end: employee.break_end,
-            start_time: employee.start_time,
-            end_time: employee.end_time,
-            days_of_week: employee.days_of_week,
-          };
-
-          const enhancedClockOutCalcs = await enhancedClockOutCalculation(
-            attendanceRecord,
-            clockOutTime,
-            scheduleInfo
-          );
-
-          // Update attendance record with clock-out data
-          const finalResult = await pool.query(
-            `UPDATE attendance 
-             SET time_out = $1, total_hours = $2, updated_at = $3, 
-                 is_undertime = $4, is_halfday = $5, undertime_minutes = $6, 
-                 night_differential_hours = $7, rest_day_hours_worked = $8, overtime_hours = $9,
-                 regular_holiday_hours_worked = $10, special_holiday_hours_worked = $11,
-                 payroll_breakdown = $12
-             WHERE attendance_id = $13
-             RETURNING *`,
-            [
+            const enhancedClockOutCalcs = await enhancedClockOutCalculation(
+              attendanceRecord,
               clockOutTime,
-              enhancedClockOutCalcs.total_hours,
-              clockOutTime,
-              enhancedClockOutCalcs.is_undertime,
-              enhancedClockOutCalcs.is_halfday,
-              enhancedClockOutCalcs.undertime_minutes,
-              enhancedClockOutCalcs.night_differential_hours,
-              enhancedClockOutCalcs.rest_day_hours_worked,
-              enhancedClockOutCalcs.overtime_hours,
-              enhancedClockOutCalcs.regular_holiday_hours_worked || 0,
-              enhancedClockOutCalcs.special_holiday_hours_worked || 0,
-              JSON.stringify(enhancedClockOutCalcs.payroll_breakdown),
-              attendanceRecord.attendance_id,
-            ]
-          );
+              scheduleInfo
+            );
 
-          successful.push({
-            row: i + 2,
-            employee_id,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            date,
-            attendance_id: finalResult.rows[0].attendance_id,
-            total_hours: enhancedClockOutCalcs.total_hours,
-            overtime_hours: enhancedClockOutCalcs.overtime_hours,
-            is_dayoff: isScheduledDayOff,
-            is_regular_holiday: enhancedClockInCalcs.is_regular_holiday,
-            is_special_holiday: enhancedClockInCalcs.is_special_holiday,
-            night_differential_hours:
-              enhancedClockOutCalcs.night_differential_hours,
-            payroll_summary: {
-              regular_hours:
-                enhancedClockOutCalcs.payroll_breakdown.regular_hours,
-              night_diff_hours: enhancedClockOutCalcs.night_differential_hours,
-              rest_day_hours: enhancedClockOutCalcs.rest_day_hours_worked,
-              overtime_hours: enhancedClockOutCalcs.overtime_hours,
-              regular_holiday_hours:
+            // Update attendance record with clock-out data
+            const finalResult = await pool.query(
+              `UPDATE attendance
+               SET time_out = $1, total_hours = $2, updated_at = $3,
+                   is_undertime = $4, is_halfday = $5, undertime_minutes = $6,
+                   night_differential_hours = $7, rest_day_hours_worked = $8, overtime_hours = $9,
+                   regular_holiday_hours_worked = $10, special_holiday_hours_worked = $11,
+                   payroll_breakdown = $12
+               WHERE attendance_id = $13
+               RETURNING *`,
+              [
+                clockOutTime,
+                enhancedClockOutCalcs.total_hours,
+                clockOutTime,
+                enhancedClockOutCalcs.is_undertime,
+                enhancedClockOutCalcs.is_halfday,
+                enhancedClockOutCalcs.undertime_minutes,
+                enhancedClockOutCalcs.night_differential_hours,
+                enhancedClockOutCalcs.rest_day_hours_worked,
+                enhancedClockOutCalcs.overtime_hours,
                 enhancedClockOutCalcs.regular_holiday_hours_worked || 0,
-              special_holiday_hours:
                 enhancedClockOutCalcs.special_holiday_hours_worked || 0,
-              edge_cases:
-                enhancedClockOutCalcs.payroll_breakdown.edge_case_flags,
-            },
-          });
+                JSON.stringify(enhancedClockOutCalcs.payroll_breakdown),
+                attendanceRecord.attendance_id,
+              ]
+            );
 
-          console.log(
-            `✅ [BULK] Row ${i + 2}: Processed ${employee_id} for ${date} - ${
-              enhancedClockOutCalcs.total_hours
-            } hours`
-          );
-        } catch (error) {
-          console.error(
-            `❌ [BULK] Row ${
-              i + 2
-            }: Error processing ${employee_id} for ${date}:`,
-            error.message
-          );
-          errors.push({
-            row: i + 2,
-            employee_id: employee_id || "Unknown",
-            date: date || "Unknown",
-            error: error.message,
-          });
+            successful.push({
+              row: globalIndex + 2,
+              employee_id,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              date,
+              attendance_id: finalResult.rows[0].attendance_id,
+              total_hours: enhancedClockOutCalcs.total_hours,
+              overtime_hours: enhancedClockOutCalcs.overtime_hours,
+              is_dayoff: isScheduledDayOff,
+              is_regular_holiday: enhancedClockInCalcs.is_regular_holiday,
+              is_special_holiday: enhancedClockInCalcs.is_special_holiday,
+              night_differential_hours:
+                enhancedClockOutCalcs.night_differential_hours,
+              payroll_summary: {
+                regular_hours:
+                  enhancedClockOutCalcs.payroll_breakdown.regular_hours,
+                night_diff_hours:
+                  enhancedClockOutCalcs.night_differential_hours,
+                rest_day_hours: enhancedClockOutCalcs.rest_day_hours_worked,
+                overtime_hours: enhancedClockOutCalcs.overtime_hours,
+                regular_holiday_hours:
+                  enhancedClockOutCalcs.regular_holiday_hours_worked || 0,
+                special_holiday_hours:
+                  enhancedClockOutCalcs.special_holiday_hours_worked || 0,
+                edge_cases:
+                  enhancedClockOutCalcs.payroll_breakdown.edge_case_flags,
+              },
+            });
+
+            if ((globalIndex + 1) % 10 === 0) {
+              console.log(
+                `✅ [BULK] Processed ${globalIndex + 1}/${
+                  attendanceData.length
+                } records`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `❌ [BULK] Row ${
+                globalIndex + 2
+              }: Error processing ${employee_id} for ${date}:`,
+              error.message
+            );
+            errors.push({
+              row: globalIndex + 2,
+              employee_id: employee_id || "Unknown",
+              date: date || "Unknown",
+              error: error.message,
+            });
+          }
         }
-      }
-
-      // Clean up uploaded file
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
       }
 
       // Return comprehensive results
@@ -909,14 +976,13 @@ export const bulkExcelAttendance = async (req, res) => {
 
       res.status(errors.length === 0 ? 200 : 207).json(response); // 207 = Multi-Status
     } catch (parseError) {
-      // Clean up uploaded file on parsing error
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      // No file cleanup needed for memory storage
       throw parseError;
     }
   } catch (error) {
     console.error("❌ [BULK] Fatal error:", error);
+
+    // No file cleanup needed for memory storage
     res.status(500).json({
       success: false,
       message: "Bulk attendance processing failed",
@@ -965,6 +1031,73 @@ const parseCSVAttendanceFile = async (filePath) => {
     const csv = require("csv-parser");
 
     fs.createReadStream(filePath)
+      .pipe(csv())
+      .on("data", (data) => {
+        const record = {
+          employee_id: data.employee_id?.trim(),
+          date: formatDateValue(data.date),
+          time_in: formatTimeValue(data.time_in),
+          time_out: formatTimeValue(data.time_out),
+        };
+
+        if (
+          record.employee_id &&
+          record.date &&
+          record.time_in &&
+          record.time_out
+        ) {
+          results.push(record);
+        }
+      })
+      .on("end", () => resolve(results))
+      .on("error", reject);
+  });
+};
+
+// Helper function to parse Excel attendance files from buffer (for Vercel)
+const parseExcelAttendanceFileFromBuffer = async (buffer) => {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+
+  const worksheet = workbook.getWorksheet(1);
+  const attendanceData = [];
+
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; // Skip header row
+
+    const record = {
+      employee_id: row.getCell(1).value?.toString().trim(),
+      date: formatDateValue(row.getCell(2).value),
+      time_in: formatTimeValue(row.getCell(3).value),
+      time_out: formatTimeValue(row.getCell(4).value),
+    };
+
+    // Only add if we have required data
+    if (
+      record.employee_id &&
+      record.date &&
+      record.time_in &&
+      record.time_out
+    ) {
+      attendanceData.push(record);
+    }
+  });
+
+  return attendanceData;
+};
+
+// Helper function to parse CSV attendance files from buffer (for Vercel)
+const parseCSVAttendanceFileFromBuffer = async (buffer) => {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    const csv = require("csv-parser");
+    const stream = require("stream");
+
+    // Convert buffer to readable stream
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(buffer);
+
+    bufferStream
       .pipe(csv())
       .on("data", (data) => {
         const record = {
@@ -1952,6 +2085,72 @@ export const deleteAttendanceRecord = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete attendance record",
+      error: error.message,
+    });
+  }
+};
+
+export const bulkDeleteAttendanceRecords = async (req, res) => {
+  try {
+    const { attendance_ids } = req.body;
+
+    if (
+      !attendance_ids ||
+      !Array.isArray(attendance_ids) ||
+      attendance_ids.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Attendance IDs array is required",
+      });
+    }
+
+    // Check if all attendance records exist
+    const existingRecords = await pool.query(
+      "SELECT attendance_id FROM attendance WHERE attendance_id = ANY($1)",
+      [attendance_ids]
+    );
+
+    if (existingRecords.rows.length !== attendance_ids.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Some attendance records not found",
+      });
+    }
+
+    // Check if any records are part of consumed timesheets
+    const timesheetCheck = await pool.query(
+      `SELECT a.attendance_id, t.is_consumed
+       FROM timesheets t
+       JOIN attendance a ON a.timesheet_id = t.timesheet_id
+       WHERE a.attendance_id = ANY($1)`,
+      [attendance_ids]
+    );
+
+    const consumedRecords = timesheetCheck.rows.filter(
+      (row) => row.is_consumed
+    );
+    if (consumedRecords.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete ${consumedRecords.length} attendance record(s) that are part of consumed timesheets`,
+      });
+    }
+
+    // Delete the attendance records
+    await pool.query("DELETE FROM attendance WHERE attendance_id = ANY($1)", [
+      attendance_ids,
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: `${attendance_ids.length} attendance record(s) deleted successfully`,
+    });
+  } catch (error) {
+    console.error("Error bulk deleting attendance records:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete attendance records",
       error: error.message,
     });
   }
