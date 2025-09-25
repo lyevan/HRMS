@@ -16,6 +16,7 @@ import {
   AlarmClockMinus,
   CalendarDays,
   Coffee,
+  Trash2,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { AttendanceRecord } from "@/models/attendance-model";
@@ -33,12 +34,14 @@ interface AttendanceColumnsProps {
   getStatusBadges: (record: AttendanceRecord) => JSX.Element;
   handleViewRecord: (record: AttendanceRecord) => void;
   handleEditRecord: (record: AttendanceRecord) => void;
+  handleDeleteRecord: (record: AttendanceRecord) => void;
 }
 
 export const createAttendanceColumns = ({
   getStatusBadges,
   handleViewRecord,
   handleEditRecord,
+  handleDeleteRecord,
 }: AttendanceColumnsProps): ColumnDef<AttendanceRecord>[] => [
   {
     accessorKey: "date",
@@ -592,6 +595,13 @@ export const createAttendanceColumns = ({
             >
               <Edit className="mr-2 h-4 w-4" />
               Edit Record
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleDeleteRecord(record)}
+              className="cursor-pointer text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Record
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

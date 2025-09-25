@@ -14,6 +14,7 @@ import {
   getEmployeeStatus,
   canTakeBreak,
   manualUpdate,
+  deleteAttendanceRecord,
   createManualAttendance,
   getEmployeeAttendance,
   processTimesheet,
@@ -95,6 +96,14 @@ router.put(
   verifyToken,
   verifyAdmin,
   manualUpdate
+);
+
+// Only admin can delete attendance records
+router.delete(
+  "/:attendance_id",
+  verifyToken,
+  verifyAdmin,
+  deleteAttendanceRecord
 );
 
 // Only admin can create manual attendance records

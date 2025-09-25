@@ -259,7 +259,11 @@ const FileOvertimeContent = ({
               <span>Work Day *</span>
             </Label>
             <Select
-              value={watch("attendance_id")?.toString() || ""}
+              value={
+                watch("attendance_id")
+                  ? watch("attendance_id").toString()
+                  : undefined
+              }
               onValueChange={(value) =>
                 setValue("attendance_id", parseInt(value))
               }
@@ -267,7 +271,6 @@ const FileOvertimeContent = ({
             >
               <SelectTrigger className="w-full">
                 <SelectValue
-                  className="w-full"
                   placeholder={
                     attendanceLoading
                       ? "Loading attendance records..."
@@ -277,12 +280,16 @@ const FileOvertimeContent = ({
               </SelectTrigger>
               <SelectContent>
                 {attendanceOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <SelectItem
+                    key={option.value}
+                    value={option.value.toString()}
+                  >
                     {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
             {eligibleAttendanceRecords.length === 0 &&
               !attendanceLoading &&
               selectedEmployeeId && (

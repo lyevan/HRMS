@@ -223,7 +223,7 @@ const PayrollManagement = () => {
           <Button
             onClick={() => setOverrideModalOpen(true)}
             variant="outline"
-            className="flex items-center gap-2"
+            className="items-center gap-2 hidden"
           >
             <UserCog className="h-4 w-4" />
             Employee Overrides
@@ -231,14 +231,14 @@ const PayrollManagement = () => {
           <Button
             onClick={handleConfigClick}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 hover:text-primary cursor-pointer"
           >
             <Settings className="h-4 w-4" />
-            Configure
+            Payroll Configuration
           </Button>
           <Button
             onClick={handleGeneratePayrollClick}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             Generate Payroll

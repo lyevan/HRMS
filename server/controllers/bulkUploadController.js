@@ -829,6 +829,123 @@ const processUploadedRecords = async (records, res, filePath) => {
   }
 };
 
+const generateSimpleAttendanceTemplate = async (req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Simple Attendance Template");
+
+    // Define columns with headers to match database schema
+    // Width is header character count + 4 eg Employee ID has 11 characters so 15 is a good width
+    worksheet.columns = [
+      { header: "Employee ID", key: "employee_id", width: 16 },
+      { header: "Date", key: "date", width: 16 },
+      { header: "Time In", key: "time_in", width: 16 },
+      { header: "Time Out", key: "time_out", width: 16 },
+    ];
+
+    // Style the header row
+    const headerRow = worksheet.getRow(1);
+    const dateCol = worksheet.getColumn("date");
+    const timeInCol = worksheet.getColumn("time_in");
+    const timeOutCol = worksheet.getColumn("time_out");
+    headerRow.font = { color: { argb: "FFF0EDEE" } };
+    headerRow.border = {
+      top: { style: "thin", color: { argb: "FFF0EDEE" } },
+      left: { style: "thin", color: { argb: "FFF0EDEE" } },
+      bottom: { style: "thin", color: { argb: "FFF0EDEE" } },
+      right: { style: "thin", color: { argb: "FFF0EDEE" } },
+    };
+
+    const idCell = headerRow.getCell(1);
+    const dateCell = headerRow.getCell(2);
+    const timeInCell = headerRow.getCell(3);
+    const timeOutCell = headerRow.getCell(4);
+
+    idCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2C666E" },
+    };
+    dateCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2C666E" },
+    };
+    timeInCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2C666E" },
+    };
+    timeOutCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF2C666E" },
+    };
+
+    idCell.protection = { locked: true };
+    dateCell.protection = { locked: true };
+    timeInCell.protection = { locked: true };
+    timeOutCell.protection = { locked: true };
+
+    headerRow.alignment = {
+      vertical: "middle",
+      horizontal: "center",
+      wrapText: true,
+    };
+
+    dateCol.numFmt = "mm/dd/yyyy";
+    timeInCol.numFmt = "hh:mm AM/PM";
+    timeOutCol.numFmt = "hh:mm AM/PM";
+
+    // Generate Instructions
+    worksheet.getColumn("F").width = 80;
+    worksheet.getCell("F1").value = "Instructions:";
+    worksheet.getCell("F1").fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFFFFF00" },
+    };
+
+    worksheet.getCell("F1").font = { bold: true, color: { argb: "FF000000" } };
+    worksheet.getCell("F2").value =
+      "1. Employee ID: Unique identifier for each employee (e.g., 2025-00001).";
+    worksheet.getCell("F3").value =
+      "2. Date: Format as MM/DD/YYYY (e.g., 09/14/2025).";
+    worksheet.getCell("F4").value =
+      "3. Time In: Format as HH:MM AM/PM (e.g., 08:00 AM).";
+    worksheet.getCell("F5").value =
+      "4. Time Out: Format as HH:MM AM/PM (e.g., 05:00 PM).";
+    worksheet.getCell("F6").value =
+      "5. Ensure no duplicate entries for the same employee on the same date.";
+    worksheet.getCell("F7").value =
+      "6. Leave blank if the employee is either ABSENT, ON LEAVE or DAY OFF that day.";
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    // Set response headers
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=attendance-upload-template.xlsx"
+    );
+    res.setHeader("Content-Length", buffer.length);
+
+    // Send file
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error generating attendance template:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate attendance template",
+      error: error.message,
+    });
+  }
+};
+
 const generateAttendanceTemplate = async (req, res) => {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -1828,6 +1945,7 @@ const parseCSVFile = (filePath) => {
 };
 
 export {
+  generateSimpleAttendanceTemplate,
   generateAttendanceTemplate,
   generateCSVTemplate,
   uploadAttendanceFile,

@@ -5,6 +5,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import {
   generateAttendanceTemplate,
+  generateSimpleAttendanceTemplate,
   generateCSVTemplate,
   uploadAttendanceFile,
   processAttendanceFile,
@@ -66,7 +67,7 @@ const upload = multer({
 });
 
 // Template download routes
-router.get("/template/excel", verifyToken, generateAttendanceTemplate);
+router.get("/template/excel", verifyToken, generateSimpleAttendanceTemplate);
 router.get("/template/csv", verifyToken, generateCSVTemplate);
 
 // NEW WORKFLOW: File upload routes

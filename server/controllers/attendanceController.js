@@ -615,9 +615,9 @@ export const bulkExcelAttendance = async (req, res) => {
       });
     }
 
-    console.log(
-      `🚀 [BULK] Processing attendance file: ${req.file.originalname}`
-    );
+    // console.log(
+    //   `🚀 [BULK] Processing attendance file: ${req.file.originalname}`
+    // );
 
     const filePath = req.file.path;
     const fileExtension = path.extname(req.file.originalname).toLowerCase();
@@ -1391,27 +1391,7 @@ export const canTakeBreak = async (req, res) => {
 export const manualUpdate = async (req, res) => {
   try {
     const { attendance_id } = req.params;
-    const {
-      date,
-      time_in,
-      time_out,
-      notes,
-      total_hours,
-      overtime_hours,
-      // Boolean flags
-      is_present,
-      is_absent,
-      is_late,
-      on_leave,
-      is_undertime,
-      is_halfday,
-      is_dayoff,
-      is_regular_holiday,
-      is_special_holiday,
-      // Leave information
-      leave_type_id,
-      leave_request_id,
-    } = req.body;
+    const { time_in, time_out } = req.body;
 
     // Validate required fields
     if (!attendance_id) {
@@ -1421,122 +1401,174 @@ export const manualUpdate = async (req, res) => {
       });
     }
 
-    // Build dynamic update query
-    let updateFields = [];
-    let values = [];
-    let paramIndex = 1;
-
-    // Basic fields
-    if (date !== undefined) {
-      updateFields.push(`date = $${paramIndex++}`);
-      values.push(date);
-    }
-    if (time_in !== undefined) {
-      updateFields.push(`time_in = $${paramIndex++}`);
-      values.push(time_in);
-    }
-    if (time_out !== undefined) {
-      updateFields.push(`time_out = $${paramIndex++}`);
-      values.push(time_out);
-    }
-    if (notes !== undefined) {
-      updateFields.push(`notes = $${paramIndex++}`);
-      values.push(notes);
-    }
-    if (total_hours !== undefined) {
-      updateFields.push(`total_hours = $${paramIndex++}`);
-      values.push(total_hours);
-    }
-    if (overtime_hours !== undefined) {
-      updateFields.push(`overtime_hours = $${paramIndex++}`);
-      values.push(overtime_hours);
-    }
-
-    // Boolean attendance flags
-    if (is_present !== undefined) {
-      updateFields.push(`is_present = $${paramIndex++}`);
-      values.push(is_present);
-    }
-    if (is_absent !== undefined) {
-      updateFields.push(`is_absent = $${paramIndex++}`);
-      values.push(is_absent);
-    }
-    if (is_late !== undefined) {
-      updateFields.push(`is_late = $${paramIndex++}`);
-      values.push(is_late);
-    }
-    if (on_leave !== undefined) {
-      updateFields.push(`on_leave = $${paramIndex++}`);
-      values.push(on_leave);
-    }
-    if (is_undertime !== undefined) {
-      updateFields.push(`is_undertime = $${paramIndex++}`);
-      values.push(is_undertime);
-    }
-    if (is_halfday !== undefined) {
-      updateFields.push(`is_halfday = $${paramIndex++}`);
-      values.push(is_halfday);
-    }
-
-    // Special day flags
-    if (is_dayoff !== undefined) {
-      updateFields.push(`is_dayoff = $${paramIndex++}`);
-      values.push(is_dayoff);
-    }
-    if (is_regular_holiday !== undefined) {
-      updateFields.push(`is_regular_holiday = $${paramIndex++}`);
-      values.push(is_regular_holiday);
-    }
-    if (is_special_holiday !== undefined) {
-      updateFields.push(`is_special_holiday = $${paramIndex++}`);
-      values.push(is_special_holiday);
-    }
-
-    // Leave information
-    if (leave_type_id !== undefined) {
-      updateFields.push(`leave_type_id = $${paramIndex++}`);
-      values.push(leave_type_id);
-    }
-    if (leave_request_id !== undefined) {
-      updateFields.push(`leave_request_id = $${paramIndex++}`);
-      values.push(leave_request_id);
-    }
-
-    // Always update the updated_at timestamp
-    updateFields.push(`updated_at = NOW()`);
-
-    if (updateFields.length === 1) {
-      // Only updated_at
+    if (!time_in || !time_out) {
       return res.status(400).json({
         success: false,
-        message: "No fields to update",
+        message: "Both time_in and time_out are required",
       });
     }
 
-    // Add attendance_id as the last parameter
-    values.push(attendance_id);
+    // Validate time difference is less than 20 hours to prevent exploits
+    const timeInDate = new Date(time_in);
+    const timeOutDate = new Date(time_out);
+    const timeDifferenceHours = (timeOutDate - timeInDate) / (1000 * 60 * 60);
 
-    const result = await pool.query(
-      `
-      UPDATE attendance
-      SET ${updateFields.join(", ")}
-      WHERE attendance_id = $${paramIndex}
-      RETURNING *
-    `,
-      values
+    if (timeDifferenceHours >= 20) {
+      return res.status(400).json({
+        success: false,
+        message: "Time difference cannot be 20 hours or more",
+      });
+    }
+
+    if (timeDifferenceHours <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Time out must be after time in",
+      });
+    }
+
+    // Get the existing attendance record
+    const existingRecord = await pool.query(
+      `SELECT a.*, e.first_name, e.last_name, s.start_time, s.end_time, s.days_of_week, s.break_duration, s.break_start, s.break_end
+       FROM attendance a
+       JOIN employees e ON a.employee_id = e.employee_id
+       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+       WHERE a.attendance_id = $1`,
+      [attendance_id]
     );
 
-    if (result.rows.length === 0) {
+    if (existingRecord.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "Attendance record not found",
       });
     }
 
-    // Get the updated record with employee information
-    const detailedResult = await pool.query(
+    const record = existingRecord.rows[0];
+    const employeeId = record.employee_id;
+    const attendanceDate = record.date;
+
+    // Check if the record is part of a consumed timesheet
+    const timesheetCheck = await pool.query(
+      "SELECT is_consumed FROM timesheets WHERE timesheet_id = (SELECT timesheet_id FROM attendance WHERE attendance_id = $1)",
+      [attendance_id]
+    );
+
+    if (timesheetCheck.rows.length > 0 && timesheetCheck.rows[0].is_consumed) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot edit attendance record that is part of a consumed timesheet",
+      });
+    }
+
+    // Delete the existing record
+    await pool.query("DELETE FROM attendance WHERE attendance_id = $1", [
+      attendance_id,
+    ]);
+
+    // Create new attendance record using clockIn/clockOut logic
+    // First, simulate clockIn with the provided time_in
+    const timeInISOString = new Date(time_in).toISOString();
+
+    // Get holiday information for the date
+    const holidayInfo = await getHolidayInfo(timeInISOString);
+
+    // Check if the date is a working day according to schedule
+    const workingDays = record.days_of_week || [];
+    const dayOfWeek = new Date(attendanceDate)
+      .toLocaleDateString("en-US", {
+        weekday: "long",
+        timeZone: "Asia/Manila",
+      })
+      .toLowerCase();
+    const isScheduledDayOff = !workingDays.includes(dayOfWeek);
+
+    // Calculate enhanced clock-in data
+    const enhancedClockInCalcs = await enhancedClockInCalculation(
+      employeeId,
+      timeInISOString,
+      {
+        start_time: record.start_time,
+        end_time: record.end_time,
+      },
+      holidayInfo
+    );
+
+    // Insert new attendance record with clock-in data
+    const clockInResult = await pool.query(
+      `INSERT INTO attendance (
+        employee_id, date, time_in, is_present, is_late, is_absent,
+        is_dayoff, is_regular_holiday, is_special_holiday, late_minutes, is_entitled_holiday
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      [
+        employeeId,
+        attendanceDate,
+        timeInISOString,
+        true,
+        enhancedClockInCalcs.is_late,
+        false,
+        isScheduledDayOff,
+        enhancedClockInCalcs.is_regular_holiday,
+        enhancedClockInCalcs.is_special_holiday,
+        enhancedClockInCalcs.late_minutes,
+        enhancedClockInCalcs.is_entitled_holiday,
+      ]
+    );
+
+    const newRecord = clockInResult.rows[0];
+
+    // Now simulate clockOut with the provided time_out
+    const timeOutISOString = new Date(time_out).toISOString();
+
+    const scheduleInfo = {
+      break_duration: record.break_duration || 60,
+      break_start: record.break_start || "12:00:00",
+      break_end: record.break_end || "13:00:00",
+      start_time: record.start_time,
+      end_time: record.end_time,
+      days_of_week: record.days_of_week,
+    };
+
+    // Calculate enhanced clock-out data
+    const enhancedClockOutCalcs = await enhancedClockOutCalculation(
+      newRecord,
+      timeOutISOString,
+      scheduleInfo
+    );
+
+    // Update the record with clock-out data
+    const clockOutResult = await pool.query(
+      `UPDATE attendance
+       SET time_out = $1, total_hours = $2, updated_at = $3,
+           is_undertime = $4, is_halfday = $5, undertime_minutes = $6,
+           night_differential_hours = $7, rest_day_hours_worked = $8, overtime_hours = $9,
+           regular_holiday_hours_worked = $10, special_holiday_hours_worked = $11,
+           payroll_breakdown = $12
+       WHERE attendance_id = $13
+       RETURNING *`,
+      [
+        timeOutISOString,
+        enhancedClockOutCalcs.total_hours,
+        new Date().toISOString(),
+        enhancedClockOutCalcs.is_undertime,
+        enhancedClockOutCalcs.is_halfday,
+        enhancedClockOutCalcs.undertime_minutes,
+        enhancedClockOutCalcs.night_differential_hours,
+        enhancedClockOutCalcs.rest_day_hours_worked,
+        enhancedClockOutCalcs.overtime_hours,
+        enhancedClockOutCalcs.regular_holiday_hours_worked || 0,
+        enhancedClockOutCalcs.special_holiday_hours_worked || 0,
+        JSON.stringify(enhancedClockOutCalcs.payroll_breakdown),
+        newRecord.attendance_id,
+      ]
+    );
+
+    // Get the final record with employee information
+    const finalResult = await pool.query(
       `
-      SELECT 
+      SELECT
         a.*, e.first_name, e.last_name,
         COALESCE(a.total_hours, 0) as calculated_total_hours,
         COALESCE(a.overtime_hours, 0) as overtime_hours,
@@ -1548,13 +1580,14 @@ export const manualUpdate = async (req, res) => {
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       WHERE a.attendance_id = $1
     `,
-      [attendance_id]
+      [newRecord.attendance_id]
     );
 
     res.status(200).json({
       success: true,
-      message: "Attendance record updated successfully",
-      data: detailedResult.rows[0],
+      message:
+        "Attendance record updated successfully with recalculated values",
+      data: finalResult.rows[0],
     });
   } catch (error) {
     console.error("Error updating attendance:", error);
@@ -1861,5 +1894,65 @@ export const getAttendanceByTimesheet = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deleteAttendanceRecord = async (req, res) => {
+  try {
+    const { attendance_id } = req.params;
+
+    if (!attendance_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Attendance ID is required",
+      });
+    }
+
+    // Check if attendance record exists
+    const existingRecord = await pool.query(
+      "SELECT * FROM attendance WHERE attendance_id = $1",
+      [attendance_id]
+    );
+
+    if (existingRecord.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Attendance record not found",
+      });
+    }
+
+    // Check if the record is part of a consumed timesheet
+    const timesheetCheck = await pool.query(
+      `SELECT t.is_consumed
+       FROM timesheets t
+       JOIN attendance a ON a.timesheet_id = t.timesheet_id
+       WHERE a.attendance_id = $1`,
+      [attendance_id]
+    );
+
+    if (timesheetCheck.rows.length > 0 && timesheetCheck.rows[0].is_consumed) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot delete attendance record that is part of a consumed timesheet",
+      });
+    }
+
+    // Delete the attendance record
+    await pool.query("DELETE FROM attendance WHERE attendance_id = $1", [
+      attendance_id,
+    ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance record deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting attendance record:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete attendance record",
+      error: error.message,
+    });
   }
 };

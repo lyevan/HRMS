@@ -431,7 +431,7 @@ const Overtime = () => {
         <FileOvertimeContent
           onSuccess={handleFileOvertimeSuccess}
           onClose={() => setIsFileOvertimeOpen(false)}
-          isAdminFiling={false}
+          isAdminFiling={true}
           currentEmployeeId={employee?.employee_id}
         />
       </Modal>

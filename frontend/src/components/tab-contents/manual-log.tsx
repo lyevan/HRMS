@@ -282,7 +282,7 @@ const ManualLog = () => {
                 </h1>
                 <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
-                  <span>Upload Excel</span>
+                  <span>Upload Attendance from Excel</span>
                 </DropdownMenuItem>
               </div>
 
@@ -297,7 +297,7 @@ const ManualLog = () => {
                 </h1>
                 <DropdownMenuItem onClick={handleDownloadExcelTemplate}>
                   <Download className="h-4 w-4 mr-2" />
-                  <span>Excel Template</span>
+                  <span>Download Excel Template</span>
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>
@@ -504,7 +504,7 @@ const ManualLog = () => {
         <FileManualAttendanceContent
           onSuccess={handleFileManualLogSuccess}
           onClose={() => setIsFileManualLogOpen(false)}
-          isAdminFiling={true}
+          // isAdminFiling={true}
         />
       </Modal>
 

@@ -13,6 +13,7 @@ import { getStatusBadges } from "@/lib/badge-config";
 // import { exportTimesheetToExcel } from "@/utils/excel-export";
 import axios from "axios";
 import Modal from "@/components/modal";
+import { deleteAttendanceRecord } from "@/models/attendance-model";
 
 const RawTimesheet = () => {
   const { attendanceRecords, loading, error, fetchAttendanceRecords } =
@@ -28,23 +29,8 @@ const RawTimesheet = () => {
 
   // Form state for editing
   const [editForm, setEditForm] = useState({
-    date: "",
     time_in: "",
     time_out: "",
-    total_hours: "",
-    overtime_hours: "",
-    notes: "",
-    is_present: false,
-    is_absent: false,
-    is_late: false,
-    on_leave: false,
-    is_undertime: false,
-    is_halfday: false,
-    is_dayoff: false,
-    is_regular_holiday: false,
-    is_special_holiday: false,
-    leave_type_id: "",
-    leave_request_id: "",
   });
 
   useEffect(() => {
@@ -60,37 +46,41 @@ const RawTimesheet = () => {
     setSelectedRecord(record);
 
     // Populate form with existing data
-    const formatDateTime = (dateTime: string | null) => {
+    const formatTime = (dateTime: string | null) => {
       if (!dateTime) return "";
-      return new Date(dateTime).toISOString().slice(0, 16);
-    };
-
-    const formatDate = (date: string | null) => {
-      if (!date) return "";
-      return new Date(date).toISOString().slice(0, 10);
+      // Convert UTC timestamp to Manila time for display
+      const utcDate = new Date(dateTime);
+      const manilaTime = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000); // Add 8 hours for Manila
+      return manilaTime.toISOString().slice(11, 16); // Extract HH:MM
     };
 
     setEditForm({
-      date: formatDate(record.date),
-      time_in: formatDateTime(record.time_in),
-      time_out: formatDateTime(record.time_out),
-      total_hours: record.total_hours?.toString() || "",
-      overtime_hours: record.overtime_hours?.toString() || "",
-      notes: record.notes || "",
-      is_present: record.is_present,
-      is_absent: record.is_absent,
-      is_late: record.is_late,
-      on_leave: record.on_leave,
-      is_undertime: record.is_undertime,
-      is_halfday: record.is_halfday,
-      is_dayoff: record.is_dayoff,
-      is_regular_holiday: record.is_regular_holiday,
-      is_special_holiday: record.is_special_holiday,
-      leave_type_id: record.leave_type_id?.toString() || "",
-      leave_request_id: record.leave_request_id?.toString() || "",
+      time_in: formatTime(record.time_in),
+      time_out: formatTime(record.time_out),
     });
 
     setEditModalOpen(true);
+  };
+
+  const handleDeleteRecord = async (record: AttendanceRecord) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete the attendance record for ${record.first_name} ${record.last_name} on ${record.date}?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteAttendanceRecord(record.attendance_id);
+      toast.success("Attendance record deleted successfully");
+      fetchAttendanceRecords(); // Refresh data
+    } catch (error: any) {
+      console.error("Error deleting attendance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete attendance record"
+      );
+    }
   };
 
   const handleCloseModals = () => {
@@ -99,57 +89,81 @@ const RawTimesheet = () => {
     setSelectedRecord(null);
     // Reset form
     setEditForm({
-      date: "",
       time_in: "",
       time_out: "",
-      total_hours: "",
-      overtime_hours: "",
-      notes: "",
-      is_present: false,
-      is_absent: false,
-      is_late: false,
-      on_leave: false,
-      is_undertime: false,
-      is_halfday: false,
-      is_dayoff: false,
-      is_regular_holiday: false,
-      is_special_holiday: false,
-      leave_type_id: "",
-      leave_request_id: "",
     });
   };
 
   const handleUpdateAttendance = async () => {
     if (!selectedRecord) return;
 
+    // Validate required fields
+    if (!editForm.time_in || !editForm.time_out) {
+      alert("Both Time In and Time Out are required");
+      return;
+    }
+
+    // Combine date with times to create full datetime strings
+    // Convert Manila time inputs to UTC (same as manual log request)
+    // Convert Some dates like this recordDate: 2025-09-30T16:00:00.000Z to YYYY-MM-DD
+    const recordDate = selectedRecord.date.split("T")[0];
+    console.log("recordDate:", recordDate);
+    console.log("editForm.time_in:", editForm.time_in);
+    console.log("editForm.time_out:", editForm.time_out);
+
+    const convertManilaTimeToUTC = (
+      date: string,
+      timeIn: string,
+      timeOut: string
+    ): { timeInUTC: string; timeOutUTC: string } => {
+      let timeInDate = new Date(`${date}T${timeIn}+08:00`);
+      let timeOutDate = new Date(`${date}T${timeOut}+08:00`);
+
+      // If time_out is earlier than time_in, add +1 day
+      if (timeOutDate <= timeInDate) {
+        timeOutDate.setUTCDate(timeOutDate.getUTCDate() + 1);
+      }
+
+      return {
+        timeInUTC: timeInDate.toISOString(),
+        timeOutUTC: timeOutDate.toISOString(),
+      };
+    };
+
+    const timeInISOString = convertManilaTimeToUTC(
+      recordDate,
+      editForm.time_in,
+      editForm.time_out
+    ).timeInUTC;
+    let timeOutISOString = convertManilaTimeToUTC(
+      recordDate,
+      editForm.time_in,
+      editForm.time_out
+    ).timeOutUTC;
+
+    // Handle next day time_out (for night shifts)
+
+    // Validate time difference
+    const timeDiffHours =
+      (new Date(timeOutISOString).getTime() -
+        new Date(timeInISOString).getTime()) /
+      (1000 * 60 * 60);
+
+    if (timeDiffHours >= 20) {
+      alert("Time difference cannot be 20 hours or more");
+      return;
+    }
+
+    if (timeDiffHours <= 0) {
+      alert("Time Out must be after Time In");
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const updateData = {
-        date: editForm.date || undefined,
-        time_in: editForm.time_in || undefined,
-        time_out: editForm.time_out || undefined,
-        total_hours: editForm.total_hours
-          ? parseFloat(editForm.total_hours)
-          : undefined,
-        overtime_hours: editForm.overtime_hours
-          ? parseFloat(editForm.overtime_hours)
-          : undefined,
-        notes: editForm.notes || undefined,
-        is_present: editForm.is_present,
-        is_absent: editForm.is_absent,
-        is_late: editForm.is_late,
-        on_leave: editForm.on_leave,
-        is_undertime: editForm.is_undertime,
-        is_halfday: editForm.is_halfday,
-        is_dayoff: editForm.is_dayoff,
-        is_regular_holiday: editForm.is_regular_holiday,
-        is_special_holiday: editForm.is_special_holiday,
-        leave_type_id: editForm.leave_type_id
-          ? parseInt(editForm.leave_type_id)
-          : undefined,
-        leave_request_id: editForm.leave_request_id
-          ? parseInt(editForm.leave_request_id)
-          : undefined,
+        time_in: timeInISOString,
+        time_out: timeOutISOString,
       };
 
       const response = await axios.put(
@@ -177,6 +191,7 @@ const RawTimesheet = () => {
     getStatusBadges,
     handleViewRecord,
     handleEditRecord,
+    handleDeleteRecord,
   });
 
   // Handle Excel export
@@ -244,6 +259,7 @@ const RawTimesheet = () => {
         setOpen={setViewModalOpen}
         title="View Attendance Record"
         description=""
+        className="sm:max-w-6xl max-h-[90vh] overflow-y-auto"
       >
         {viewModalContent({ selectedRecord, getStatusBadges })}
       </Modal>
@@ -253,7 +269,7 @@ const RawTimesheet = () => {
         setOpen={setEditModalOpen}
         title=""
         description=""
-        className="max-w-3xl max-h-[90vh] overflow-y-auto"
+        className="sm:max-w-6xl max-h-[90vh] overflow-y-auto"
       >
         {editModalContent({
           selectedRecord,

@@ -147,32 +147,14 @@ export const calculateNightDifferentialHours = (
   let breakEnd = null;
 
   if (scheduleInfo?.break_start && scheduleInfo?.break_end) {
-    // Parse break times on the same date as clock-in
-    const clockInDate = start.toISOString().split("T")[0];
-    breakStart = new Date(`${clockInDate}T${scheduleInfo.break_start}`);
-    breakEnd = new Date(`${clockInDate}T${scheduleInfo.break_end}`);
-
-    // Handle overnight shifts - if break times are before actual start time,
-    // they likely fall on the next day
-    if (breakStart < start) {
-      // Shift started before break time, so break is on the same day
-      // No adjustment needed
-    } else if (scheduleInfo?.start_time) {
-      // Check if this is an overnight shift
-      const scheduleStart = new Date(
-        `${clockInDate}T${scheduleInfo.start_time}`
+    const { breakStart: adjustedBreakStart, breakEnd: adjustedBreakEnd } =
+      buildBreakWindow(
+        timeIn,
+        scheduleInfo.break_start,
+        scheduleInfo.break_end
       );
-      const scheduleEnd = new Date(
-        `${clockInDate}T${scheduleInfo.end_time || "23:59:59"}`
-      );
-
-      // If schedule end is before schedule start, it's an overnight shift
-      if (scheduleEnd <= scheduleStart && breakStart > scheduleStart) {
-        // Break times should be adjusted for overnight shift
-        // If break is after midnight, no adjustment needed
-        // If break is before midnight but after shift start, no adjustment needed
-      }
-    }
+    breakStart = adjustedBreakStart;
+    breakEnd = adjustedBreakEnd;
   }
 
   let nightHours = 0;
@@ -193,29 +175,35 @@ export const calculateNightDifferentialHours = (
       let segmentStart = current;
       let actualSegmentEnd = segmentEnd;
 
-      if (breakStart && breakEnd) {
-        // If break overlaps with this night differential segment, exclude it
-        if (breakStart < segmentEnd && breakEnd > segmentStart) {
-          // Calculate non-break portions of this segment
-          const beforeBreak =
-            breakStart > segmentStart
-              ? diffMinutesUTC(segmentStart, breakStart)
-              : 0;
-          const afterBreak =
-            breakEnd < segmentEnd ? diffMinutesUTC(breakEnd, segmentEnd) : 0;
+      if (breakStart && breakEnd && breakStart < breakEnd) {
+        // If break overlaps with this night differential segment, exclude break time
+        if (segmentStart < breakEnd && segmentEnd > breakStart) {
+          // Calculate worked time excluding break period
+          let workedMinutes = 0;
 
-          nightHours += (beforeBreak + afterBreak) / 60;
+          // Time before break
+          if (segmentStart < breakStart) {
+            const beforeBreakEnd =
+              breakStart < segmentEnd ? breakStart : segmentEnd;
+            workedMinutes += diffMinutesUTC(segmentStart, beforeBreakEnd);
+          }
+
+          // Time after break
+          if (segmentEnd > breakEnd) {
+            const afterBreakStart =
+              breakEnd > segmentStart ? breakEnd : segmentStart;
+            workedMinutes += diffMinutesUTC(afterBreakStart, segmentEnd);
+          }
+
+          nightHours += workedMinutes / 60;
         } else {
           // No break overlap, count full segment
-          const minutesInSegment = diffMinutesUTC(
-            segmentStart,
-            actualSegmentEnd
-          );
+          const minutesInSegment = diffMinutesUTC(segmentStart, segmentEnd);
           nightHours += minutesInSegment / 60;
         }
       } else {
         // No break time defined, count full segment
-        const minutesInSegment = diffMinutesUTC(segmentStart, actualSegmentEnd);
+        const minutesInSegment = diffMinutesUTC(segmentStart, segmentEnd);
         nightHours += minutesInSegment / 60;
       }
     }
@@ -330,21 +318,25 @@ export const enhancedClockInCalculation = async (
 };
 
 function buildBreakWindow(timeIn, breakStartStr, breakEndStr) {
-  // breakStartStr like "02:00:00", breakEndStr like "03:00:00"
+  // breakStartStr like "12:00:00", breakEndStr like "13:00:00" in Manila time
   const [bsHour, bsMin, bsSec] = breakStartStr.split(":").map(Number);
   const [beHour, beMin, beSec] = breakEndStr.split(":").map(Number);
 
+  // Convert Manila time to UTC (Manila is UTC+8)
+  const bsUtcHour = (bsHour - 8 + 24) % 24;
+  const beUtcHour = (beHour - 8 + 24) % 24;
+
   const breakStart = new Date(timeIn);
-  breakStart.setHours(bsHour, bsMin, bsSec, 0);
+  breakStart.setUTCHours(bsUtcHour, bsMin, bsSec || 0, 0);
 
   const breakEnd = new Date(timeIn);
-  breakEnd.setHours(beHour, beMin, beSec, 0);
+  breakEnd.setUTCHours(beUtcHour, beMin, beSec || 0, 0);
 
   // Handle overnight shifts: if break times are before timeIn, they're likely on the next day
   if (breakStart < timeIn) {
     // Break is on the next day for overnight shifts
-    breakStart.setDate(breakStart.getDate() + 1);
-    breakEnd.setDate(breakEnd.getDate() + 1);
+    breakStart.setUTCDate(breakStart.getUTCDate() + 1);
+    breakEnd.setUTCDate(breakEnd.getUTCDate() + 1);
   }
 
   return { breakStart, breakEnd };
@@ -954,39 +946,32 @@ export const enhancedClockOutCalculation = async (
       regularTime_nightDiffSpecialHolidayRestDay
   );
 
-  // 3. TWO-WAY: NIGHT DIFF + HOLIDAY (without rest day portion) - FIXED
-  const regularTime_nightDiffRegularHoliday = Math.max(
-    0,
-    nightDiffHours - // Start with total night diff hours
-      nightDiffOvertimeHours - // Remove pure night diff OT
-      nightDiffRestDayOvertimeHours - // Remove night diff + rest day OT
-      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
-      nightDiffSpecialHolidayRestDayOvertimeHours - // Remove other 3-way OT
-      nightDiffSpecialHolidayOvertimeHours - // Remove night diff + special holiday OT
-      nightDiffRegularHolidayOvertimeHours // Remove night diff + regular holiday OT
-  );
+  // Allocate remaining night diff hours based on day type
+  let remainingNightDiffRegHours =
+    nightDiffRegHours -
+    regularTime_nightDiffRegularHolidayRestDay -
+    regularTime_nightDiffSpecialHolidayRestDay;
 
-  const regularTime_nightDiffSpecialHoliday = Math.max(
-    0,
-    nightDiffHours - // Start with total night diff hours
-      nightDiffOvertimeHours - // Remove pure night diff OT
-      nightDiffRestDayOvertimeHours - // Remove night diff + rest day OT
-      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
-      nightDiffSpecialHolidayRestDayOvertimeHours - // Remove 3-way OT
-      nightDiffRegularHolidayOvertimeHours - // Remove night diff + regular holiday OT
-      nightDiffSpecialHolidayOvertimeHours // Remove night diff + special holiday OT
-  );
+  // Initialize variables
+  let regularTime_nightDiffRegularHoliday = 0;
+  let regularTime_nightDiffSpecialHoliday = 0;
+  let regularTime_nightDiffRestDay = 0;
+  let regularTime_nightDiff = 0;
 
-  // 4. TWO-WAY: NIGHT DIFF + REST DAY (without holiday portion) - FIXED
-  const regularTime_nightDiffRestDay = Math.max(
-    0,
-    nightDiffHours - // Start with total night diff hours
-      nightDiffOvertimeHours - // Remove pure night diff OT
-      nightDiffRegularHolidayOvertimeHours - // Remove night diff + regular holiday OT
-      nightDiffSpecialHolidayOvertimeHours - // Remove night diff + special holiday OT
-      nightDiffRegularHolidayRestDayOvertimeHours - // Remove 3-way OT
-      nightDiffSpecialHolidayRestDayOvertimeHours // Remove 3-way OT
-  );
+  // Allocate to appropriate category based on day type
+  if (is_regular_holiday && !is_dayoff) {
+    regularTime_nightDiffRegularHoliday = remainingNightDiffRegHours;
+    remainingNightDiffRegHours = 0;
+  } else if (is_special_holiday && !is_dayoff) {
+    regularTime_nightDiffSpecialHoliday = remainingNightDiffRegHours;
+    remainingNightDiffRegHours = 0;
+  } else if (is_dayoff && !is_regular_holiday && !is_special_holiday) {
+    regularTime_nightDiffRestDay = remainingNightDiffRegHours;
+    remainingNightDiffRegHours = 0;
+  } else {
+    regularTime_nightDiff = remainingNightDiffRegHours;
+    remainingNightDiffRegHours = 0;
+  }
 
   // 5. SINGLE PREMIUMS - COMPLETELY REWRITTEN FOR ACCURACY
 
@@ -1023,16 +1008,7 @@ export const enhancedClockOutCalculation = async (
   );
 
   // Pure night diff (no rest day, no holiday overlap)
-  const regularTime_nightDiff = Math.max(
-    0,
-    nightDiffHours -
-      nightDiffOvertimeHours -
-      nightDiffRegularHolidayOvertimeHours -
-      nightDiffSpecialHolidayOvertimeHours -
-      nightDiffRestDayOvertimeHours -
-      nightDiffRegularHolidayRestDayOvertimeHours -
-      nightDiffSpecialHolidayRestDayOvertimeHours
-  );
+  // regularTime_nightDiff is already calculated in the allocation section above
 
   // === VERIFICATION CHECK ===
   // The sum of all regularTime_* values should equal baseHours (adjustedTotalHours - overtimeHours)

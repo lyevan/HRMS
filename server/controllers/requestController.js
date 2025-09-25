@@ -281,6 +281,8 @@ export const createRequest = async (req, res) => {
 
     const { request_type, ...requestData } = req.body;
 
+    console.log("Request Data", requestData);
+
     // Validate request data
     const validationErrors = validateRequestData(request_type, requestData);
     if (validationErrors.length > 0) {
@@ -317,10 +319,14 @@ export const createRequest = async (req, res) => {
     // Insert type-specific data
     switch (request_type) {
       case "manual_log":
+        // Ensure target_date is treated as UTC date (not local time)
+        const targetDate = new Date(requestData.target_date + "T00:00:00Z");
+        const formattedTargetDate = targetDate.toISOString().split("T")[0];
+
         await client.query(
           `
           INSERT INTO manual_log_requests (
-            request_id, target_date, time_in, time_out, break_duration, 
+            request_id, target_date, time_in, time_out, break_duration,
             shift_start_time, shift_end_time, reason, supporting_documents
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `,
@@ -497,6 +503,13 @@ export const approveRequest = async (req, res) => {
 
     // Handle special processing based on request type
     if (request.request_type === "manual_log") {
+      // Import required functions
+      const {
+        getHolidayInfo,
+        enhancedClockInCalculation,
+        enhancedClockOutCalculation,
+      } = await import("../utils/attendanceCalculations.js");
+
       // Get the manual log request details
       const manualLogResult = await client.query(
         "SELECT * FROM manual_log_requests WHERE request_id = $1",
@@ -513,172 +526,145 @@ export const approveRequest = async (req, res) => {
         );
 
         if (existingAttendance.rows.length > 0) {
-          // Update existing attendance record
-          let updateQuery = `
-            UPDATE attendance 
-            SET updated_at = NOW()
-          `;
-          let updateParams = [];
-          let paramIndex = 1;
-
-          if (manualLog.time_in) {
-            updateQuery += `, time_in = $${paramIndex}`;
-            updateParams.push(`${manualLog.target_date}T${manualLog.time_in}`);
-            paramIndex++;
-          }
-
-          if (manualLog.time_out) {
-            updateQuery += `, time_out = $${paramIndex}`;
-            updateParams.push(`${manualLog.target_date}T${manualLog.time_out}`);
-            paramIndex++;
-          }
-
-          // Calculate total hours if both times are provided
-          if (manualLog.time_in && manualLog.time_out) {
-            const timeInDate = new Date(
-              `${manualLog.target_date}T${manualLog.time_in}`
-            );
-            const timeOutDate = new Date(
-              `${manualLog.target_date}T${manualLog.time_out}`
-            );
-
-            // Handle next day time_out (for night shifts)
-            if (timeOutDate < timeInDate) {
-              timeOutDate.setDate(timeOutDate.getDate() + 1);
-            }
-
-            const diffMs = timeOutDate - timeInDate;
-            const diffHours = diffMs / (1000 * 60 * 60);
-            const totalHours = Math.round(diffHours * 100) / 100;
-
-            updateQuery += `, total_hours = $${paramIndex}`;
-            updateParams.push(totalHours);
-            paramIndex++;
-
-            // Calculate overtime (hours over 8)
-            if (totalHours > 8) {
-              const overtimeHours = Math.round((totalHours - 8) * 100) / 100;
-              updateQuery += `, overtime_hours = $${paramIndex}`;
-              updateParams.push(overtimeHours);
-              paramIndex++;
-            }
-          }
-
-          updateQuery += ` WHERE employee_id = $${paramIndex} AND date = $${
-            paramIndex + 1
-          }`;
-          updateParams.push(request.employee_id, manualLog.target_date);
-
-          await client.query(updateQuery, updateParams);
-        } else {
-          // Create new attendance record with proper calculation
-          let totalHours = null;
-          let overtimeHours = 0;
-
-          // Calculate hours worked using the new logic if all required fields are provided
-          if (
-            manualLog.time_in &&
-            manualLog.time_out &&
-            manualLog.shift_start_time &&
-            manualLog.shift_end_time
-          ) {
-            // Helper function to convert time string to minutes
-            const timeToMinutes = (timeStr) => {
-              const [hours, minutes] = timeStr.split(":").map(Number);
-              return hours * 60 + minutes;
-            };
-
-            // Helper function to convert minutes to hours (decimal)
-            const minutesToHours = (minutes) =>
-              Math.round((minutes / 60) * 100) / 100;
-
-            // Calculate shift duration
-            const shiftStartMinutes = timeToMinutes(manualLog.shift_start_time);
-            const shiftEndMinutes = timeToMinutes(manualLog.shift_end_time);
-            let shiftDurationMinutes = shiftEndMinutes - shiftStartMinutes;
-
-            // Handle overnight shifts
-            if (shiftDurationMinutes < 0) {
-              shiftDurationMinutes += 24 * 60; // Add 24 hours in minutes
-            }
-
-            // Calculate worked duration
-            const timeInMinutes = timeToMinutes(manualLog.time_in);
-            const timeOutMinutes = timeToMinutes(manualLog.time_out);
-            let workedDurationMinutes = timeOutMinutes - timeInMinutes;
-
-            // Handle overnight work
-            if (workedDurationMinutes < 0) {
-              workedDurationMinutes += 24 * 60; // Add 24 hours in minutes
-            }
-
-            // Subtract break duration if provided
-            if (manualLog.break_duration) {
-              // break_duration is now stored as minutes (number or string)
-              const breakDurationMinutes = parseInt(manualLog.break_duration);
-              if (!isNaN(breakDurationMinutes) && breakDurationMinutes > 0) {
-                workedDurationMinutes -= breakDurationMinutes;
-                shiftDurationMinutes -= breakDurationMinutes;
-              }
-            }
-
-            // Convert to hours
-            totalHours = minutesToHours(workedDurationMinutes);
-            const shiftHours = minutesToHours(shiftDurationMinutes);
-
-            // Calculate overtime: worked time - expected shift time
-            overtimeHours = Math.max(0, totalHours - shiftHours);
-            overtimeHours = Math.round(overtimeHours * 100) / 100;
-
-            console.log("Calculation details:", {
-              time_in: manualLog.time_in,
-              time_out: manualLog.time_out,
-              shift_start: manualLog.shift_start_time,
-              shift_end: manualLog.shift_end_time,
-              break_duration: manualLog.break_duration,
-              worked_minutes: workedDurationMinutes,
-              shift_minutes: shiftDurationMinutes,
-              total_hours: totalHours,
-              overtime_hours: overtimeHours,
-            });
-          }
-
-          // Convert date to proper string format considering local timezone
-          const dateStr =
-            manualLog.target_date instanceof Date
-              ? manualLog.target_date.toLocaleDateString("en-CA") // Returns YYYY-MM-DD in local timezone
-              : manualLog.target_date;
-
-          console.log("Creating attendance record for:", {
-            employee_id: request.employee_id,
-            date: dateStr,
-            time_in: manualLog.time_in
-              ? `${dateStr} ${manualLog.time_in}`
-              : null,
-            time_out: manualLog.time_out
-              ? `${dateStr} ${manualLog.time_out}`
-              : null,
-            total_hours: totalHours,
-            overtime_hours: overtimeHours,
-          });
-
-          await client.query(
-            `
-            INSERT INTO attendance (
-              employee_id, date, time_in, time_out, total_hours, overtime_hours, notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-          `,
-            [
-              request.employee_id,
-              dateStr,
-              manualLog.time_in ? `${dateStr} ${manualLog.time_in}` : null,
-              manualLog.time_out ? `${dateStr} ${manualLog.time_out}` : null,
-              totalHours,
-              overtimeHours,
-              `Manual log approved from request #${request_id}: ${manualLog.reason}`,
-            ]
+          throw new Error(
+            `Attendance record already exists for employee ${request.employee_id} on date ${manualLog.target_date}`
           );
         }
+
+        // Get employee schedule information
+        const scheduleQuery = await client.query(
+          `SELECT s.*, e.first_name, e.last_name
+           FROM schedules s
+           JOIN employees e ON e.schedule_id = s.schedule_id
+           WHERE e.employee_id = $1`,
+          [request.employee_id]
+        );
+
+        const scheduleInfo =
+          scheduleQuery.rows.length > 0
+            ? scheduleQuery.rows[0]
+            : {
+                break_duration: 60,
+                break_start: "12:00:00",
+                break_end: "13:00:00",
+                start_time: "08:00:00",
+                end_time: "17:00:00",
+              };
+
+        // Convert manual log times to UTC timestamps
+        // time_in and time_out are now stored as full timestamptz in the database
+        // const workDateObj = new Date(manualLog.target_date);
+        // const workDate = workDateObj.toISOString().split("T")[0]; // Format as YYYY-MM-DD
+        const workDate = manualLog.target_date;
+
+        // time_in and time_out are now full timestamps, convert to ISO strings for calculations
+        const timeInUTC = manualLog.time_in
+          ? new Date(manualLog.time_in).toISOString()
+          : null;
+        const timeOutUTC = manualLog.time_out
+          ? new Date(manualLog.time_out).toISOString()
+          : null;
+
+        // Validate required fields
+        if (!workDate || !timeInUTC || !timeOutUTC) {
+          throw new Error(
+            `Missing required fields for manual log: date=${workDate}, time_in=${timeInUTC}, time_out=${timeOutUTC}`
+          );
+        }
+
+        // Handle overnight shifts (if timeOut is next day)
+        if (new Date(timeOutUTC) < new Date(timeInUTC)) {
+          const timeOutDate = new Date(timeOutUTC);
+          timeOutDate.setDate(timeOutDate.getDate() + 1);
+          timeOutUTC = timeOutDate.toISOString();
+        }
+
+        // Get holiday information
+        const holidayInfo = await getHolidayInfo(timeInUTC);
+
+        // Create attendance record using enhanced calculations
+        // First, simulate clock-in
+        const clockInCalcs = await enhancedClockInCalculation(
+          request.employee_id,
+          timeInUTC,
+          {
+            start_time: scheduleInfo.start_time,
+            end_time: scheduleInfo.end_time,
+            break_start: scheduleInfo.break_start,
+            break_end: scheduleInfo.break_end,
+          },
+          holidayInfo
+        );
+
+        // Create initial attendance record
+        const attendanceRecord = {
+          attendance_id: null, // Will be set after insert
+          employee_id: request.employee_id,
+          date: workDate,
+          time_in: timeInUTC,
+          time_out: null, // Will be set by clock-out
+          is_present: true,
+          is_late: clockInCalcs.is_late,
+          is_absent: false,
+          is_dayoff: false, // Will be determined by schedule
+          is_regular_holiday: clockInCalcs.is_regular_holiday,
+          is_special_holiday: clockInCalcs.is_special_holiday,
+          late_minutes: clockInCalcs.late_minutes,
+          is_entitled_holiday: clockInCalcs.is_entitled_holiday,
+        };
+
+        // Now simulate clock-out to get complete calculations
+        const clockOutCalcs = await enhancedClockOutCalculation(
+          attendanceRecord,
+          timeOutUTC,
+          {
+            start_time: scheduleInfo.start_time,
+            end_time: scheduleInfo.end_time,
+            break_start: scheduleInfo.break_start,
+            break_end: scheduleInfo.break_end,
+          }
+        );
+
+        console.log("Clock-in calculations:", clockInCalcs);
+        console.log("Clock-out calculations:", clockOutCalcs);
+        const attendanceResult = await client.query(
+          `INSERT INTO attendance (
+            employee_id, date, time_in, time_out, total_hours, overtime_hours,
+            is_present, is_late, is_absent, is_undertime, is_halfday,
+            undertime_minutes, is_dayoff, is_regular_holiday, is_special_holiday,
+            late_minutes, night_differential_hours, rest_day_hours_worked,
+            regular_holiday_hours_worked, special_holiday_hours_worked,
+            payroll_breakdown, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+            $16, $17, $18, $19, $20, $21, NOW(), NOW()
+          ) RETURNING *`,
+          [
+            request.employee_id,
+            workDate,
+            timeInUTC,
+            timeOutUTC,
+            clockOutCalcs.total_hours,
+            clockOutCalcs.overtime_hours,
+            true, // is_present
+            clockOutCalcs.is_undertime ? false : clockInCalcs.is_late, // is_late
+            false, // is_absent
+            clockOutCalcs.is_undertime,
+            clockOutCalcs.is_halfday,
+            clockOutCalcs.undertime_minutes,
+            false, // is_dayoff (TODO: determine from schedule)
+            clockInCalcs.is_regular_holiday,
+            clockInCalcs.is_special_holiday,
+            clockInCalcs.late_minutes,
+            clockOutCalcs.night_differential_hours,
+            clockOutCalcs.rest_day_hours_worked,
+            clockOutCalcs.regular_holiday_hours_worked,
+            clockOutCalcs.special_holiday_hours_worked,
+            JSON.stringify(clockOutCalcs.payroll_breakdown),
+          ]
+        );
+
+        console.log("Manual log attendance created:", attendanceResult.rows[0]);
       }
     }
 
