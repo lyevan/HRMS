@@ -784,11 +784,14 @@ export const enhancedClockOutCalculation = async (
     */
 
     // 5. Night differential overtime (remaining night diff)
-    // Only allocate to ND OT for rest days or holidays, not regular days
+    // DISABLED for rest days and holidays - overtime should be base premium OT
+    // ND OT only applies for regular days when overtime occurs during ND period
     if (
       nightDiffHours > 0 &&
       remainingOvertimeToAllocate > 0 &&
-      (is_dayoff || is_regular_holiday || is_special_holiday)
+      !is_dayoff &&
+      !is_regular_holiday &&
+      !is_special_holiday
     ) {
       const remainingNightDiff =
         nightDiffHours -
