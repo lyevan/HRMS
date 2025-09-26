@@ -1074,7 +1074,11 @@ const calculateEmployeePayrollSync = async (
       payroll_breakdowns: attendance.payroll_breakdowns || [],
     };
 
-    const dateRangeQuery = createDateRangeQuery(startDate, endDate, "a.date");
+    const dateRangeQuery = createDateOnlyRangeQuery(
+      startDate,
+      endDate,
+      "a.date"
+    );
     const calculationStartDate = dateRangeQuery.startDate;
     const calculationEndDate = dateRangeQuery.endDate;
 
@@ -1459,7 +1463,11 @@ const getContractDetails = async (employee_id) => {
 
 const getAttendanceDetails = async (employee_id, start_date, end_date) => {
   // Create proper date range query using utilities
-  const dateRangeQuery = createDateRangeQuery(start_date, end_date, "a.date");
+  const dateRangeQuery = createDateOnlyRangeQuery(
+    start_date,
+    end_date,
+    "a.date"
+  );
 
   const attendanceQuery = `
       SELECT 
@@ -1690,7 +1698,7 @@ const optimizedGeneratePayroll = async (req, res) => {
       });
     }
 
-    const dateRange = createDateRangeQuery(start_date, end_date);
+    const dateRange = createDateOnlyRangeQuery(start_date, end_date);
 
     // Create payroll header using actual schema columns
     const headerResult = await pool.query(

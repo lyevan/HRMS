@@ -170,8 +170,8 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
       // Convert Date objects to local date strings (YYYY-MM-DD) for the intended calendar dates
       const formatDateString = (date: Date) => {
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
         return `${year}-${month}-${day}`;
       };
 
@@ -292,10 +292,10 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
       // Date range filter - compare dates in UTC to avoid timezone issues
       if (dateRange.from || dateRange.to) {
         // Convert record date to UTC date string (YYYY-MM-DD)
-        const recordDateUTC = new Date(record.date).toISOString().split('T')[0];
+        const recordDateUTC = new Date(record.date).toISOString().split("T")[0];
         // Convert dateRange dates to UTC date strings
-        const fromDateUTC = dateRange.from?.toISOString().split('T')[0] || null;
-        const toDateUTC = dateRange.to?.toISOString().split('T')[0] || null;
+        const fromDateUTC = dateRange.from?.toISOString().split("T")[0] || null;
+        const toDateUTC = dateRange.to?.toISOString().split("T")[0] || null;
 
         if (fromDateUTC && recordDateUTC < fromDateUTC) return false;
         if (toDateUTC && recordDateUTC > toDateUTC) return false;
