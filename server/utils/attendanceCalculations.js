@@ -86,12 +86,16 @@ export const calculateLateMinutes = (clockInTime, scheduledStartTime) => {
   const clockIn = new Date(clockInTime);
 
   // Convert Manila scheduled start time to UTC
-  const [startH, startM, startS] = scheduledStartTime.split(':').map(Number);
+  const [startH, startM, startS] = scheduledStartTime.split(":").map(Number);
   const startUtcHour = (startH - 8 + 24) % 24; // Manila is UTC+8
 
   // Use the same date as clock-in
   const clockInDate = clockIn.toISOString().split("T")[0];
-  let scheduledStart = new Date(`${clockInDate}T${startUtcHour.toString().padStart(2,'0')}:${startM.toString().padStart(2,'0')}:${(startS || 0).toString().padStart(2,'0')}.000Z`);
+  let scheduledStart = new Date(
+    `${clockInDate}T${startUtcHour.toString().padStart(2, "0")}:${startM
+      .toString()
+      .padStart(2, "0")}:${(startS || 0).toString().padStart(2, "0")}.000Z`
+  );
 
   // Handle cross-midnight shifts: adjust if the difference is too large
   const diffHours = (clockIn - scheduledStart) / (1000 * 60 * 60);
@@ -120,12 +124,16 @@ export const calculateUndertimeMinutes = (clockOutTime, scheduledEndTime) => {
   const clockOut = new Date(clockOutTime);
 
   // Convert Manila scheduled end time to UTC
-  const [endH, endM, endS] = scheduledEndTime.split(':').map(Number);
+  const [endH, endM, endS] = scheduledEndTime.split(":").map(Number);
   const endUtcHour = (endH - 8 + 24) % 24; // Manila is UTC+8
 
   // Parse scheduled end time for the same date as clock-out
   const clockOutDate = clockOut.toISOString().split("T")[0];
-  const scheduledEnd = new Date(`${clockOutDate}T${endUtcHour.toString().padStart(2,'0')}:${endM.toString().padStart(2,'0')}:${(endS || 0).toString().padStart(2,'0')}.000Z`);
+  const scheduledEnd = new Date(
+    `${clockOutDate}T${endUtcHour.toString().padStart(2, "0")}:${endM
+      .toString()
+      .padStart(2, "0")}:${(endS || 0).toString().padStart(2, "0")}.000Z`
+  );
 
   if (clockOut < scheduledEnd) {
     return diffMinutesUTC(clockOut, scheduledEnd);
@@ -460,12 +468,18 @@ export const enhancedClockOutCalculation = async (
     const timeInDate = new Date(timeIn);
 
     // Convert Manila scheduled start time to UTC
-    const [startH, startM, startS] = scheduleInfo.start_time.split(':').map(Number);
+    const [startH, startM, startS] = scheduleInfo.start_time
+      .split(":")
+      .map(Number);
     const startUtcHour = (startH - 8 + 24) % 24; // Manila is UTC+8
 
     // Parse scheduled start time for the same date as timeIn
     const clockInDate = timeInDate.toISOString().split("T")[0];
-    let scheduledStart = new Date(`${clockInDate}T${startUtcHour.toString().padStart(2,'0')}:${startM.toString().padStart(2,'0')}:${(startS || 0).toString().padStart(2,'0')}.000Z`);
+    let scheduledStart = new Date(
+      `${clockInDate}T${startUtcHour.toString().padStart(2, "0")}:${startM
+        .toString()
+        .padStart(2, "0")}:${(startS || 0).toString().padStart(2, "0")}.000Z`
+    );
 
     // Handle cross-midnight shifts: adjust if the difference is too large
     const diffHours = (timeInDate - scheduledStart) / (1000 * 60 * 60);
