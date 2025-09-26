@@ -5,7 +5,7 @@ import utc from "dayjs/plugin/utc.js";
 import { AdvancedPayrollCalculator } from "../services/AdvancedPayrollCalculator.js";
 import {
   normalizeToPhilippineDate,
-  createDateRangeQuery,
+  createDateOnlyRangeQuery,
   debugDateFormats,
 } from "../utils/dateUtils.js";
 
@@ -793,7 +793,11 @@ const calculateBatchPayroll = async (employee_ids, start_date, end_date) => {
     // debugDateFormats(end_date, "Payroll End Date");
 
     // Create normalized date range for consistent querying
-    const dateRangeQuery = createDateRangeQuery(start_date, end_date, "a.date");
+    const dateRangeQuery = createDateOnlyRangeQuery(
+      start_date,
+      end_date,
+      "a.date"
+    );
 
     console.log("📅 [PAYROLL] Normalized date range:", {
       start: dateRangeQuery.startDate,

@@ -107,22 +107,24 @@ export const extractDateFromDateTime = (datetimeField) => {
 };
 
 /**
- * Create date range query conditions for PostgreSQL
- * Returns parameterized query parts for safe date filtering
+ * Create date range query conditions for PostgreSQL DATE columns
+ * DATE columns don't have timezone, so no conversion needed
  */
-export const createDateRangeQuery = (
+export const createDateOnlyRangeQuery = (
   startDate,
   endDate,
   dateColumn = "date"
 ) => {
-  const normalizedStart = normalizeToBusinessDate(startDate);
-  const normalizedEnd = normalizeToBusinessDate(endDate);
+  // For DATE columns, use the input dates directly without timezone conversion
+  // This prevents the -1 day offset issue
+  const start = dayjs(startDate).format("YYYY-MM-DD");
+  const end = dayjs(endDate).format("YYYY-MM-DD");
 
   return {
-    condition: `${dateColumn}::date BETWEEN $1 AND $2`,
-    params: [normalizedStart, normalizedEnd],
-    startDate: normalizedStart,
-    endDate: normalizedEnd,
+    condition: `${dateColumn} BETWEEN $1 AND $2`,
+    params: [start, end],
+    startDate: start,
+    endDate: end,
   };
 };
 

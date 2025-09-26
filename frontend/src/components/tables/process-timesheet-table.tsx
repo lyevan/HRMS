@@ -167,10 +167,18 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
         return;
       }
 
+      // Convert Date objects to local date strings (YYYY-MM-DD) for the intended calendar dates
+      const formatDateString = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const response = await axios.patch("/attendance/process-timesheet", {
         attendanceIds: selectedRecords.map((rec) => rec.attendance_id),
-        startDate: dateRange.from,
-        endDate: dateRange.to,
+        startDate: formatDateString(dateRange.from),
+        endDate: formatDateString(dateRange.to),
         approverId: employee?.employee_id,
       });
       if (response.data.success) {
@@ -281,11 +289,16 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
   // Filter data based on date range and status - using useMemo to prevent unnecessary recalculations
   const filteredData = useMemo(() => {
     return data.filter((record) => {
-      // Date range filter
+      // Date range filter - compare dates in UTC to avoid timezone issues
       if (dateRange.from || dateRange.to) {
-        const recordDate = new Date(record.date);
-        if (dateRange.from && recordDate < dateRange.from) return false;
-        if (dateRange.to && recordDate > dateRange.to) return false;
+        // Convert record date to UTC date string (YYYY-MM-DD)
+        const recordDateUTC = new Date(record.date).toISOString().split('T')[0];
+        // Convert dateRange dates to UTC date strings
+        const fromDateUTC = dateRange.from?.toISOString().split('T')[0] || null;
+        const toDateUTC = dateRange.to?.toISOString().split('T')[0] || null;
+
+        if (fromDateUTC && recordDateUTC < fromDateUTC) return false;
+        if (toDateUTC && recordDateUTC > toDateUTC) return false;
       }
 
       // Status filter

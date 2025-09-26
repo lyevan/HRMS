@@ -13,7 +13,7 @@ import {
 import {
   normalizeToPhilippineDate,
   normalizeToPhilippineDateTime,
-  createDateRangeQuery,
+  createDateOnlyRangeQuery,
   debugDateFormats,
 } from "../utils/dateUtils.js";
 import ExcelJS from "exceljs";
@@ -1833,7 +1833,7 @@ export const processTimesheet = async (req, res) => {
     // debugDateFormats(endDate, "End Date Input");
 
     // Create proper date range query using utilities
-    const dateRangeQuery = createDateRangeQuery(startDate, endDate, "date");
+    const dateRangeQuery = createDateOnlyRangeQuery(startDate, endDate, "date");
 
     console.log("📅 Normalized date range:", {
       start: dateRangeQuery.startDate,
