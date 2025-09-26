@@ -47,9 +47,7 @@ export const normalizeToBusinessDateTime = (datetimeInput) => {
   if (!datetimeInput) return null;
 
   try {
-    return dayjs(datetimeInput)
-      .utc()
-      .format("YYYY-MM-DD HH:mm:ss");
+    return dayjs(datetimeInput).utc().format("YYYY-MM-DD HH:mm:ss");
   } catch (error) {
     console.error(
       `❌ DateTime normalization error for input: ${datetimeInput}`,
