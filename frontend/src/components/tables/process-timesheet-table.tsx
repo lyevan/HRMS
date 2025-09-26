@@ -167,11 +167,11 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
         return;
       }
 
-      // Convert Date objects to local date strings (YYYY-MM-DD) for the intended calendar dates
+      // Convert Date objects to UTC date strings (YYYY-MM-DD) to avoid timezone offset issues
       const formatDateString = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
+        const year = date.getUTCFullYear();
+        const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(date.getUTCDate()).padStart(2, "0");
         return `${year}-${month}-${day}`;
       };
 
