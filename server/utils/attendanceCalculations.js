@@ -774,7 +774,12 @@ export const enhancedClockOutCalculation = async (
     }
 
     // 5. Night differential overtime (remaining night diff)
-    if (nightDiffHours > 0 && remainingOvertimeToAllocate > 0) {
+    // Only allocate to ND OT for rest days or holidays, not regular days
+    if (
+      nightDiffHours > 0 &&
+      remainingOvertimeToAllocate > 0 &&
+      (is_dayoff || is_regular_holiday || is_special_holiday)
+    ) {
       const remainingNightDiff =
         nightDiffHours -
         nightDiffRegularHolidayRestDayOvertimeHours -
@@ -941,6 +946,8 @@ export const enhancedClockOutCalculation = async (
   );
 
   // Allocate remaining night diff hours based on day type
+  // CRITICAL FIX: For rest days, prioritize rest day premium over night diff premium
+  // All base hours should be rest day premium, with night diff stacked on top
   let remainingNightDiffRegHours =
     nightDiffRegHours -
     regularTime_nightDiffRegularHolidayRestDay -
@@ -952,25 +959,34 @@ export const enhancedClockOutCalculation = async (
   let regularTime_nightDiffRestDay = 0;
   let regularTime_nightDiff = 0;
 
-  // Allocate to appropriate category based on day type
-  if (is_regular_holiday && !is_dayoff) {
-    regularTime_nightDiffRegularHoliday = remainingNightDiffRegHours;
-    remainingNightDiffRegHours = 0;
-  } else if (is_special_holiday && !is_dayoff) {
-    regularTime_nightDiffSpecialHoliday = remainingNightDiffRegHours;
-    remainingNightDiffRegHours = 0;
-  } else if (is_dayoff && !is_regular_holiday && !is_special_holiday) {
-    regularTime_nightDiffRestDay = remainingNightDiffRegHours;
-    remainingNightDiffRegHours = 0;
+  // For rest days, we need special handling: rest day premium takes priority
+  if (is_dayoff && !is_regular_holiday && !is_special_holiday) {
+    // For pure rest days: all base hours are rest day premium
+    // Night diff premium is applied on top for overlapping hours
+    regularTime_nightDiffRestDay = Math.min(
+      remainingNightDiffRegHours,
+      baseHours
+    );
+    remainingNightDiffRegHours -= regularTime_nightDiffRestDay;
   } else {
-    regularTime_nightDiff = remainingNightDiffRegHours;
-    remainingNightDiffRegHours = 0;
+    // For regular days and holidays: allocate night diff normally
+    if (is_regular_holiday && !is_dayoff) {
+      regularTime_nightDiffRegularHoliday = remainingNightDiffRegHours;
+      remainingNightDiffRegHours = 0;
+    } else if (is_special_holiday && !is_dayoff) {
+      regularTime_nightDiffSpecialHoliday = remainingNightDiffRegHours;
+      remainingNightDiffRegHours = 0;
+    } else {
+      regularTime_nightDiff = remainingNightDiffRegHours;
+      remainingNightDiffRegHours = 0;
+    }
   }
 
   // 5. SINGLE PREMIUMS - COMPLETELY REWRITTEN FOR ACCURACY
 
   // Pure rest day (no holiday, no night diff overlap)
-  const regularTime_restDay = Math.max(
+  // CRITICAL FIX: For rest days, account for night diff rest day allocation
+  let regularTime_restDay = Math.max(
     0,
     pureRestDayHours -
       restDayOvertimeHours -
@@ -980,6 +996,14 @@ export const enhancedClockOutCalculation = async (
       nightDiffRegularHolidayRestDayOvertimeHours -
       nightDiffSpecialHolidayRestDayOvertimeHours
   );
+
+  // For rest days, subtract the night diff rest day hours from pure rest day
+  if (is_dayoff && !is_regular_holiday && !is_special_holiday) {
+    regularTime_restDay = Math.max(
+      0,
+      regularTime_restDay - regularTime_nightDiffRestDay
+    );
+  }
 
   // Pure regular holiday (no rest day, no night diff overlap)
   const regularTime_regularHoliday = Math.max(
