@@ -5,8 +5,8 @@ import utc from "dayjs/plugin/utc.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// Business timezone - configurable for different deployments
-const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || "Asia/Manila";
+// Business timezone - now using UTC for consistent server-independent operation
+const BUSINESS_TIMEZONE = "UTC";
 
 // Deployment environment logging
 // console.log(
@@ -19,7 +19,7 @@ const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || "Asia/Manila";
 // console.log(`🏢 Business Time: ${dayjs().tz(BUSINESS_TIMEZONE).format()}`);
 
 /**
- * Normalize any date input to business timezone date string (YYYY-MM-DD)
+ * Normalize any date input to UTC date string (YYYY-MM-DD)
  * Works regardless of frontend, backend, or database server locations
  */
 export const normalizeToBusinessDate = (dateInput) => {
@@ -28,11 +28,11 @@ export const normalizeToBusinessDate = (dateInput) => {
   try {
     // Handle ISO datetime strings (from frontend) - most common case
     if (typeof dateInput === "string" && dateInput.includes("T")) {
-      return dayjs(dateInput).tz(BUSINESS_TIMEZONE).format("YYYY-MM-DD");
+      return dayjs(dateInput).utc().format("YYYY-MM-DD");
     }
 
     // Handle date-only strings or Date objects
-    return dayjs(dateInput).format("YYYY-MM-DD");
+    return dayjs(dateInput).utc().format("YYYY-MM-DD");
   } catch (error) {
     console.error(`❌ Date normalization error for input: ${dateInput}`, error);
     return null;
@@ -40,7 +40,7 @@ export const normalizeToBusinessDate = (dateInput) => {
 };
 
 /**
- * Normalize time_in/time_out to business timezone datetime
+ * Normalize time_in/time_out to UTC datetime
  * Works regardless of server deployment locations
  */
 export const normalizeToBusinessDateTime = (datetimeInput) => {
@@ -48,7 +48,7 @@ export const normalizeToBusinessDateTime = (datetimeInput) => {
 
   try {
     return dayjs(datetimeInput)
-      .tz(BUSINESS_TIMEZONE)
+      .utc()
       .format("YYYY-MM-DD HH:mm:ss");
   } catch (error) {
     console.error(
@@ -60,31 +60,31 @@ export const normalizeToBusinessDateTime = (datetimeInput) => {
 };
 
 /**
- * Get current business date (for comparisons)
- * Always returns business timezone date regardless of server location
+ * Get current UTC date (for comparisons)
+ * Always returns UTC date regardless of server location
  */
 export const getCurrentBusinessDate = () => {
-  return dayjs().tz(BUSINESS_TIMEZONE).format("YYYY-MM-DD");
+  return dayjs().utc().format("YYYY-MM-DD");
 };
 
 /**
- * Get current business datetime
- * Always returns business timezone datetime regardless of server location
+ * Get current UTC datetime
+ * Always returns UTC datetime regardless of server location
  */
 export const getCurrentBusinessDateTime = () => {
-  return dayjs().tz(BUSINESS_TIMEZONE).format("YYYY-MM-DD HH:mm:ss");
+  return dayjs().utc().format("YYYY-MM-DD HH:mm:ss");
 };
 
 /**
- * Convert any datetime to business timezone for database storage
+ * Convert any datetime to UTC for database storage
  * Ensures consistent timezone handling across all deployments
  */
 export const convertToBusinessTimezone = (datetimeInput) => {
   if (!datetimeInput) return null;
 
   try {
-    // Return ISO string with business timezone offset
-    return dayjs(datetimeInput).tz(BUSINESS_TIMEZONE).toISOString();
+    // Return ISO string in UTC
+    return dayjs(datetimeInput).utc().toISOString();
   } catch (error) {
     console.error(
       `❌ Timezone conversion error for input: ${datetimeInput}`,

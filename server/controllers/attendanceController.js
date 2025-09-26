@@ -1,6 +1,5 @@
 import { pool } from "../config/db.js";
 import dayjs from "dayjs";
-import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
 import path from "path";
 import fs from "fs";
@@ -20,7 +19,6 @@ import {
 import ExcelJS from "exceljs";
 
 dayjs.extend(utc);
-dayjs.extend(timezone);
 
 // DANGER: Debug mode - use fixed date/time for testing
 const isDebugMode = false;
@@ -799,7 +797,7 @@ export const bulkExcelAttendance = async (req, res) => {
 
             // Construct full datetime strings - Convert Manila time to UTC
             const clockInTime = convertManilaTimeToUTC(date, time_in);
-            const clockOutTime = convertManilaTimeToUTC(date, time_out);
+            let clockOutTime = convertManilaTimeToUTC(date, time_out);
 
             if (!clockInTime || !clockOutTime) {
               throw new Error(
@@ -807,6 +805,18 @@ export const bulkExcelAttendance = async (req, res) => {
                   globalIndex + 2
                 }: Invalid date/time format for Manila timezone conversion`
               );
+            }
+
+            // Handle night shifts: if time_out is earlier than time_in, it means next day
+            const timeInHour = parseInt(time_in.split(":")[0]);
+            const timeOutHour = parseInt(time_out.split(":")[0]);
+
+            // If time_out hour is less than time_in hour, it's a night shift (next day)
+            if (timeOutHour < timeInHour) {
+              // Add one day to time_out using native Date
+              const timeOutDate = new Date(clockOutTime);
+              timeOutDate.setDate(timeOutDate.getDate() + 1);
+              clockOutTime = timeOutDate.toISOString();
             }
 
             // Calculate day of week for the given date
@@ -1126,7 +1136,12 @@ const formatDateValue = (value) => {
   if (!value) return null;
 
   if (value instanceof Date) {
-    return value.toISOString().split("T")[0];
+    // For Date objects from Excel, format as local date (assuming Manila timezone)
+    // Use local date formatting to avoid UTC conversion shifting the date
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   if (typeof value === "string") {
@@ -1157,7 +1172,14 @@ const formatTimeValue = (value) => {
   if (!value) return null;
 
   if (value instanceof Date) {
-    return value.toTimeString().split(" ")[0]; // HH:MM:SS
+    // For Date objects from Excel, extract time in 24-hour format
+    // Assume the Date object represents the correct time in local timezone
+    const hours = value.getHours();
+    const minutes = value.getMinutes();
+    const seconds = value.getSeconds();
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   }
 
   if (typeof value === "string") {
@@ -1190,13 +1212,19 @@ const formatTimeValue = (value) => {
 const convertManilaTimeToUTC = (date, time) => {
   if (!date || !time) return null;
 
-  // Create a date object in Manila timezone
-  const manilaDateTime = new Date(`${date}T${time}`);
+  try {
+    // Create datetime string in Manila timezone (UTC+8)
+    const manilaDateTimeStr = `${date}T${time}+08:00`;
 
-  // Manila is UTC+8, so we subtract 8 hours to get UTC
-  const utcDateTime = new Date(manilaDateTime.getTime() - 8 * 60 * 60 * 1000);
+    // Parse as Manila time and convert to UTC
+    const manilaDate = new Date(manilaDateTimeStr);
+    const utcISOString = manilaDate.toISOString();
 
-  return utcDateTime.toISOString();
+    return utcISOString;
+  } catch (error) {
+    console.error("Error converting Manila time to UTC:", error);
+    return null;
+  }
 };
 
 // export const startBreak = async (req, res) => {
@@ -1374,13 +1402,30 @@ export const createManualAttendance = async (req, res) => {
     const shiftHours = shiftEnd - shiftStart - breakDuration;
 
     if (time_in && time_out) {
-      const timeInDate = new Date(`${date}T${time_in}`);
-      const timeOutDate = new Date(`${date}T${time_out}`);
+      // Convert Manila times to UTC for consistent storage
+      const timeInUTC = convertManilaTimeToUTC(date, time_in);
+      let timeOutUTC = convertManilaTimeToUTC(date, time_out);
 
-      // Handle next day time_out (for night shifts)
-      if (timeOutDate < timeInDate) {
-        timeOutDate.setDate(timeOutDate.getDate() + 1);
+      if (!timeInUTC || !timeOutUTC) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid time format",
+        });
       }
+
+      // Handle night shifts: if time_out is earlier than time_in, it means next day
+      const timeInHour = parseInt(time_in.split(":")[0]);
+      const timeOutHour = parseInt(time_out.split(":")[0]);
+
+      if (timeOutHour < timeInHour) {
+        // Add one day to time_out using native Date
+        const timeOutDate = new Date(timeOutUTC);
+        timeOutDate.setDate(timeOutDate.getDate() + 1);
+        timeOutUTC = timeOutDate.toISOString();
+      }
+
+      const timeInDate = new Date(timeInUTC);
+      const timeOutDate = new Date(timeOutUTC);
 
       const diffMs = timeOutDate - timeInDate;
       const diffHours = diffMs / (1000 * 60 * 60);
@@ -1435,8 +1480,8 @@ export const createManualAttendance = async (req, res) => {
       [
         employee_id,
         date,
-        time_in ? `${date}T${time_in}` : null,
-        time_out ? `${date}T${time_out}` : null,
+        time_in ? timeInUTC : null,
+        time_out ? timeOutUTC : null,
         hoursWorked,
         overtime || 0,
         notes,
