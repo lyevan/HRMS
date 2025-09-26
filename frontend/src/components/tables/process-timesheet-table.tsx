@@ -121,6 +121,8 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
       "timesheetCutoffSettings",
       JSON.stringify(cutoffSettings)
     );
+    console.log("===Date Range From:", dateRange.from);
+    console.log("===Date Range To:", dateRange.to);
   }, [cutoffType, periodSelection]);
 
   const isMobile = useIsMobile();
@@ -215,16 +217,16 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
     switch (cutoffType) {
       case "15-EOM":
         if (periodSelection === "first-half") {
-          // 1-15 of current month
+          // 1-15 of current month - create dates at midnight UTC to avoid timezone offset
           return {
-            from: new Date(currentYear, currentMonth, 1),
-            to: new Date(currentYear, currentMonth, 15),
+            from: new Date(Date.UTC(currentYear, currentMonth, 1)),
+            to: new Date(Date.UTC(currentYear, currentMonth, 15)),
           };
         } else {
           // 16-EOM (End of Month) of current month
           return {
-            from: new Date(currentYear, currentMonth, 16),
-            to: new Date(currentYear, currentMonth + 1, 0), // Last day of current month
+            from: new Date(Date.UTC(currentYear, currentMonth, 16)),
+            to: new Date(Date.UTC(currentYear, currentMonth + 1, 0)), // Last day of current month
           };
         }
 
@@ -232,14 +234,14 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
         if (periodSelection === "first-half") {
           // 26 of previous month to 10 of current month
           return {
-            from: new Date(previousMonthYear, previousMonth, 26),
-            to: new Date(currentYear, currentMonth, 10),
+            from: new Date(Date.UTC(previousMonthYear, previousMonth, 26)),
+            to: new Date(Date.UTC(currentYear, currentMonth, 10)),
           };
         } else {
           // 11-25 of current month
           return {
-            from: new Date(currentYear, currentMonth, 11),
-            to: new Date(currentYear, currentMonth, 25),
+            from: new Date(Date.UTC(currentYear, currentMonth, 11)),
+            to: new Date(Date.UTC(currentYear, currentMonth, 25)),
           };
         }
 
@@ -247,22 +249,22 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
         if (periodSelection === "first-half") {
           // 21 of previous month to 5 of current month
           return {
-            from: new Date(previousMonthYear, previousMonth, 21),
-            to: new Date(currentYear, currentMonth, 5),
+            from: new Date(Date.UTC(previousMonthYear, previousMonth, 21)),
+            to: new Date(Date.UTC(currentYear, currentMonth, 5)),
           };
         } else {
           // 6-20 of current month
           return {
-            from: new Date(currentYear, currentMonth, 6),
-            to: new Date(currentYear, currentMonth, 20),
+            from: new Date(Date.UTC(currentYear, currentMonth, 6)),
+            to: new Date(Date.UTC(currentYear, currentMonth, 20)),
           };
         }
 
       case "whole-month":
         // Entire month: 1st to last day of selected month
         return {
-          from: new Date(currentYear, currentMonth, 1),
-          to: new Date(currentYear, currentMonth + 1, 0), // Last day of month
+          from: new Date(Date.UTC(currentYear, currentMonth, 1)),
+          to: new Date(Date.UTC(currentYear, currentMonth + 1, 0)), // Last day of month
         };
 
       case "custom":
