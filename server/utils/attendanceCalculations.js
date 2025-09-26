@@ -85,19 +85,23 @@ export const calculateLateMinutes = (clockInTime, scheduledStartTime) => {
 
   const clockIn = new Date(clockInTime);
 
+  // Convert Manila scheduled start time to UTC
+  const [startH, startM, startS] = scheduledStartTime.split(':').map(Number);
+  const startUtcHour = (startH - 8 + 24) % 24; // Manila is UTC+8
+
   // Use the same date as clock-in
   const clockInDate = clockIn.toISOString().split("T")[0];
-  let scheduledStart = new Date(`${clockInDate}T${scheduledStartTime}`);
+  let scheduledStart = new Date(`${clockInDate}T${startUtcHour.toString().padStart(2,'0')}:${startM.toString().padStart(2,'0')}:${(startS || 0).toString().padStart(2,'0')}.000Z`);
 
   // Handle cross-midnight shifts: adjust if the difference is too large
   const diffHours = (clockIn - scheduledStart) / (1000 * 60 * 60);
 
   if (diffHours > 12) {
     // Clock-in is way after scheduled start → shift start forward 1 day
-    scheduledStart.setDate(scheduledStart.getDate() + 1);
+    scheduledStart.setUTCDate(scheduledStart.getUTCDate() + 1);
   } else if (diffHours < -12) {
     // Scheduled start is way after clock-in → shift start back 1 day
-    scheduledStart.setDate(scheduledStart.getDate() - 1);
+    scheduledStart.setUTCDate(scheduledStart.getUTCDate() - 1);
   }
 
   console.log("Clock In", clockIn);
@@ -115,9 +119,13 @@ export const calculateUndertimeMinutes = (clockOutTime, scheduledEndTime) => {
 
   const clockOut = new Date(clockOutTime);
 
+  // Convert Manila scheduled end time to UTC
+  const [endH, endM, endS] = scheduledEndTime.split(':').map(Number);
+  const endUtcHour = (endH - 8 + 24) % 24; // Manila is UTC+8
+
   // Parse scheduled end time for the same date as clock-out
   const clockOutDate = clockOut.toISOString().split("T")[0];
-  const scheduledEnd = new Date(`${clockOutDate}T${scheduledEndTime}`);
+  const scheduledEnd = new Date(`${clockOutDate}T${endUtcHour.toString().padStart(2,'0')}:${endM.toString().padStart(2,'0')}:${(endS || 0).toString().padStart(2,'0')}.000Z`);
 
   if (clockOut < scheduledEnd) {
     return diffMinutesUTC(clockOut, scheduledEnd);
@@ -367,39 +375,7 @@ export const enhancedClockOutCalculation = async (
   let actualBreakDeduction = 0;
 
   if (scheduleInfo.break_start && scheduleInfo.break_end) {
-    // Parse break times for the correct date
-    const workDate = timeIn.toISOString().split("T")[0];
-    const breakStart = new Date(`${workDate}T${scheduleInfo.break_start}`);
-    const breakEnd = new Date(`${workDate}T${scheduleInfo.break_end}`);
-
-    // Handle overnight shifts - adjust break times if necessary
-    // let adjustedBreakStart = breakStart;
-    // let adjustedBreakEnd = breakEnd;
-
-    // If break times are before timeIn, they might be on the next day for overnight shifts
-    if (
-      breakStart < timeIn &&
-      scheduleInfo.start_time &&
-      scheduleInfo.end_time
-    ) {
-      const scheduleStart = new Date(`${workDate}T${scheduleInfo.start_time}`);
-      const scheduleEnd = new Date(`${workDate}T${scheduleInfo.end_time}`);
-
-      // Check if this is an overnight shift
-      // if (scheduleEnd <= scheduleStart) {
-      //   // This is an overnight shift, check if break should be on next day
-      //   if (breakStart.getHours() >= scheduleStart.getHours()) {
-      //     // Break is likely on the same day
-      //   } else {
-      //     // Break is likely on the next day
-      //     adjustedBreakStart = new Date(
-      //       breakStart.getTime() + 24 * 60 * 60 * 1000
-      //     );
-      //     adjustedBreakEnd = new Date(breakEnd.getTime() + 24 * 60 * 60 * 1000);
-      //   }
-      // }
-    }
-
+    // Use buildBreakWindow which correctly handles UTC conversion
     const { breakStart: adjustedBreakStart, breakEnd: adjustedBreakEnd } =
       buildBreakWindow(
         timeIn,
@@ -480,21 +456,25 @@ export const enhancedClockOutCalculation = async (
   let earlyClockInDeduction = 0;
 
   if (NEGLECT_EARLY_IN_MINUTES && scheduleInfo.start_time) {
-    // Calculate scheduled start time for comparison using the same logic as calculateLateMinutes
+    // Calculate scheduled start time for comparison using UTC conversion
     const timeInDate = new Date(timeIn);
 
-    // Parse schedule start time on the same date as timeIn initially
+    // Convert Manila scheduled start time to UTC
+    const [startH, startM, startS] = scheduleInfo.start_time.split(':').map(Number);
+    const startUtcHour = (startH - 8 + 24) % 24; // Manila is UTC+8
+
+    // Parse scheduled start time for the same date as timeIn
     const clockInDate = timeInDate.toISOString().split("T")[0];
-    let scheduledStart = new Date(`${clockInDate}T${scheduleInfo.start_time}`);
+    let scheduledStart = new Date(`${clockInDate}T${startUtcHour.toString().padStart(2,'0')}:${startM.toString().padStart(2,'0')}:${(startS || 0).toString().padStart(2,'0')}.000Z`);
 
     // Handle cross-midnight shifts: adjust if the difference is too large
     const diffHours = (timeInDate - scheduledStart) / (1000 * 60 * 60);
     if (diffHours > 12) {
       // Clock-in is way after scheduled start → shift start forward 1 day
-      scheduledStart.setDate(scheduledStart.getDate() + 1);
+      scheduledStart.setUTCDate(scheduledStart.getUTCDate() + 1);
     } else if (diffHours < -12) {
       // Scheduled start is way after clock-in → shift start back 1 day
-      scheduledStart.setDate(scheduledStart.getDate() - 1);
+      scheduledStart.setUTCDate(scheduledStart.getUTCDate() - 1);
     }
 
     console.log("[DEBUG] TimeIn:", timeInDate.toISOString());
