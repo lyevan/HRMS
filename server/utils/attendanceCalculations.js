@@ -726,6 +726,10 @@ export const enhancedClockOutCalculation = async (
     }
 
     // 3. Night Diff + Holiday overtime
+    // SKIP for regular holidays not on day off - overtime should be regular holiday OT
+    // ND + Holiday OT only applies when overtime occurs during ND period on holidays
+    // For now, we'll disable this and let overtime fall through to holiday OT
+    /*
     if (
       nightDiffHours > 0 &&
       is_regular_holiday &&
@@ -753,8 +757,13 @@ export const enhancedClockOutCalculation = async (
       );
       remainingOvertimeToAllocate -= nightDiffSpecialHolidayOvertimeHours;
     }
+    */
 
     // 4. Night Diff + Rest Day overtime
+    // SKIP for pure rest days - overtime should be regular rest day OT
+    // ND + RD OT only applies when overtime occurs during ND period on rest days
+    // For now, we'll disable this and let overtime fall through to rest day OT
+    /*
     if (
       nightDiffHours > 0 &&
       is_dayoff &&
@@ -772,6 +781,7 @@ export const enhancedClockOutCalculation = async (
       );
       remainingOvertimeToAllocate -= nightDiffRestDayOvertimeHours;
     }
+    */
 
     // 5. Night differential overtime (remaining night diff)
     // Only allocate to ND OT for rest days or holidays, not regular days
@@ -1006,7 +1016,7 @@ export const enhancedClockOutCalculation = async (
   }
 
   // Pure regular holiday (no rest day, no night diff overlap)
-  const regularTime_regularHoliday = Math.max(
+  let regularTime_regularHoliday = Math.max(
     0,
     pureRegularHolidayHours -
       regularHolidayOvertimeHours -
@@ -1015,8 +1025,16 @@ export const enhancedClockOutCalculation = async (
       nightDiffRegularHolidayRestDayOvertimeHours
   );
 
+  // For holidays, subtract the night diff holiday hours
+  if (is_regular_holiday && !is_dayoff) {
+    regularTime_regularHoliday = Math.max(
+      0,
+      regularTime_regularHoliday - regularTime_nightDiffRegularHoliday
+    );
+  }
+
   // Pure special holiday (no rest day, no night diff overlap)
-  const regularTime_specialHoliday = Math.max(
+  let regularTime_specialHoliday = Math.max(
     0,
     pureSpecialHolidayHours -
       specialHolidayOvertimeHours -
@@ -1024,6 +1042,14 @@ export const enhancedClockOutCalculation = async (
       specialHolidayRestDayOvertimeHours -
       nightDiffSpecialHolidayRestDayOvertimeHours
   );
+
+  // For special holidays, subtract the night diff special holiday hours
+  if (is_special_holiday && !is_dayoff) {
+    regularTime_specialHoliday = Math.max(
+      0,
+      regularTime_specialHoliday - regularTime_nightDiffSpecialHoliday
+    );
+  }
 
   // Pure night diff (no rest day, no holiday overlap)
   // regularTime_nightDiff is already calculated in the allocation section above
