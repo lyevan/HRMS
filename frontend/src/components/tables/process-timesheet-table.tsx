@@ -269,26 +269,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
 
       case "custom":
       default:
-        return {
-          from: dateRange.from
-            ? new Date(
-                Date.UTC(
-                  dateRange.from.getFullYear(),
-                  dateRange.from.getMonth(),
-                  dateRange.from.getDate()
-                )
-              )
-            : undefined,
-          to: dateRange.to
-            ? new Date(
-                Date.UTC(
-                  dateRange.to.getFullYear(),
-                  dateRange.to.getMonth(),
-                  dateRange.to.getDate()
-                )
-              )
-            : undefined,
-        };
+        return dateRange; // No additional conversion needed since dates are already normalized
     }
   };
 
@@ -807,6 +788,47 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
                         }
                         numberOfMonths={2}
                       />
+                      {/* Custom Date Picker */}
+                      {cutoffType === "custom" && (
+                        <div>
+                          <Label className="text-sm font-medium">
+                            Custom Date Range
+                          </Label>
+                          <div className="mt-2">
+                            <Calendar
+                              autoFocus
+                              mode="range"
+                              defaultMonth={dateRange.from}
+                              selected={{
+                                from: dateRange.from,
+                                to: dateRange.to,
+                              }}
+                              onSelect={(range: any) => {
+                                // Normalize dates to prevent timezone issues
+                                const normalizeDate = (date: Date) => {
+                                  return new Date(
+                                    Date.UTC(
+                                      date.getFullYear(),
+                                      date.getMonth(),
+                                      date.getDate()
+                                    )
+                                  );
+                                };
+
+                                setDateRange({
+                                  from: range?.from
+                                    ? normalizeDate(range.from)
+                                    : undefined,
+                                  to: range?.to
+                                    ? normalizeDate(range.to)
+                                    : undefined,
+                                });
+                              }}
+                              numberOfMonths={2}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
