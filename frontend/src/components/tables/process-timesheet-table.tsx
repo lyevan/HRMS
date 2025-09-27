@@ -776,59 +776,34 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
                     </Label>
                     <div className="mt-2">
                       <Calendar
-                        initialFocus
+                        autoFocus
                         mode="range"
                         defaultMonth={dateRange.from}
-                        selected={{ from: dateRange.from, to: dateRange.to }}
-                        onSelect={(range: any) =>
+                        selected={{
+                          from: dateRange.from,
+                          to: dateRange.to,
+                        }}
+                        onSelect={(range: any) => {
+                          // Normalize dates to prevent timezone issues
+                          const normalizeDate = (date: Date) => {
+                            return new Date(
+                              Date.UTC(
+                                date.getFullYear(),
+                                date.getMonth(),
+                                date.getDate()
+                              )
+                            );
+                          };
+
                           setDateRange({
-                            from: range?.from,
-                            to: range?.to,
-                          })
-                        }
+                            from: range?.from
+                              ? normalizeDate(range.from)
+                              : undefined,
+                            to: range?.to ? normalizeDate(range.to) : undefined,
+                          });
+                        }}
                         numberOfMonths={2}
                       />
-                      {/* Custom Date Picker */}
-                      {cutoffType === "custom" && (
-                        <div>
-                          <Label className="text-sm font-medium">
-                            Custom Date Range
-                          </Label>
-                          <div className="mt-2">
-                            <Calendar
-                              autoFocus
-                              mode="range"
-                              defaultMonth={dateRange.from}
-                              selected={{
-                                from: dateRange.from,
-                                to: dateRange.to,
-                              }}
-                              onSelect={(range: any) => {
-                                // Normalize dates to prevent timezone issues
-                                const normalizeDate = (date: Date) => {
-                                  return new Date(
-                                    Date.UTC(
-                                      date.getFullYear(),
-                                      date.getMonth(),
-                                      date.getDate()
-                                    )
-                                  );
-                                };
-
-                                setDateRange({
-                                  from: range?.from
-                                    ? normalizeDate(range.from)
-                                    : undefined,
-                                  to: range?.to
-                                    ? normalizeDate(range.to)
-                                    : undefined,
-                                });
-                              }}
-                              numberOfMonths={2}
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
