@@ -205,7 +205,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
   const calculateDateRange = () => {
     // Return empty range if selections are not made
     if (!cutoffType || !periodSelection) {
-      return { from: null, to: null };
+      return { from: undefined, to: undefined };
     }
 
     const currentYear = selectedYear;
@@ -269,7 +269,26 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
 
       case "custom":
       default:
-        return dateRange;
+        return {
+          from: dateRange.from
+            ? new Date(
+                Date.UTC(
+                  dateRange.from.getFullYear(),
+                  dateRange.from.getMonth(),
+                  dateRange.from.getDate()
+                )
+              )
+            : undefined,
+          to: dateRange.to
+            ? new Date(
+                Date.UTC(
+                  dateRange.to.getFullYear(),
+                  dateRange.to.getMonth(),
+                  dateRange.to.getDate()
+                )
+              )
+            : undefined,
+        };
     }
   };
 
