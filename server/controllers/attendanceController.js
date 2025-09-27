@@ -81,11 +81,17 @@ export const getAllAttendance = async (req, res) => {
         s.break_end,
         ts.start_date as timesheet_start_date,
         ts.end_date as timesheet_end_date,
-        ts.is_consumed as is_timesheet_consumed
+        ts.is_consumed as is_timesheet_consumed,
+        p.title as position_title,
+        d.name as department_name,
+        c.contract_id
       FROM attendance a
       JOIN employees e ON a.employee_id = e.employee_id
       LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
       LEFT JOIN timesheets ts ON a.timesheet_id = ts.timesheet_id
+      LEFT JOIN contracts c ON e.contract_id = c.contract_id
+      LEFT JOIN positions p ON c.position_id = p.position_id
+      LEFT JOIN departments d ON p.department_id = d.department_id
       ORDER BY a.date DESC, a.time_in DESC
     `);
     res.status(200).json({ success: true, data: result.rows });

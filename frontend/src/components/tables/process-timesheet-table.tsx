@@ -4,7 +4,6 @@ import {
   type ColumnFiltersState,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -81,7 +80,9 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
   onSelectionChange,
 }: ProcessTimesheetTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [isTimesheetProcessing, setIsTimesheetProcessing] = useState(false);
   const [filterInput, setFilterInput] = useState("employee_name");
+  const [searchValue, setSearchValue] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -159,6 +160,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
 
   const handleProcessTimesheet = async () => {
     try {
+      setIsTimesheetProcessing(true);
       if (selectedRecords.length === 0) {
         toast.error("No records selected for processing.");
         return;
@@ -192,6 +194,8 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
       toast.error(
         (error as any).response.data.message || "Failed to process timesheet."
       );
+    } finally {
+      setIsTimesheetProcessing(false);
     }
   };
 
@@ -313,9 +317,46 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
         }
       }
 
+      // Search filter - use the same logic as table filtering
+      if (searchValue) {
+        const searchLower = searchValue.toLowerCase();
+        let fieldValue = "";
+        const attendanceRecord = record as AttendanceRecord;
+
+        switch (filterInput) {
+          case "employee_id":
+            fieldValue = attendanceRecord.employee_id?.toString() || "";
+            break;
+          case "employee_name":
+            fieldValue = `${attendanceRecord.first_name || ""} ${
+              attendanceRecord.last_name || ""
+            }`.trim();
+            break;
+          case "department_position":
+            fieldValue = `${attendanceRecord.department_name || ""} ${
+              attendanceRecord.position_title || ""
+            }`.trim();
+            break;
+          case "date":
+            fieldValue = attendanceRecord.date || "";
+            break;
+          case "status":
+            fieldValue = getAttendanceStatusText(attendanceRecord);
+            break;
+          default:
+            fieldValue = `${attendanceRecord.first_name || ""} ${
+              attendanceRecord.last_name || ""
+            }`.trim();
+        }
+
+        if (!fieldValue.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [data, dateRange, statusFilter]);
+  }, [data, dateRange, statusFilter, filterInput, searchValue]);
 
   // Create columns with checkbox (only if onSelectionChange is provided)
   const columnsWithCheckbox = onSelectionChange
@@ -357,7 +398,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
     columns: columnsWithCheckbox,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    // Remove getFilteredRowModel since we handle filtering in filteredData
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setColumnFilters,
     initialState: {
@@ -424,16 +465,12 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
             <Input
               placeholder={
                 !isMobile
-                  ? `Search by ${filterInput.split("_").join(" ")}...`
-                  : "Search..."
+                  ? `Filter by ${filterInput.split("_").join(" ")}...`
+                  : "Filter..."
               }
-              value={
-                (table.getColumn(filterInput)?.getFilterValue() as string) ?? ""
-              }
-              onChange={(event) =>
-                table.getColumn(filterInput)?.setFilterValue(event.target.value)
-              }
-              className="max-w-xs"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              className="w-sm"
               disabled={loading}
             />
             <DropdownMenu>
@@ -443,7 +480,7 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56 font-[Nunito]">
-                <DropdownMenuLabel>Search by:</DropdownMenuLabel>
+                <DropdownMenuLabel>Filter by:</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuRadioGroup
                   value={filterInput}
@@ -454,6 +491,9 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem defaultChecked value="employee_name">
                     Employee Name
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="department_position">
+                    Department / Position
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="date">
                     Date
@@ -830,7 +870,14 @@ export function ProcessTimesheetTable<TData extends AttendanceRecord, TValue>({
             size={isMobile ? "icon" : "default"}
             className="bg-accent hover:bg-accent/90 cursor-pointer"
             onClick={() => handleProcessTimesheet()}
-            disabled={loading}
+            disabled={
+              loading ||
+              isTimesheetProcessing ||
+              !onSelectionChange ||
+              selectedRecords.length === 0 ||
+              !dateRange.from ||
+              !dateRange.to
+            }
           >
             <CalendarCog />
             Process Timesheet

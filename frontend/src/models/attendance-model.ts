@@ -300,6 +300,8 @@ export interface AttendanceRecord {
   // Joined fields from employees table
   first_name?: string;
   last_name?: string;
+  position_title?: string;
+  department_name?: string;
   calculated_total_hours?: number;
   break_duration?: number; // From schedule
   start_time?: string; // From schedule

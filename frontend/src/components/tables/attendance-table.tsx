@@ -4,7 +4,6 @@ import {
   type ColumnFiltersState,
   getCoreRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
   type RowSelectionState,
@@ -72,6 +71,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
 }: AttendanceTableProps<TData, TValue>) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterInput, setFilterInput] = useState("employee_name");
+  const [searchValue, setSearchValue] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [pageIndex, setPageIndex] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -86,7 +86,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
   const isMobile = useIsMobile();
   const { fetchAttendanceRecords } = useAttendanceStore();
 
-  // Filter data based on date range and status - using useMemo to prevent unnecessary recalculations
+  // Filter data based on date range, status, and search - using useMemo to prevent unnecessary recalculations
   const filteredData = useMemo(() => {
     return data.filter((record) => {
       // Date range filter
@@ -106,9 +106,46 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
         }
       }
 
+      // Search filter
+      if (searchValue) {
+        const searchLower = searchValue.toLowerCase();
+        let fieldValue = "";
+        const attendanceRecord = record as AttendanceRecord;
+
+        switch (filterInput) {
+          case "employee_id":
+            fieldValue = attendanceRecord.employee_id?.toString() || "";
+            break;
+          case "employee_name":
+            fieldValue = `${attendanceRecord.first_name || ""} ${
+              attendanceRecord.last_name || ""
+            }`.trim();
+            break;
+          case "department_position":
+            fieldValue = `${attendanceRecord.department_name || ""} ${
+              attendanceRecord.position_title || ""
+            }`.trim();
+            break;
+          case "date":
+            fieldValue = attendanceRecord.date || "";
+            break;
+          case "status":
+            fieldValue = getAttendanceStatusText(attendanceRecord);
+            break;
+          default:
+            fieldValue = `${attendanceRecord.first_name || ""} ${
+              attendanceRecord.last_name || ""
+            }`.trim();
+        }
+
+        if (!fieldValue.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [data, dateRange, statusFilter]);
+  }, [data, dateRange, statusFilter, filterInput, searchValue]);
 
   const table = useReactTable({
     data: filteredData,
@@ -141,7 +178,7 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
     ],
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    // Remove getFilteredRowModel since we handle filtering in filteredData
     getPaginationRowModel: getPaginationRowModel(),
     onColumnFiltersChange: setColumnFilters,
     onRowSelectionChange: setRowSelection,
@@ -209,16 +246,12 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
             <Input
               placeholder={
                 !isMobile
-                  ? `Search by ${filterInput.split("_").join(" ")}...`
-                  : "Search..."
+                  ? `Filter by ${filterInput.split("_").join(" ")}...`
+                  : "Filter..."
               }
-              value={
-                (table.getColumn(filterInput)?.getFilterValue() as string) ?? ""
-              }
-              onChange={(event) =>
-                table.getColumn(filterInput)?.setFilterValue(event.target.value)
-              }
-              className="max-w-xs"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              className="w-sm"
               disabled={loading}
             />
             <DropdownMenu>
@@ -239,6 +272,9 @@ export function AttendanceTable<TData extends AttendanceRecord, TValue>({
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem defaultChecked value="employee_name">
                     Employee Name
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="department_position">
+                    Department / Position
                   </DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="date">
                     Date

@@ -71,6 +71,32 @@ export const createProcessTimesheetColumns = ({
     ),
   },
   {
+    accessorKey: "department_position",
+    id: "department_position",
+    header: "Department / Position",
+    cell: ({ row }) => {
+      const department = row.original.department_name as
+        | string
+        | null
+        | undefined;
+      const position = row.original.position_title as string | null | undefined;
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="font-medium">
+            {department || (
+              <span className="text-muted-foreground">No department</span>
+            )}
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {position || (
+              <span className="text-muted-foreground">No position</span>
+            )}
+          </span>
+        </div>
+      );
+    },
+  },
+  {
     accessorKey: "payroll_breakdown",
     id: "schedule",
     header: "Schedule",
