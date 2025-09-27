@@ -313,9 +313,14 @@ const AddEmployeeForm = ({ setOpen }: AddEmployeeFormProps) => {
               </SelectTrigger>
               <SelectContent className="">
                 <SelectItem value="hourly">Hourly</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
                 <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-                <SelectItem value="exempted">Exempted</SelectItem>
+                <SelectItem value="yearly" disabled>
+                  Yearly
+                </SelectItem>
+                <SelectItem value="exempted" disabled>
+                  Exempted
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -25,7 +25,7 @@ export const createPendingEmployee = async (req, res) => {
   try {
     // Check if the employee already exists
     const result = await pool.query(
-      "SELECT * FROM pending_employees WHERE email = $1",
+      "SELECT * FROM pending_employees WHERE email = $1 AND status != 'rejected'",
       [ei.email]
     );
 

@@ -24,7 +24,7 @@ const PendingEmployees = () => {
     setSelectedPendingEmployee(employee);
   };
 
-  const columns = pendingEmployeeColumns(
+  const { columns, approveModal } = pendingEmployeeColumns(
     setIsViewPendingEmployeeModalOpen,
     handleViewDetails
   );
@@ -68,6 +68,9 @@ const PendingEmployees = () => {
           data={pendingEmployees}
         />
       </div>
+
+      {/* Approve Employee Modal */}
+      {approveModal}
     </>
   );
 };

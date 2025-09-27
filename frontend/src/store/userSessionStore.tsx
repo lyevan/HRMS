@@ -48,7 +48,12 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
   login: (userData: User, employeeData: Employee) => {
     set({ user: userData });
     set({ employee: employeeData });
-    toast.success("Login successful!");
+    console.log("LOGIN", employeeData);
+    toast.success(
+      employeeData
+        ? `Welcome, ${employeeData.first_name} ${employeeData.last_name}!`
+        : "Login successful!"
+    );
   },
 
   logout: async () => {
@@ -74,7 +79,7 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
       "/services",
       "/pricing",
       "/testimonials",
-      "/contact", 
+      "/contact",
     ];
     const currentPath = window.location.pathname;
 
@@ -106,7 +111,11 @@ const useUserSessionStore = create<UserSessionStore>((set, get) => ({
 
       if (response.data && response.data.success) {
         // Store fresh user data from database verification
-        set({ user: response.data.user, employee: response.data.employee, isLoading: false });
+        set({
+          user: response.data.user,
+          employee: response.data.employee,
+          isLoading: false,
+        });
         if (config.isProduction) {
           console.log("Production auth success:", response.data.user.role);
         }

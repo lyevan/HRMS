@@ -54,7 +54,17 @@ export const verifyUser = async (req, res) => {
     }
 
     const employee = await pool.query(
-      "SELECT * FROM employees WHERE employee_id = $1",
+      `SELECT e.*,
+      s.schedule_name, s.start_time, s.end_time, s.break_start, s.break_end, s.break_duration, s.days_of_week,
+      p.title as position,
+      d.name as department,
+      c.start_date as hire_date
+      FROM employees e
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      LEFT JOIN contracts c ON e.contract_id = c.contract_id
+      LEFT JOIN positions p ON c.position_id = p.position_id
+      LEFT JOIN departments d ON p.department_id = d.department_id
+      WHERE e.employee_id = $1`,
       [employee_id]
     );
     if (employee.rows.length === 0) {
@@ -230,7 +240,17 @@ export const loginUser = async (req, res) => {
     const user = result.rows[0];
 
     const employee = await pool.query(
-      "SELECT * FROM employees WHERE employee_id = $1",
+      `SELECT e.*,
+      s.schedule_name, s.start_time, s.end_time, s.break_start, s.break_end, s.break_duration, s.days_of_week,
+      p.title as position,
+      d.name as department,
+      c.start_date as hire_date
+      FROM employees e
+      LEFT JOIN schedules s ON e.schedule_id = s.schedule_id
+      LEFT JOIN contracts c ON e.contract_id = c.contract_id
+      LEFT JOIN positions p ON c.position_id = p.position_id
+      LEFT JOIN departments d ON p.department_id = d.department_id
+      WHERE e.employee_id = $1`,
       [user.employee_id]
     );
 
@@ -297,6 +317,7 @@ export const loginUser = async (req, res) => {
         hire_date: employeeData.hire_date,
       },
     });
+    console.log("LoginData:", employeeData);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
     console.log("Login error:", error.message);

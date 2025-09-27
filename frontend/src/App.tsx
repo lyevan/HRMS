@@ -23,6 +23,8 @@ import FilingAndApproval from "./pages/admin/timekeeping/timesheet-management/fi
 import RawTimesheet from "./pages/admin/timekeeping/timesheet-management/raw-timesheet";
 import ProcessingTimesheet from "./pages/admin/timekeeping/timesheet-management/processing-timesheet";
 import LoanManagementPage from "./pages/LoanManagementPage";
+import EmployeeLayout from "./pages/employee/layout";
+import EmployeeUserDashboard from "./pages/employee/dashboard";
 
 function App() {
   // Validate environment variables and configure axios
@@ -221,7 +223,18 @@ function App() {
               path="/app/employee/*"
               element={
                 <ProtectedRoute requiredRole="employee">
-                  <div>Employee Dashboard - Coming Soon</div>
+                  <EmployeeLayout>
+                    <Routes>
+                      <Route
+                        path="/"
+                        element={<Navigate to="dashboard" replace />}
+                      />
+                      <Route
+                        path="dashboard"
+                        element={<EmployeeUserDashboard />}
+                      />
+                    </Routes>
+                  </EmployeeLayout>
                 </ProtectedRoute>
               }
             />

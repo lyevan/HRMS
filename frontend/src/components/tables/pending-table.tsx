@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  RefreshCcw,
 } from "lucide-react";
 
 import {
@@ -44,6 +45,10 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 // import { type DateRange } from "react-day-picker";
 // import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  useFetchPendingEmployees,
+  usePendingEmployeeLoading,
+} from "@/store/pendingEmployeeStore";
 
 interface EmployeeTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -66,6 +71,9 @@ export function PendingEmployeeTable<TData, TValue>({
   //     from: new Date(2025, 8, 15),
   //     to: new Date(2025, 9, 6),
   //   });
+
+  const fetchPendingEmployees = useFetchPendingEmployees();
+  const fetchLoading = usePendingEmployeeLoading();
 
   // Filter data based on showRejected state
   const filteredData = showRejected
@@ -195,6 +203,13 @@ export function PendingEmployeeTable<TData, TValue>({
             <Calendar />
             {!isMobile && "Date Range"}
           </Button>
+          <Button
+            size={"icon"}
+            onClick={() => fetchPendingEmployees(true)}
+            disabled={fetchLoading}
+          >
+            <RefreshCcw />
+          </Button>
         </div>
       </div>
       <div className="overflow-hidden rounded-md border border-muted-foreground/30 font-[Nunito]">
@@ -218,7 +233,16 @@ export function PendingEmployeeTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {fetchLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
